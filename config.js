@@ -1,4 +1,4 @@
 window.KG_CONFIG = {
-  supabaseUrl: 'https://cfbnotlhpfviigeveloz.supabase.co/rest/v1/',
+  supabaseUrl: 'https://cfbnotlhpfviigeveloz.supabase.co',
   supabasePublishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmYm5vdGxocGZ2aWlnZXZlbG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzIyOTIsImV4cCI6MjA5NzMwODI5Mn0.iuDHvrizHYFteNP5dEn1VyeZpRnhkDMGXboZSyT9mXw',
 }
