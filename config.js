@@ -1,4 +1,4 @@
 window.KG_CONFIG = {
-  supabaseUrl: 'PASTE_SUPABASE_URL_HERE',
-  supabasePublishableKey: 'PASTE_SUPABASE_PUBLISHABLE_KEY_HERE',
+  supabaseUrl: 'https://cfbnotlhpfviigeveloz.supabase.co/rest/v1/',
+  supabasePublishableKey: 'sb_publishable_yhZZ7cR_-TViGpONze8WKA_QSSPdZEt',
 }
