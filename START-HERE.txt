@@ -1,0 +1,70 @@
+KG OPERATIONS PLANNER — FIX FOR EMPTY WEBSITE
+
+IMPORTANT
+Upload the FILES, not the ZIP file.
+Do not upload an extra folder into GitHub.
+
+PART 1 — REMOVE THE OLD WEBSITE FILES
+1. Open your GitHub repository.
+2. Delete the old index.html, config.js and assets folder.
+3. Make sure you are on the main branch.
+
+PART 2 — UPLOAD THE NEW FILES
+1. Extract kg-operations-planner-fixed-blank.zip on your computer.
+2. Open the extracted folder.
+3. You will see:
+   - index.html
+   - config.js
+   - 1-DATABASE.sql
+   - 2-USER-FUNCTION.ts
+   - START-HERE.txt
+4. Select all these files.
+5. Drag the selected FILES into the main page of your GitHub repository.
+6. Press Commit changes.
+
+VERY IMPORTANT
+When you look at the GitHub repository main page, you must immediately see:
+index.html
+config.js
+
+They must NOT be inside another folder.
+There is no assets folder in this fixed version.
+
+PART 3 — ADD SUPABASE DETAILS
+1. In GitHub, press config.js.
+2. Press the pencil Edit button.
+3. Replace PASTE_SUPABASE_URL_HERE with your Supabase Project URL.
+4. Replace PASTE_SUPABASE_PUBLISHABLE_KEY_HERE with your Supabase publishable key.
+5. Do not remove the quote marks.
+6. Press Commit changes.
+
+Correct example:
+window.KG_CONFIG = {
+  supabaseUrl: 'https://abc123.supabase.co',
+  supabasePublishableKey: 'sb_publishable_ABC123',
+}
+
+PART 4 — GITHUB PAGES
+1. Repository → Settings.
+2. Pages.
+3. Source: Deploy from a branch.
+4. Branch: main.
+5. Folder: /(root).
+6. Save.
+
+Do not use Actions.
+
+PART 5 — REFRESH
+1. Open the GitHub Pages website.
+2. Press Ctrl + F5 on Windows.
+3. On phone, close the browser tab and open the website again.
+
+DEFAULT ADMIN
+Email: kgchesterlee@gmail.com
+Password: KGadmin123!
+
+After login, open My Login and change the password.
+
+IF YOU STILL SEE NOTHING
+On the GitHub repository main page, check that index.html and config.js are shown directly.
+If they are inside a folder, move/upload them to the main root.
