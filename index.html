@@ -35848,8 +35848,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
           const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean);
-          if (!v.length) continue;
           const x = kgAssignmentLorries(m), p = x.length ? x : [null];
+          // Copy 1 rule: show a site when it has workers OR lorry.
+          // Do not show if it only has foreman and no lorry/worker.
+          if (!v.length && !x.length) continue;
           for (const g of p) {
             const S = g && g.id ? `lorry-${g.id}` : "unassigned";
             (l.has(S) || l.set(S, { lorry: g, items: [] }), l.get(S).items.push({ assignment: m, workers: v }));
@@ -35862,7 +35864,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 p = v.map(({ assignment: g, workers: S }) => {
                   var E;
                   const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
-                  return `* ${Ca((E = g.site) == null ? void 0 : E.address)}${w} - ${S.join(" + ")}`;
+                  const k = Ca((E = g.site) == null ? void 0 : E.address);
+                  return S.length ? `* ${k}${w} - ${S.join(" + ")}` : `* ${k}${w}`;
                 });
               return [x, ...p].join(`
 `);
@@ -36599,7 +36602,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1: lorry @ driver, address and workers. Copy 2: only sites with foremen. Edit the copy box before copying if needed.",
+                        "Copy 1: shows sites with workers or lorry. Foreman-only sites are skipped. Copy 2: only sites with foremen. Edit the copy box before copying if needed.",
                     }),
                   ],
                 }),
@@ -36779,90 +36782,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     }),
                   ],
                 }),
-                d.jsx("aside", {
-                  className: "side-stack",
-                  style: { display: "none" },
-                  children: d.jsxs("section", {
-                    className: "panel compact-panel",
-                    children: [
-                      d.jsxs("div", {
-                        className: "panel-heading",
-                        children: [
-                          d.jsxs("div", {
-                            children: [
-                              d.jsx("h2", {
-                                children: "Extra Copy 1 sections",
-                              }),
-                              d.jsx("span", {
-                                children: "Warehouse, Hougang or other notes",
-                              }),
-                            ],
-                          }),
-                          r &&
-                            d.jsx("button", {
-                              className: "icon-button",
-                              onClick: () => {
-                                (D("new"), L({ title: "", body: "" }));
-                              },
-                              children: d.jsx(ti, { size: 17 }),
-                            }),
-                        ],
-                      }),
-                      d.jsx("div", {
-                        className: "mini-list",
-                        children:
-                          c.length === 0
-                            ? d.jsx("div", {
-                                className: "empty-state small",
-                                children: "No extra sections.",
-                              })
-                            : c.map((V) =>
-                                d.jsxs(
-                                  "div",
-                                  {
-                                    className: "section-row",
-                                    children: [
-                                      d.jsxs("div", {
-                                        children: [
-                                          d.jsx("strong", {
-                                            children: V.title,
-                                          }),
-                                          d.jsx("pre", { children: V.body }),
-                                        ],
-                                      }),
-                                      r &&
-                                        d.jsxs("div", {
-                                          className: "card-actions",
-                                          children: [
-                                            d.jsx("button", {
-                                              className: "icon-button",
-                                              onClick: () => {
-                                                (D(V.id),
-                                                  L({
-                                                    title: V.title,
-                                                    body: V.body,
-                                                  }));
-                                              },
-                                              children: d.jsx(Ds, { size: 15 }),
-                                            }),
-                                            d.jsx("button", {
-                                              className: "icon-button danger",
-                                              onClick: () => ue(V.id),
-                                              children: d.jsx(N0, { size: 15 }),
-                                            }),
-                                          ],
-                                        }),
-                                    ],
-                                  },
-                                  V.id,
-                                ),
-                              ),
-                      }),
-                    ],
-                  }),
-                }),
-              ],
-            }),
+                null,
             S &&
               d.jsx(hl, {
                 title:
@@ -39631,19 +39551,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         setInterval(kgAddCopyPanel, 800);
         window.addEventListener("hashchange", kgAddCopyPanel);
         window.addEventListener("popstate", kgAddCopyPanel);
-      })();
-
-      (function KgHideExtraCopy1Sections() {
-        function hide() {
-          document.querySelectorAll("section.panel").forEach((el) => {
-            const h2 = el.querySelector("h2");
-            if (h2 && h2.textContent && h2.textContent.trim() === "Extra Copy 1 sections") el.style.display = "none";
-          });
-        }
-        setInterval(hide, 800);
-        window.addEventListener("hashchange", hide);
-        window.addEventListener("popstate", hide);
-        setTimeout(hide, 300);
       })();
 
       c_.createRoot(document.getElementById("root")).render(
