@@ -16262,6 +16262,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                           d.jsx("span", { children: "All Users" }),
                         ],
                       }),
+                    t.role === "admin" &&
+                      d.jsxs(Ho, {
+                        to: "/backlog",
+                        className: ({ isActive: s }) =>
+                          s ? "nav-link active" : "nav-link",
+                        children: [
+                          d.jsx(Ds, { size: 19 }),
+                          d.jsx("span", { children: "Backlog" }),
+                        ],
+                      }),
                   ],
                 }),
                 d.jsxs("div", {
@@ -16478,10 +16488,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }).format(Number(t || 0));
       }
       const _s = `
-  id, plan_date, shift, notes, sort_order,
+  id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed,
   site:sites(id,address,status),
   lorry:lorries(id,registration_no,driver_name),
-  assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status)),
+  assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status))
 `,
         w0 = `
@@ -33877,21 +33887,20 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         );
       }
       function wv(t) {
-        return t.map((r) => {
-          var n, l, s;
+        return kgSortAssignmentsByLorry(t).map((r) => {
+          var n;
           return {
             Date: r.plan_date,
             Address: ((n = r.site) == null ? void 0 : n.address) || "",
             Shift: r.shift || "",
-            Lorry: ((l = r.lorry) == null ? void 0 : l.registration_no) || "",
-            Driver: ((s = r.lorry) == null ? void 0 : s.driver_name) || "",
-            Foremen: typeof kgForemanNames == "function" ? kgForemanNames(r) : ar(r).map((f) => kgNameNick(f)).join(" + "),
+            Lorry: kgLorryExcel(r.lorry),
+            Foremen: kgForemanNames(r),
             "Foreman shifts": ar(r).length,
-            Workers: typeof kgWorkerNames == "function" ? kgWorkerNames(r) : (r.assignment_workers || [])
-              .map((f) => kgNameNick(f.worker))
-              .filter(Boolean)
-              .join(" + "),
+            Workers: kgWorkerNames(r),
             "Worker shifts": (r.assignment_workers || []).length,
+            "Job status": r.job_status || "",
+            PIC: r.pic || "",
+            Confirmed: r.is_confirmed ? "Yes" : "No",
             Notes: r.notes || "",
           };
         });
@@ -35466,6 +35475,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const kgWorkerNames = (t) =>
         kgJoinNames((t.assignment_workers || []).map((r) => r.worker));
       const kgForemanNames = (t) => kgJoinNames(ar(t));
+      const kgWeekDay = (t) => {
+        const r = new Date(`${t}T12:00:00+08:00`).getDay();
+        return ["Sun", "Mon", "Tues", "Wed", "Thu", "Fri", "Sat"][r] || "";
+      };
+      const kgCopyDate = (t) => `${cp(t)} (${kgWeekDay(t)})`;
+      const kgExcelDate = (t) => cp(t).replaceAll(".", "/");
+      const kgShortHistoryDate = (t) => `${cp(t).slice(0, 5)} (${kgWeekDay(t)})`;
       const kgLorryCopy = (t) =>
         t
           ? `${Ca(t.registration_no)} @${Ca(t.driver_name, "No driver")}`
@@ -35475,34 +35491,61 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           ? `${Ca(t.registration_no, "")}${t.driver_name ? ` (${Ca(t.driver_name, "")})` : ""}`
           : "";
       const kgCleanExtraLine = (t) => String(t || "").replace(/^[-*•]\s*/, "").trim();
+      const kgSortAssignmentsByLorry = (t) =>
+        [...(t || [])].sort((r, n) => {
+          var l, s, f, c;
+          const m = (l = r.lorry) == null ? void 0 : l.registration_no,
+            v = (s = n.lorry) == null ? void 0 : s.registration_no;
+          if (!!m !== !!v) return m ? -1 : 1;
+          const x = Ca(m, "ZZZ").localeCompare(Ca(v, "ZZZ"), void 0, { numeric: !0, sensitivity: "base" });
+          if (x) return x;
+          return Ca((f = r.site) == null ? void 0 : f.address).localeCompare(Ca((c = n.site) == null ? void 0 : c.address), void 0, { numeric: !0, sensitivity: "base" });
+        });
+      const kgBuildRankMap = (t) => {
+        const r = new Map(), n = new Map();
+        for (const l of t || []) {
+          for (const s of l.assignment_workers || []) {
+            const f = Number(s.worker_id);
+            if (!r.has(f)) r.set(f, []);
+            r.get(f).push(l.id);
+          }
+          for (const s of l.assignment_foremen || []) {
+            const f = Number(s.foreman_id);
+            if (!n.has(f)) n.set(f, []);
+            n.get(f).push(l.id);
+          }
+        }
+        const l = new Map();
+        for (const [s, f] of r.entries()) f.length > 1 && f.forEach((c, m) => l.set(`w:${s}:${c}`, m + 1));
+        for (const [s, f] of n.entries()) f.length > 1 && f.forEach((c, m) => l.set(`f:${s}:${c}`, m + 1));
+        return l;
+      };
+      const kgWorkerNamesForAssignment = (t, r) =>
+        (t.assignment_workers || []).map((n) => {
+          const l = kgNameNick(n.worker), s = r == null ? void 0 : r.get(`w:${Number(n.worker_id)}:${t.id}`);
+          return l ? `${l}${s ? ` (${s})` : ""}` : "";
+        }).filter(Boolean);
+      const kgForemanNamesForAssignment = (t, r) =>
+        (t.assignment_foremen || []).map((n) => {
+          const l = kgNameNick(n.foreman), s = r == null ? void 0 : r.get(`f:${Number(n.foreman_id)}:${t.id}`);
+          return l ? `${l}${s ? ` (${s})` : ""}` : "";
+        }).filter(Boolean);
       const kgDailyExcelRows = (t, r = []) => {
-        const n = (t || []).map((l) => {
+        const n = kgSortAssignmentsByLorry(t).map((l) => {
           var s;
           return {
             Lorry: kgLorryExcel(l.lorry),
             Workers: kgWorkerNames(l),
             Foremen: kgForemanNames(l),
-            Date: D0(l.plan_date),
+            Date: kgExcelDate(l.plan_date),
             "Job status": l.job_status || l.jobStatus || "",
             PIC: l.pic || l.pic_name || l.picName || "",
             Address: Ca((s = l.site) == null ? void 0 : s.address, ""),
           };
         });
         for (const l of r || []) {
-          const s = String(l.body || "")
-            .split(`
-`)
-            .map(kgCleanExtraLine)
-            .filter(Boolean);
-          n.push({
-            Lorry: "",
-            Workers: s.join(" + "),
-            Foremen: "",
-            Date: l.plan_date ? D0(l.plan_date) : "",
-            "Job status": "EXTRA",
-            PIC: "",
-            Address: Ca(l.title, ""),
-          });
+          const s = String(l.body || "").split("\n").map(kgCleanExtraLine).filter(Boolean);
+          n.push({ Lorry: "", Workers: s.join(" + "), Foremen: "", Date: l.plan_date ? kgExcelDate(l.plan_date) : "", "Job status": "EXTRA", PIC: "", Address: Ca(l.title, "") });
         }
         return n;
       };
@@ -35516,102 +35559,52 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function mC(t, r, n = []) {
         var c;
         const l = new Map();
-        for (const m of r) {
+        for (const m of kgSortAssignmentsByLorry(r)) {
           if (!(m.assignment_workers || []).length) continue;
           const v = ((c = m.lorry) == null ? void 0 : c.id) || "unassigned";
-          (l.has(v) || l.set(v, { lorry: m.lorry, items: [] }),
-            l.get(v).items.push(m));
+          (l.has(v) || l.set(v, { lorry: m.lorry, items: [] }), l.get(v).items.push(m));
         }
-        const s = [...l.values()]
-            .sort((m, v) => {
-              var x, p;
-              return Ca(
-                (x = m.lorry) == null ? void 0 : x.registration_no,
-                "ZZZ",
-              ).localeCompare(
-                Ca((p = v.lorry) == null ? void 0 : p.registration_no, "ZZZ"),
-                void 0,
-                { numeric: !0 },
-              );
-            })
-            .map(({ lorry: m, items: v }) => {
-              const x = kgLorryCopy(m),
-                p = v.map((g) => {
-                  var w;
-                  const S = kgWorkerNames(g),
-                    E = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
-                  return `* ${Ca((w = g.site) == null ? void 0 : w.address)}${E} - ${S}`;
-                });
-              return [x, ...p].join(`
-`);
-            }),
-          f = n.map((m) => {
-            const v = String(m.body || "")
-              .split(`
-`)
-              .map(kgCleanExtraLine)
-              .filter(Boolean);
-            return [m.title, ...v.map((x) => `* ${x}`)].filter(Boolean).join(`
-`);
+        const s = [...l.values()].map(({ lorry: m, items: v }) => {
+          const x = kgLorryCopy(m), p = v.map((g) => {
+            var w;
+            const S = kgWorkerNames(g), E = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
+            return `* ${Ca((w = g.site) == null ? void 0 : w.address)}${E} - ${S}`;
           });
-        return [`${cp(t)} - Jobs`, ...s, ...f].filter(Boolean).join(`
-
-`);
+          return [`*${x}*`, ...p].join("\n");
+        }),
+        f = n.map((m) => {
+          const v = String(m.body || "").split("\n").map(kgCleanExtraLine).filter(Boolean);
+          return [m.title, ...v.map((x) => `* ${x}`)].filter(Boolean).join("\n");
+        });
+        return [`*${kgCopyDate(t)} - Job*`, ...s, ...f].filter(Boolean).join("\n\n");
       }
       function xC(t, r) {
-        const n = [...r]
-          .sort((l, s) => {
-            var f, c;
-            return Ca((f = l.site) == null ? void 0 : f.address).localeCompare(
-              Ca((c = s.site) == null ? void 0 : c.address),
-            );
-          })
-          .map((l) => {
-            var f;
-            const s = kgForemanNames(l) || "No foreman assigned";
-            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s}`;
-          });
-        return [`${cp(t)} - foreman`, ...n].join(`
-`);
+        const n = kgSortAssignmentsByLorry(r).filter((l) => ar(l).length > 0).map((l) => {
+          var s;
+          const f = kgForemanNames(l), c = (l.assignment_workers || []).length;
+          return `* ${Ca((s = l.site) == null ? void 0 : s.address)} - ${f} (${c} worker${c === 1 ? "" : "s"})`;
+        });
+        return [`*${kgCopyDate(t)} - Foreman*`, ...n].join("\n");
       }
       async function vC(t) {
         let r = !1;
-        async function n() {
-          try {
-            (navigator.clipboard && (await navigator.clipboard.writeText(t)),
-              (r = !0));
-          } catch {}
+        async function n(l) {
+          try { (navigator.clipboard && (await navigator.clipboard.writeText(l)), (r = !0)); } catch {}
           try {
             const s = document.createElement("textarea");
-            ((s.value = t),
-              (s.style.position = "fixed"),
-              (s.style.left = "-9999px"),
-              (s.style.top = "0"),
-              document.body.appendChild(s),
-              s.focus(),
-              s.select(),
-              document.execCommand("copy"),
-              document.body.removeChild(s),
-              (r = !0));
+            ((s.value = l), (s.style.position = "fixed"), (s.style.left = "-9999px"), (s.style.top = "0"), document.body.appendChild(s), s.focus(), s.select(), document.execCommand("copy"), document.body.removeChild(s), (r = !0));
           } catch {}
         }
-        await n();
+        await n(t);
         const l = document.createElement("div");
-        l.style.cssText =
-          "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px";
-        l.innerHTML = `<div style="background:white;border-radius:22px;max-width:760px;width:100%;box-shadow:0 24px 80px rgba(15,23,42,.35);padding:18px;font-family:Arial,sans-serif"><h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Copy text ready</h2><p style="margin:0 0 12px;color:#475569;font-size:14px">If WhatsApp paste is empty, press Copy again or hold inside the box and select all.</p><textarea id="kg-copy-box" style="width:100%;height:360px;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;line-height:1.45;white-space:pre-wrap">${t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</textarea><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap"><button id="kg-copy-again" style="border:0;border-radius:999px;background:#f97316;color:white;font-weight:700;padding:10px 16px">Copy again</button><button id="kg-copy-close" style="border:1px solid #cbd5e1;border-radius:999px;background:white;color:#0f172a;font-weight:700;padding:10px 16px">Close</button></div><div style="margin-top:8px;color:${r ? "#166534" : "#b45309"};font-size:13px">${r ? "Copied to clipboard. You can also copy manually from the box." : "Auto-copy may be blocked. Copy manually from the box."}</div></div>`;
+        l.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px";
+        l.innerHTML = `<div style="background:white;border-radius:22px;max-width:760px;width:100%;box-shadow:0 24px 80px rgba(15,23,42,.35);padding:18px;font-family:Arial,sans-serif"><h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Copy text ready</h2><p style="margin:0 0 12px;color:#475569;font-size:14px">You can edit this box first. Copy again will copy exactly what is inside this box.</p><textarea id="kg-copy-box" style="width:100%;height:360px;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;line-height:1.45;white-space:pre-wrap">${t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</textarea><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap"><button id="kg-copy-again" style="border:0;border-radius:999px;background:#f97316;color:white;font-weight:700;padding:10px 16px">Copy again</button><button id="kg-copy-wa" style="border:0;border-radius:999px;background:#22c55e;color:white;font-weight:700;padding:10px 16px">Open WhatsApp</button><button id="kg-copy-close" style="border:1px solid #cbd5e1;border-radius:999px;background:white;color:#0f172a;font-weight:700;padding:10px 16px">Close</button></div><div id="kg-copy-status" style="margin-top:8px;color:${r ? "#166534" : "#b45309"};font-size:13px">${r ? "Copied to clipboard. You can edit then press Copy again." : "Auto-copy may be blocked. Edit/copy manually from the box."}</div></div>`;
         document.body.appendChild(l);
-        const s = l.querySelector("#kg-copy-box");
-        setTimeout(() => {
-          s.focus();
-          s.select();
-        }, 80);
+        const s = l.querySelector("#kg-copy-box"), f = l.querySelector("#kg-copy-status");
+        setTimeout(() => { s.focus(); s.select(); }, 80);
         l.querySelector("#kg-copy-close").onclick = () => l.remove();
-        l.querySelector("#kg-copy-again").onclick = async () => {
-          s.focus();
-          s.select();
-          await n();
-        };
+        l.querySelector("#kg-copy-again").onclick = async () => { s.focus(); s.select(); await n(s.value); f.textContent = "Copied edited text from the box."; f.style.color = "#166534"; };
+        l.querySelector("#kg-copy-wa").onclick = () => window.open(`https://wa.me/?text=${encodeURIComponent(s.value)}`, "_blank", "noopener,noreferrer");
       }
       function hl({ title: t, children: r, onClose: n }) {
         return d.jsx("div", {
@@ -35645,6 +35638,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         lorry_id: "",
         foreman_ids: [],
         shift: "day",
+        job_status: "NEW",
+        pic: "",
+        is_confirmed: !1,
         notes: "",
         worker_ids: [],
       };
@@ -35667,6 +35663,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [I, L] = q.useState({ title: "", body: "" }),
           [W, he] = q.useState(""),
           [J, j] = q.useState(""),
+          [kgHistory, kgSetHistory] = q.useState([]),
           [fe, G] = q.useState(!0);
         async function de() {
           const V = await sh();
@@ -35707,7 +35704,23 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }, []),
           q.useEffect(() => {
             oe();
-          }, [n]));
+          }, [n]),
+          q.useEffect(() => {
+            async function V() {
+              if (!S || !w.site_id) {
+                kgSetHistory([]);
+                return;
+              }
+              const { data: xe } = await qe
+                .from("site_assignments")
+                .select(_s)
+                .eq("site_id", Number(w.site_id))
+                .order("plan_date", { ascending: !1 })
+                .limit(30);
+              kgSetHistory(xe || []);
+            }
+            V();
+          }, [S, w.site_id, n]));
         const ge = q.useMemo(() => Go(s), [s]),
           Ne = q.useMemo(() => op(s), [s]),
           Ye = q.useMemo(
@@ -35759,7 +35772,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               ).size,
             }),
             [s, ge],
-          );
+          ),
+          kgRows = q.useMemo(() => kgSortAssignmentsByLorry(s), [s]),
+          kgRankMap = q.useMemo(() => kgBuildRankMap(kgRows), [kgRows]);
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
@@ -35775,6 +35790,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 (ke = V.lorry) != null && ke.id ? String(V.lorry.id) : "",
               foreman_ids: ar(V).map((Le) => Number(Le.id)),
               shift: V.shift || "day",
+              job_status: V.job_status || "NEW",
+              pic: V.pic || "",
+              is_confirmed: V.is_confirmed === !0,
               notes: V.notes || "",
               worker_ids: (V.assignment_workers || []).map((Le) =>
                 Number(Le.worker_id),
@@ -35803,20 +35821,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           const V = [];
           for (const xe of w.worker_ids) {
             const ke = p.workers.find((Qe) => Number(Qe.id) === Number(xe)),
-              Le = s.filter(
-                (Qe) =>
-                  Qe.id !== S &&
-                  (Qe.assignment_workers || []).some(
-                    (Ve) => Number(Ve.worker_id) === Number(xe),
-                  ),
-              );
-            Le.length &&
-              V.push(
-                `${kgNameNick(ke) || "Worker"} is already at ${Le.map((Qe) => {
-                  var Ve;
-                  return `${(Ve = Qe.site) == null ? void 0 : Ve.address} (${Qe.shift})`;
-                }).join(", ")}`,
-              );
+              Le = s.filter((Qe) => Qe.id !== S && (Qe.assignment_workers || []).some((Ve) => Number(Ve.worker_id) === Number(xe)));
+            Le.length && V.push(`${kgNameNick(ke) || "Worker"} is already at ${Le.map((Qe) => { var Ve; return `${(Ve = Qe.site) == null ? void 0 : Ve.address} (${Qe.shift})`; }).join(", ")}`);
+          }
+          for (const xe of w.foreman_ids) {
+            const ke = p.foremen.find((Qe) => Number(Qe.id) === Number(xe)),
+              Le = s.filter((Qe) => Qe.id !== S && (Qe.assignment_foremen || []).some((Ve) => Number(Ve.foreman_id) === Number(xe)));
+            Le.length && V.push(`${kgNameNick(ke) || "Foreman"} is already at ${Le.map((Qe) => { var Ve; return `${(Ve = Qe.site) == null ? void 0 : Ve.address} (${Qe.shift})`; }).join(", ")}`);
           }
           return V;
         }
@@ -35839,6 +35850,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             lorry_id: w.lorry_id ? Number(w.lorry_id) : null,
             foreman_id: w.foreman_ids.length ? Number(w.foreman_ids[0]) : null,
             shift: w.shift,
+            job_status: w.job_status || "NEW",
+            pic: w.pic || null,
+            is_confirmed: w.is_confirmed === !0,
             notes: w.notes || null,
           };
           let Le = S;
@@ -35890,7 +35904,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             await oe(),
             He(
               xe.length
-                ? "Saved. Duplicate worker assignment confirmed."
+                ? "Saved. Duplicate worker/foreman assignment confirmed."
                 : "Assignment saved.",
             ));
         }
@@ -36209,7 +36223,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1: lorry @ driver, address and workers. Copy 2: sites and foremen. Build Copy1 manual fix.",
+                        "Copy 1: bold date/lorry, address and workers only. Copy 2: only sites with foremen and worker count.",
                     }),
                   ],
                 }),
@@ -36277,26 +36291,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "empty-state",
                               children: "No assignments for this day.",
                             })
-                          : s.map((V) => {
+                          : kgRows.map((V) => {
                               var Qe, Ve;
-                              const xe = (V.assignment_workers || [])
-                                  .map((Re) => {
-                                    var At;
-                                    return kgNameNick(Re.worker);
-                                  })
-                                  .filter(Boolean),
-                                ke = ar(V)
-                                  .map((Re) => kgNameNick(Re))
-                                  .filter(Boolean),
+                              const xe = kgWorkerNamesForAssignment(V, kgRankMap),
+                                ke = kgForemanNamesForAssignment(V, kgRankMap),
                                 Le = Te.has(
                                   Number(
                                     (Qe = V.site) == null ? void 0 : Qe.id,
                                   ),
-                                );
+                                ),
+                                kgConfirmed = V.is_confirmed === !0;
                               return d.jsxs(
                                 "article",
                                 {
-                                  className: "assignment-card",
+                                  className: `assignment-card ${kgConfirmed ? "site-confirmed" : ""}`,
                                   children: [
                                     d.jsxs("div", {
                                       className: "assignment-main",
@@ -36315,6 +36323,15 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               className: "shift-pill",
                                               children: V.shift,
                                             }),
+                                            d.jsx("span", {
+                                              className: "status-pill",
+                                              children: V.job_status || "NEW",
+                                            }),
+                                            kgConfirmed &&
+                                              d.jsx("span", {
+                                                className: "confirm-pill",
+                                                children: "CONFIRM",
+                                              }),
                                             d.jsxs("span", {
                                               className: `do-pill ${Le ? "sent" : "not-sent"}`,
                                               children: [
@@ -36339,7 +36356,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               children: [
                                                 d.jsx(ei, { size: 15 }),
                                                 ke.length
-                                                  ? ke.join(", ")
+                                                  ? ke.join(" + ")
                                                   : "No foreman",
                                                 " · ",
                                                 ke.length,
@@ -36351,7 +36368,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               children: [
                                                 d.jsx(Rs, { size: 15 }),
                                                 xe.length
-                                                  ? xe.join(", ")
+                                                  ? xe.join(" + ")
                                                   : "No workers",
                                                 " · ",
                                                 xe.length,
@@ -36359,6 +36376,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                 xe.length === 1 ? "" : "s",
                                               ],
                                             }),
+                                            V.pic &&
+                                              d.jsxs("span", {
+                                                children: ["P.I.C.: ", V.pic],
+                                              }),
                                           ],
                                         }),
                                         V.notes &&
@@ -36508,6 +36529,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
+                    w.site_id &&
+                      d.jsxs("div", {
+                        className: "site-history-box wide",
+                        children: [
+                          d.jsx("strong", { children: "This site previous workers / foremen" }),
+                          kgHistory.length === 0
+                            ? d.jsx("span", { children: "No previous planner history found." })
+                            : kgHistory.slice(0, 8).map((V) =>
+                                d.jsxs("div", { className: "site-history-row", children: [
+                                  d.jsxs("b", { children: [kgShortHistoryDate(V.plan_date), V.pic ? ` · P.I.C.: ${V.pic}` : ""] }),
+                                  d.jsxs("span", { children: ["Foreman: ", kgForemanNames(V) || "-"] }),
+                                  d.jsxs("span", { children: ["Worker: ", kgWorkerNames(V) || "-"] }),
+                                ]}, V.id),
+                              ),
+                        ],
+                      }),
                     d.jsxs("label", {
                       children: [
                         "Shift",
@@ -36528,7 +36565,37 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     }),
                     d.jsxs("label", {
                       children: [
+                        "Job status",
+                        d.jsxs("select", {
+                          value: w.job_status,
+                          onChange: (V) => _({ ...w, job_status: V.target.value }),
+                          children: [
+                            d.jsx("option", { value: "NEW", children: "NEW" }),
+                            d.jsx("option", { value: "CONTINUE JOB", children: "CONTINUE JOB" }),
+                            d.jsx("option", { value: "TOUCH UP", children: "TOUCH UP" }),
+                          ],
+                        }),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      children: [
+                        "P.I.C.",
+                        d.jsx("input", { value: w.pic, onChange: (V) => _({ ...w, pic: V.target.value }), placeholder: "Wei Yee" }),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      children: [
+                        "Site confirm",
+                        d.jsxs("div", { className: "check-card", children: [
+                          d.jsx("input", { type: "checkbox", checked: w.is_confirmed, onChange: (V) => _({ ...w, is_confirmed: V.target.checked }) }),
+                          d.jsx("span", { children: "Highlight this site as confirmed" }),
+                        ]}),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      children: [
                         "Lorry",
+                        d.jsx("span", { className: "field-help block", children: "Need 2 lorries for same site? Save this site once, then add the same site again with another lorry." }),
                         d.jsxs("select", {
                           value: w.lorry_id,
                           onChange: (V) =>
@@ -36565,27 +36632,64 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           children:
                             "Select one or more foremen for the same site.",
                         }),
-                        d.jsx("div", {
-                          className: "check-grid",
-                          children: p.foremen.map((V) =>
-                            d.jsxs(
-                              "label",
-                              {
-                                className: "check-card",
-                                children: [
-                                  d.jsx("input", {
-                                    type: "checkbox",
-                                    checked: w.foreman_ids.includes(
-                                      Number(V.id),
+                        d.jsxs("div", {
+                          className: "foreman-type-wrap",
+                          children: [
+                            d.jsxs("div", {
+                              className: "foreman-type-block",
+                              children: [
+                                d.jsx("strong", { children: "Boss foreman" }),
+                                d.jsx("span", { className: "field-help block", children: "Boss foreman list. Tick or untick anytime to interchange." }),
+                                d.jsx("div", {
+                                  className: "check-grid",
+                                  children: p.foremen.filter((V) => V.foreman_type === "boss").map((V) =>
+                                    d.jsxs(
+                                      "label",
+                                      {
+                                        className: "check-card",
+                                        children: [
+                                          d.jsx("input", {
+                                            type: "checkbox",
+                                            checked: w.foreman_ids.includes(Number(V.id)),
+                                            onChange: () => z(V.id),
+                                          }),
+                                          d.jsxs("span", { children: [kgNameNick(V), " · Boss"] }),
+                                        ],
+                                      },
+                                      V.id,
                                     ),
-                                    onChange: () => z(V.id),
-                                  }),
-                                  d.jsx("span", { children: kgNameNick(V) }),
-                                ],
-                              },
-                              V.id,
-                            ),
-                          ),
+                                  ),
+                                }),
+                              ],
+                            }),
+                            d.jsxs("div", {
+                              className: "foreman-type-block",
+                              children: [
+                                d.jsx("strong", { children: "Project foreman" }),
+                                d.jsx("span", { className: "field-help block", children: "Project foreman list. Same person can be changed from Foremen master page." }),
+                                d.jsx("div", {
+                                  className: "check-grid",
+                                  children: p.foremen.filter((V) => V.foreman_type !== "boss").map((V) =>
+                                    d.jsxs(
+                                      "label",
+                                      {
+                                        className: "check-card",
+                                        children: [
+                                          d.jsx("input", {
+                                            type: "checkbox",
+                                            checked: w.foreman_ids.includes(Number(V.id)),
+                                            onChange: () => z(V.id),
+                                          }),
+                                          d.jsxs("span", { children: [kgNameNick(V), " · Project"] }),
+                                        ],
+                                      },
+                                      V.id,
+                                    ),
+                                  ),
+                                }),
+                              ],
+                            }),
+                          ],
                         }),
                       ],
                     }),
@@ -37953,7 +38057,24 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           ],
         });
       }
-      const bv = { username: "", full_name: "", password: "", role: "basic" },
+      
+      function kgBacklogPage() {
+        const [t, r] = q.useState([]), [n, l] = q.useState(!0), [s, f] = q.useState("");
+        async function c() {
+          (l(!0), f(""));
+          const { data: m, error: v } = await qe.from("edit_backlog").select("*").order("created_at", { ascending: !1 }).limit(200);
+          (v ? f(v.message) : r(m || []), l(!1));
+        }
+        return (q.useEffect(() => { c(); }, []), d.jsxs("div", { className: "page", children: [
+          d.jsxs("header", { className: "page-header", children: [
+            d.jsxs("div", { children: [d.jsx("p", { className: "eyebrow", children: "Admin only" }), d.jsx("h1", { children: "Edit Backlog" }), d.jsx("p", { children: "Shows who edited planner and master data. Only admin can view this page." })] }),
+            d.jsx("button", { className: "secondary-button", onClick: c, children: "Refresh" }),
+          ]}),
+          s && d.jsx("div", { className: "error-box", children: s }),
+          n ? d.jsx("div", { className: "empty-state", children: "Loading backlog…" }) : t.length === 0 ? d.jsx("div", { className: "empty-state", children: "No backlog records yet." }) : d.jsx("div", { className: "grid-list", children: t.map((m) => d.jsxs("article", { className: "backlog-card", children: [d.jsxs("strong", { children: [m.action, " · ", m.table_name] }), d.jsxs("small", { children: [new Date(m.created_at).toLocaleString(), " · ", m.username || "unknown", " · ", m.role || ""] }), m.record_id && d.jsxs("small", { children: ["Record: ", m.record_id] }), d.jsx("pre", { children: JSON.stringify(m.details || {}, null, 2) })] }, m.id)) }),
+        ]}));
+      }
+const bv = { username: "", full_name: "", password: "", role: "basic" },
         Ov = {
           id: "",
           username: "",
@@ -38578,6 +38699,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           columns: [
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
+            { key: "foreman_type", label: "Type" },
             { key: "phone", label: "Phone" },
             { key: "pass", label: "Pass" },
             { key: "license", label: "License" },
@@ -38585,10 +38707,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           fields: [
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Foreman full name", required: !0 },
+            { name: "foreman_type", label: "Foreman type", type: "select", options: [["project", "Project foreman"], ["boss", "Boss foreman"]] },
             { name: "phone", label: "Phone" },
             { name: "pass", label: "Pass" },
             { name: "license", label: "License" },
           ],
+          defaults: { foreman_type: "project" },
         },
         catalog: {
           title: "Delivery Items",
@@ -38714,6 +38838,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             : d.jsx(Dx, { to: "/", replace: !0 }),
                       }),
                       d.jsx(jn, {
+                        path: "/backlog",
+                        element:
+                          t.role === "admin"
+                            ? d.jsx(kgBacklogPage, {})
+                            : d.jsx(Dx, { to: "/", replace: !0 }),
+                      }),
+                      d.jsx(jn, {
                         path: "*",
                         element: d.jsx(Dx, { to: "/", replace: !0 }),
                       }),
@@ -38773,7 +38904,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         async function kgFetchDay(sourceDate) {
           const { data: assignments, error: aErr } = await qe
             .from("site_assignments")
-            .select("id,site_id,lorry_id,foreman_id,shift,notes")
+            .select("id,site_id,lorry_id,foreman_id,shift,notes,job_status,pic,is_confirmed")
             .eq("plan_date", sourceDate)
             .order("id");
           if (aErr) throw new Error(aErr.message);
@@ -38854,6 +38985,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               lorry_id: assignment.lorry_id || null,
               foreman_id: assignment.foreman_id || null,
               shift: assignment.shift || "day",
+              job_status: assignment.job_status || "NEW",
+              pic: assignment.pic || null,
+              is_confirmed: assignment.is_confirmed === true,
               notes: assignment.notes || null,
             };
             const { data: inserted, error: insErr } = await qe
@@ -38939,7 +39073,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         <div>
           <p class="eyebrow" style="margin:0 0 4px">Copy date</p>
           <h2 style="margin:0;font-size:20px">Copy this planner day to other dates</h2>
-          <p style="margin:5px 0 0;color:var(--muted,#64748b)">Copies site, lorry, workers, foremen, shift, notes and extra WhatsApp sections.</p>
+          <p style="margin:5px 0 0;color:var(--muted,#64748b)">Copies site, lorry, workers, foremen, shift, job status, P.I.C., site confirm, notes and extra WhatsApp sections.</p>
         </div>
         <strong id="kg-copy-source-date" style="white-space:nowrap;background:#ecfdf5;color:#047857;border-radius:999px;padding:8px 11px">Source: ${sourceDate || "Choose date above"}</strong>
       </div>
@@ -40799,6 +40933,25 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           width: 100%;
         }
       }
+
+      .assignment-card.site-confirmed { border: 3px solid #16a34a; background: #f0fdf4; box-shadow: 0 18px 42px rgba(22, 163, 74, .16); }
+      .confirm-pill { background:#dcfce7; color:#166534; border-radius:999px; padding:4px 9px; font-size:11px; font-weight:900; border:1px solid #86efac; }
+      .status-pill { background:#eef2ff; color:#3730a3; border-radius:999px; padding:4px 9px; font-size:11px; font-weight:800; }
+      .field-help.block { display:block; margin-top:6px; }
+
+      .foreman-type-wrap { display:grid; gap:12px; }
+      .foreman-type-block { border:1px solid #dbeafe; border-radius:16px; padding:12px; background:#f8fafc; }
+      .foreman-type-block > strong { display:block; color:#0f172a; margin-bottom:4px; font-size:14px; }
+      .foreman-type-block .check-grid { margin-top:9px; }
+      @media (max-width: 680px) { .foreman-type-block { padding:10px; } }
+      .site-history-box { border:1px dashed #9ca3af; border-radius:14px; background:#f8fafc; padding:12px; margin-top:-6px; }
+      .site-history-box strong { display:block; margin-bottom:8px; color:#0f172a; }
+      .site-history-row { display:grid; gap:3px; padding:8px 0; border-top:1px solid #e2e8f0; font-size:13px; }
+      .site-history-row:first-of-type { border-top:0; }
+      .site-history-row span { color:#64748b; }
+      .backlog-card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:var(--shadow); display:grid; gap:6px; }
+      .backlog-card small { color:var(--muted); }
+      .backlog-card pre { margin:0; max-height:220px; overflow:auto; background:#f8fafc; border-radius:12px; padding:10px; font-size:12px; }
     </style>
   </head>
   <body>
