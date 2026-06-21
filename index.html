@@ -16450,7 +16450,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 children: [
                   "Connected: ",
                   GS || "Not configured",
-                  " · Build V5.5 no extra copy + lorry embed fix",
+                  " · Build V5.6 stable lorry fix",
                 ],
               }),
             ],
@@ -16531,8 +16531,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const _s = `
   id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed,
   site:sites(id,address,status),
-  lorry_id,
-  assignment_lorries(lorry_id, sort_order),
+  lorry:lorries!site_assignments_lorry_id_fkey(id,registration_no,driver_name),
+  assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status))
 `,
@@ -34041,14 +34041,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           }
           const [ue, ee] = await Promise.all([B, me]),
             V = ue.error || ee.error;
-          (V && j(V.message), _(kgHydrateAssignmentsWithLorries(ue.data || [], p.lorries)), D(ee.data || []), L(!1));
+          (V && j(V.message), _(ue.data || []), D(ee.data || []), L(!1));
         }
         (q.useEffect(() => {
           fe();
         }, []),
           q.useEffect(() => {
             G();
-          }, [n, s, c, p.lorries.length]),
+          }, [n, s, c]),
           q.useEffect(() => {
             !v && S.length && x(String(S[0].id));
           }, [S, v]));
@@ -35504,19 +35504,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         if (r.length) return r;
         return t && t.lorry && t.lorry.id ? [t.lorry] : [];
       }
-      function kgHydrateAssignmentsWithLorries(t, r) {
-        const n = new Map((r || []).map((l) => [Number(l.id), l]));
-        return (t || []).map((l) => {
-          const s = l && l.lorry_id ? n.get(Number(l.lorry_id)) || null : null,
-            f = (l.assignment_lorries || [])
-              .map((c) => ({
-                ...c,
-                lorry: n.get(Number(c.lorry_id)) || null,
-              }))
-              .filter((c) => c.lorry);
-          return { ...l, lorry: l.lorry || s, assignment_lorries: f };
-        });
-      }
       function kgLorryText(t, r = "copy") {
         if (!t) return r === "excel" ? "" : "No lorry";
         const n = Ca(t.registration_no, ""), l = Ca(t.driver_name, "No driver");
@@ -35808,7 +35795,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 ? void 0
                 : Qe.error;
           (Le && j(Le.message),
-            f(kgHydrateAssignmentsWithLorries(V.data || [], p.lorries)),
+            f(V.data || []),
             m(xe.data || []),
             x(ke.data || []),
             G(!1));
@@ -35818,7 +35805,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }, []),
           q.useEffect(() => {
             oe();
-          }, [n, p.lorries.length]));
+          }, [n]));
         const ge = q.useMemo(() => Go(s), [s]),
           Ne = q.useMemo(() => op(s), [s]),
           Ye = q.useMemo(
@@ -36547,7 +36534,87 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     }),
                   ],
                 }),
-                d.jsx("aside", { className: "side-stack", children: null }),
+                d.jsx("aside", {
+                  className: "side-stack",
+                  children: d.jsxs("section", {
+                    className: "panel compact-panel",
+                    children: [
+                      d.jsxs("div", {
+                        className: "panel-heading",
+                        children: [
+                          d.jsxs("div", {
+                            children: [
+                              d.jsx("h2", {
+                                children: "Extra Copy 1 sections",
+                              }),
+                              d.jsx("span", {
+                                children: "Warehouse, Hougang or other notes",
+                              }),
+                            ],
+                          }),
+                          r &&
+                            d.jsx("button", {
+                              className: "icon-button",
+                              onClick: () => {
+                                (D("new"), L({ title: "", body: "" }));
+                              },
+                              children: d.jsx(ti, { size: 17 }),
+                            }),
+                        ],
+                      }),
+                      d.jsx("div", {
+                        className: "mini-list",
+                        children:
+                          c.length === 0
+                            ? d.jsx("div", {
+                                className: "empty-state small",
+                                children: "No extra sections.",
+                              })
+                            : c.map((V) =>
+                                d.jsxs(
+                                  "div",
+                                  {
+                                    className: "section-row",
+                                    children: [
+                                      d.jsxs("div", {
+                                        children: [
+                                          d.jsx("strong", {
+                                            children: V.title,
+                                          }),
+                                          d.jsx("pre", { children: V.body }),
+                                        ],
+                                      }),
+                                      r &&
+                                        d.jsxs("div", {
+                                          className: "card-actions",
+                                          children: [
+                                            d.jsx("button", {
+                                              className: "icon-button",
+                                              onClick: () => {
+                                                (D(V.id),
+                                                  L({
+                                                    title: V.title,
+                                                    body: V.body,
+                                                  }));
+                                              },
+                                              children: d.jsx(Ds, { size: 15 }),
+                                            }),
+                                            d.jsx("button", {
+                                              className: "icon-button danger",
+                                              onClick: () => ue(V.id),
+                                              children: d.jsx(N0, { size: 15 }),
+                                            }),
+                                          ],
+                                        }),
+                                    ],
+                                  },
+                                  V.id,
+                                ),
+                              ),
+                      }),
+                    ],
+                  }),
+                }),
               ],
             }),
             S &&
@@ -39271,7 +39338,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         <div>
           <p class="eyebrow" style="margin:0 0 4px">Copy date</p>
           <h2 style="margin:0;font-size:20px">Copy this planner day to other dates</h2>
-          <p style="margin:5px 0 0;color:var(--muted,#64748b)">Copies site, lorry, workers, foremen, shift, notes and extra WhatsApp sections.</p>
+          <p style="margin:5px 0 0;color:var(--muted,#64748b)">Copies site, lorry, workers, foremen, shift and notes.</p>
         </div>
         <strong id="kg-copy-source-date" style="white-space:nowrap;background:#ecfdf5;color:#047857;border-radius:999px;padding:8px 11px">Source: ${sourceDate || "Choose date above"}</strong>
       </div>
@@ -39334,7 +39401,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 const action = replace ? "replace" : "add to";
                 if (
                   !window.confirm(
-                    `Copy ${payload.assignments.length} site assignment(s) and ${payload.sections.length} extra section(s) from ${source} to ${targets.length} date(s)?\n\nThis will ${action} the target date(s).`,
+                    `Copy ${payload.assignments.length} site assignment(s) from ${source} to ${targets.length} date(s)?\n\nThis will ${action} the target date(s).`,
                   )
                 )
                   return;
@@ -41204,7 +41271,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #64748b;
         font-weight: 700;
       }
-    </style>
+    
+      /* Hide old Extra Copy 1 sections box from Planner page */
+      aside.side-stack {
+        display: none !important;
+      }
+</style>
   </head>
   <body>
     <div id="root"></div>
