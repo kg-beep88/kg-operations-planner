@@ -16262,6 +16262,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                           d.jsx("span", { children: "All Users" }),
                         ],
                       }),
+                    t.role === "admin" &&
+                      d.jsxs(Ho, {
+                        to: "/backlog",
+                        className: ({ isActive: s }) =>
+                          s ? "nav-link active" : "nav-link",
+                        children: [
+                          d.jsx(Ds, { size: 19 }),
+                          d.jsx("span", { children: "Backlog" }),
+                        ],
+                      }),
                   ],
                 }),
                 d.jsxs("div", {
@@ -16478,10 +16488,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }).format(Number(t || 0));
       }
       const _s = `
-  id, plan_date, shift, notes, sort_order,
+  id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed,
   site:sites(id,address,status),
   lorry:lorries(id,registration_no,driver_name),
-  assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status)),
+  assignment_lorries(lorry_id, sort_order, lorry:lorries(id,registration_no,driver_name)),
+  assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status))
 `,
         w0 = `
@@ -34322,6 +34333,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .order("plan_date")
                 .limit(1e4),
               qe
+                .from("assignment_lorries")
+                .select("assignment_id,lorry_id,sort_order,lorry:lorries(registration_no,driver_name)")
+                .order("assignment_id")
+                .order("sort_order")
+                .limit(1e4),
+              qe
                 .from("delivery_orders")
                 .select(w0)
                 .order("delivery_date")
@@ -34338,7 +34355,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             const ue = await Promise.all(me),
               ee = (B = ue.find((Pe) => Pe.error)) == null ? void 0 : B.error;
             if (ee) throw new Error(ee.message);
-            const [V, xe, ke, Le, Qe, Ve, Re, At, ln] = ue.map(
+            const [V, xe, ke, Le, Qe, Ve, Dt, Re, At, ln] = ue.map(
                 (Pe) => Pe.data || [],
               ),
               vn = ri(0),
@@ -34418,6 +34435,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   })),
                 },
                 { name: "Assignments", rows: wv(Ve) },
+                {
+                  name: "Assignment Lorries",
+                  rows: Dt.map((Pe) => ({
+                    "Assignment ID": Pe.assignment_id,
+                    "Lorry ID": Pe.lorry_id,
+                    Lorry: Pe.lorry ? Pe.lorry.registration_no : "",
+                    Driver: Pe.lorry ? Pe.lorry.driver_name || "" : "",
+                    "Sort order": Pe.sort_order,
+                  })),
+                },
                 { name: "Delivery Orders", rows: Av(Re) },
                 { name: "Delivery Items", rows: Cv(Re) },
                 {
@@ -35516,39 +35543,122 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const kgWorkerNames = (t) =>
         kgJoinNames((t.assignment_workers || []).map((r) => r.worker));
       const kgForemanNames = (t) => kgJoinNames(ar(t));
-      const kgLorryCopy = (t) =>
-        t
-          ? `${Ca(t.registration_no)} @${Ca(t.driver_name, "No driver")}`
-          : "No lorry assigned";
-      const kgLorryExcel = (t) =>
-        t
-          ? `${Ca(t.registration_no, "")}${t.driver_name ? ` (${Ca(t.driver_name, "")})` : ""}`
-          : "";
+      const kgDayName = ["Sun", "Mon", "Tues", "Wed", "Thu", "Fri", "Sat"];
+      function kgDayShort(t) {
+        const r = new Date(`${t}T12:00:00+08:00`);
+        return kgDayName[r.getUTCDay()] || "";
+      }
+      function kgCopyDateTitle(t) {
+        return `${cp(t)} (${kgDayShort(t)})`;
+      }
+      function kgMiniDate(t) {
+        if (!t) return "-";
+        const [r, n, l] = String(t).split("-");
+        return `${l}.${n}.${r} (${kgDayShort(t)})`;
+      }
+      function kgAssignmentLorries(t) {
+        const r = (t.assignment_lorries || [])
+          .filter((n) => n && n.lorry && n.lorry.id)
+          .sort((n, l) => Number(n.sort_order || 0) - Number(l.sort_order || 0))
+          .map((n) => n.lorry);
+        if (r.length) return r;
+        return t && t.lorry && t.lorry.id ? [t.lorry] : [];
+      }
+      function kgLorryText(t, r = "copy") {
+        if (!t) return r === "excel" ? "" : "No lorry";
+        const n = Ca(t.registration_no, ""), l = Ca(t.driver_name, "No driver");
+        return r === "excel" ? `${n}${l ? ` (${l})` : ""}` : `${n} @${l}`;
+      }
+      const kgLorryCopy = (t) => kgLorryText(t);
+      const kgLorryExcel = (t) => kgLorryText(t, "excel");
+      function kgLorryCopyList(t) {
+        const r = kgAssignmentLorries(t).map((n) => kgLorryCopy(n)).filter(Boolean);
+        return r.length ? r.join(" + ") : "No lorry";
+      }
+      function kgLorryExcelList(t) {
+        return kgAssignmentLorries(t).map((r) => kgLorryExcel(r)).filter(Boolean).join(" + ");
+      }
       const kgCleanExtraLine = (t) => String(t || "").replace(/^[-*•]\s*/, "").trim();
+      function kgFirstLorry(t) {
+        return kgAssignmentLorries(t)[0] || null;
+      }
+      function kgAssignmentLorryKey(t) {
+        const r = kgFirstLorry(t);
+        return r
+          ? `0-${Ca(r.registration_no, "").padStart(10, "0")}-${r.id || ""}`
+          : "9-ZZZZZZZZZZ";
+      }
+      function kgSortAssignmentsByLorry(t) {
+        return [...(t || [])].sort((r, n) => {
+          const l = kgAssignmentLorryKey(r).localeCompare(kgAssignmentLorryKey(n), void 0, {
+            numeric: !0,
+            sensitivity: "base",
+          });
+          if (l) return l;
+          return Ca(r.site && r.site.address, "ZZZ").localeCompare(
+            Ca(n.site && n.site.address, "ZZZ"),
+            void 0,
+            { numeric: !0, sensitivity: "base" },
+          );
+        });
+      }
+      function kgBuildRankMap(t) {
+        const r = new Map();
+        function n(l, s, f) {
+          if (!s) return;
+          const c = `${l}:${Number(s)}`;
+          r.has(c) || r.set(c, []);
+          r.get(c).push({ assignmentId: f, index: r.get(c).length + 1 });
+        }
+        for (const l of kgSortAssignmentsByLorry(t || [])) {
+          for (const s of l.assignment_workers || []) n("worker", s.worker_id || (s.worker && s.worker.id), l.id);
+          for (const s of ar(l)) n("foreman", s.id, l.id);
+        }
+        return r;
+      }
+      function kgRankSuffix(t, r, n, l) {
+        const s = `${t}:${Number(r)}`, f = (l && l.get(s)) || [];
+        if (f.length < 2) return "";
+        const c = f.find((m) => m.assignmentId === n);
+        return c ? ` (${c.index})` : "";
+      }
+      function kgWorkerNamesForAssignment(t, r) {
+        return (t.assignment_workers || [])
+          .map((n) => {
+            const l = n.worker || {}, s = kgNameNick(l);
+            return s ? `${s}${kgRankSuffix("worker", n.worker_id || l.id, t.id, r)}` : "";
+          })
+          .filter(Boolean);
+      }
+      function kgForemanNamesForAssignment(t, r) {
+        return ar(t)
+          .map((n) => {
+            const l = kgNameNick(n);
+            return l ? `${l}${kgRankSuffix("foreman", n.id, t.id, r)}` : "";
+          })
+          .filter(Boolean);
+      }
       const kgDailyExcelRows = (t, r = []) => {
-        const n = (t || []).map((l) => {
+        const n = kgSortAssignmentsByLorry(t || []).map((l) => {
           var s;
           return {
-            Lorry: kgLorryExcel(l.lorry),
+            Lorry: kgLorryExcelList(l),
             Workers: kgWorkerNames(l),
             Foremen: kgForemanNames(l),
-            Date: D0(l.plan_date),
+            Date: l.plan_date ? cp(l.plan_date).replaceAll(".", "/") : "",
             "Job status": l.job_status || l.jobStatus || "",
             PIC: l.pic || l.pic_name || l.picName || "",
             Address: Ca((s = l.site) == null ? void 0 : s.address, ""),
           };
         });
         for (const l of r || []) {
-          const s = String(l.body || "")
-            .split(`
-`)
-            .map(kgCleanExtraLine)
-            .filter(Boolean);
+          const s = String(l.body || "").split(`
+`).map(kgCleanExtraLine).filter(Boolean);
           n.push({
             Lorry: "",
             Workers: s.join(" + "),
             Foremen: "",
-            Date: l.plan_date ? D0(l.plan_date) : "",
+            Date: l.plan_date ? cp(l.plan_date).replaceAll(".", "/") : "",
             "Job status": "EXTRA",
             PIC: "",
             Address: Ca(l.title, ""),
@@ -35564,76 +35674,60 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           }),
         );
       function mC(t, r, n = []) {
-        var c;
         const l = new Map();
-        for (const m of r) {
-          if (!(m.assignment_workers || []).length) continue;
-          const v = ((c = m.lorry) == null ? void 0 : c.id) || "unassigned";
-          (l.has(v) || l.set(v, { lorry: m.lorry, items: [] }),
-            l.get(v).items.push(m));
+        for (const m of kgSortAssignmentsByLorry(r)) {
+          const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean);
+          if (!v.length) continue;
+          const x = kgAssignmentLorries(m), p = x.length ? x : [null];
+          for (const g of p) {
+            const S = g && g.id ? `lorry-${g.id}` : "unassigned";
+            (l.has(S) || l.set(S, { lorry: g, items: [] }), l.get(S).items.push({ assignment: m, workers: v }));
+          }
         }
         const s = [...l.values()]
-            .sort((m, v) => {
-              var x, p;
-              return Ca(
-                (x = m.lorry) == null ? void 0 : x.registration_no,
-                "ZZZ",
-              ).localeCompare(
-                Ca((p = v.lorry) == null ? void 0 : p.registration_no, "ZZZ"),
-                void 0,
-                { numeric: !0 },
-              );
-            })
+            .sort((m, v) => kgAssignmentLorryKey({ assignment_lorries: m.lorry ? [{ lorry: m.lorry }] : [] }).localeCompare(kgAssignmentLorryKey({ assignment_lorries: v.lorry ? [{ lorry: v.lorry }] : [] }), void 0, { numeric: !0 }))
             .map(({ lorry: m, items: v }) => {
-              const x = kgLorryCopy(m),
-                p = v.map((g) => {
-                  var w;
-                  const S = kgWorkerNames(g),
-                    E = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
-                  return `* ${Ca((w = g.site) == null ? void 0 : w.address)}${E} - ${S}`;
+              const x = m ? `*${kgLorryText(m)}*` : "*No lorry*",
+                p = v.map(({ assignment: g, workers: S }) => {
+                  var E;
+                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
+                  return `* ${Ca((E = g.site) == null ? void 0 : E.address)}${w} - ${S.join(" + ")}`;
                 });
               return [x, ...p].join(`
 `);
             }),
           f = n.map((m) => {
-            const v = String(m.body || "")
-              .split(`
-`)
-              .map(kgCleanExtraLine)
-              .filter(Boolean);
-            return [m.title, ...v.map((x) => `* ${x}`)].filter(Boolean).join(`
+            const v = String(m.body || "").split(`
+`).map((x) => x.trim()).filter(Boolean);
+            return [m.title, ...v.map((x) => (x.startsWith("*") || x.startsWith("-") ? x : `* ${x}`))].filter(Boolean).join(`
 `);
           });
-        return [`${cp(t)} - Jobs`, ...s, ...f].filter(Boolean).join(`
+        return [`*${kgCopyDateTitle(t)} - Job*`, ...s, ...f].filter(Boolean).join(`
 
 `);
       }
       function xC(t, r) {
-        const n = [...r]
-          .sort((l, s) => {
-            var f, c;
-            return Ca((f = l.site) == null ? void 0 : f.address).localeCompare(
-              Ca((c = s.site) == null ? void 0 : c.address),
-            );
-          })
+        const n = kgSortAssignmentsByLorry(r)
+          .filter((l) => ar(l).length > 0)
           .map((l) => {
             var f;
-            const s = kgForemanNames(l) || "No foreman assigned";
+            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + ");
             return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s}`;
           });
-        return [`${cp(t)} - foreman`, ...n].join(`
+        return [`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
 `);
       }
       async function vC(t) {
         let r = !1;
-        async function n(l) {
+        async function n(ke) {
+          const Le = ke == null ? t : String(ke);
           try {
-            (navigator.clipboard && (await navigator.clipboard.writeText(l)),
+            (navigator.clipboard && (await navigator.clipboard.writeText(Le)),
               (r = !0));
           } catch {}
           try {
             const s = document.createElement("textarea");
-            ((s.value = l),
+            ((s.value = Le),
               (s.style.position = "fixed"),
               (s.style.left = "-9999px"),
               (s.style.top = "0"),
@@ -35645,14 +35739,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               (r = !0));
           } catch {}
         }
-        await n(t);
+        await n();
         const l = document.createElement("div");
         l.style.cssText =
           "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px";
-        l.innerHTML = `<div style="background:white;border-radius:22px;max-width:760px;width:100%;box-shadow:0 24px 80px rgba(15,23,42,.35);padding:18px;font-family:Arial,sans-serif"><h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Copy text ready</h2><p style="margin:0 0 12px;color:#475569;font-size:14px">You can edit this box first. Copy again will copy exactly what is inside this box.</p><textarea id="kg-copy-box" style="width:100%;height:360px;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;line-height:1.45;white-space:pre-wrap">${t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</textarea><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap"><button id="kg-copy-again" style="border:0;border-radius:999px;background:#f97316;color:white;font-weight:700;padding:10px 16px">Copy again</button><button id="kg-copy-wa" style="border:0;border-radius:999px;background:#22c55e;color:white;font-weight:700;padding:10px 16px">Open WhatsApp</button><button id="kg-copy-close" style="border:1px solid #cbd5e1;border-radius:999px;background:white;color:#0f172a;font-weight:700;padding:10px 16px">Close</button></div><div id="kg-copy-status" style="margin-top:8px;color:${r ? "#166534" : "#b45309"};font-size:13px">${r ? "Copied to clipboard. You can edit then press Copy again." : "Auto-copy may be blocked. Edit/copy manually from the box."}</div></div>`;
+        l.innerHTML = `<div style="background:white;border-radius:22px;max-width:760px;width:100%;box-shadow:0 24px 80px rgba(15,23,42,.35);padding:18px;font-family:Arial,sans-serif"><h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Copy text ready</h2><p style="margin:0 0 12px;color:#475569;font-size:14px">If WhatsApp paste is empty, press Copy again or hold inside the box and select all.</p><textarea id="kg-copy-box" style="width:100%;height:360px;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;line-height:1.45;white-space:pre-wrap">${t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</textarea><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap"><button id="kg-copy-again" style="border:0;border-radius:999px;background:#f97316;color:white;font-weight:700;padding:10px 16px">Copy again</button><button id="kg-copy-whatsapp" style="border:0;border-radius:999px;background:#16a34a;color:white;font-weight:700;padding:10px 16px">Open WhatsApp</button><button id="kg-copy-close" style="border:1px solid #cbd5e1;border-radius:999px;background:white;color:#0f172a;font-weight:700;padding:10px 16px">Close</button></div><div style="margin-top:8px;color:${r ? "#166534" : "#b45309"};font-size:13px">${r ? "Copied to clipboard. You can also copy manually from the box." : "Auto-copy may be blocked. Copy manually from the box."}</div></div>`;
         document.body.appendChild(l);
-        const s = l.querySelector("#kg-copy-box"),
-          f = l.querySelector("#kg-copy-status");
+        const s = l.querySelector("#kg-copy-box");
         setTimeout(() => {
           s.focus();
           s.select();
@@ -35662,15 +35755,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           s.focus();
           s.select();
           await n(s.value);
-          f.textContent = "Copied edited text from the box.";
-          f.style.color = "#166534";
         };
-        l.querySelector("#kg-copy-wa").onclick = () =>
-          window.open(
-            `https://wa.me/?text=${encodeURIComponent(s.value)}`,
-            "_blank",
-            "noopener,noreferrer",
-          );
+        l.querySelector("#kg-copy-whatsapp").onclick = () => {
+          window.open(`https://wa.me/?text=${encodeURIComponent(s.value)}`, "_blank", "noopener,noreferrer");
+        };
       }
       function hl({ title: t, children: r, onClose: n }) {
         return d.jsx("div", {
@@ -35702,8 +35790,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const Bo = {
         site_id: "",
         lorry_id: "",
+        lorry_ids: [],
         foreman_ids: [],
         shift: "day",
+        job_status: "NEW",
+        pic: "",
+        is_confirmed: !1,
         notes: "",
         worker_ids: [],
       };
@@ -35812,15 +35904,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               foremanShifts: s.reduce((V, xe) => V + ar(xe).length, 0),
               lorries: new Set(
                 s
-                  .map((V) => {
-                    var xe;
-                    return (xe = V.lorry) == null ? void 0 : xe.id;
-                  })
+                  .flatMap((V) => kgAssignmentLorries(V).map((xe) => xe.id))
                   .filter(Boolean),
               ).size,
             }),
             [s, ge],
-          );
+          ),
+          kgRows = q.useMemo(() => kgSortAssignmentsByLorry(s), [s]),
+          kgRankMap = q.useMemo(() => kgBuildRankMap(kgRows), [kgRows]);
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
@@ -35828,18 +35919,20 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           (E("new"), _({ ...Bo, site_id: V ? String(V) : "" }));
         }
         function N(V) {
-          var xe, ke;
+          var xe;
+          const ke = kgAssignmentLorries(V).map((Le) => Number(Le.id));
           (E(V.id),
             _({
               site_id: (xe = V.site) != null && xe.id ? String(V.site.id) : "",
-              lorry_id:
-                (ke = V.lorry) != null && ke.id ? String(V.lorry.id) : "",
+              lorry_id: ke.length ? String(ke[0]) : "",
+              lorry_ids: ke,
               foreman_ids: ar(V).map((Le) => Number(Le.id)),
               shift: V.shift || "day",
+              job_status: V.job_status || "NEW",
+              pic: V.pic || "",
+              is_confirmed: !!V.is_confirmed,
               notes: V.notes || "",
-              worker_ids: (V.assignment_workers || []).map((Le) =>
-                Number(Le.worker_id),
-              ),
+              worker_ids: (V.assignment_workers || []).map((Le) => Number(Le.worker_id)),
             }));
         }
         function z(V) {
@@ -35860,6 +35953,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               : [...ke.worker_ids, xe],
           }));
         }
+        function kgToggleLorry(V) {
+          const xe = Number(V);
+          _((ke) => {
+            const Le = ke.lorry_ids || [], Qe = Le.includes(xe) ? Le.filter((Ve) => Ve !== xe) : [...Le, xe];
+            return { ...ke, lorry_ids: Qe, lorry_id: Qe.length ? String(Qe[0]) : "" };
+          });
+        }
         function U() {
           const V = [];
           for (const xe of w.worker_ids) {
@@ -35867,13 +35967,22 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               Le = s.filter(
                 (Qe) =>
                   Qe.id !== S &&
-                  (Qe.assignment_workers || []).some(
-                    (Ve) => Number(Ve.worker_id) === Number(xe),
-                  ),
+                  (Qe.assignment_workers || []).some((Ve) => Number(Ve.worker_id) === Number(xe)),
               );
             Le.length &&
               V.push(
                 `${kgNameNick(ke) || "Worker"} is already at ${Le.map((Qe) => {
+                  var Ve;
+                  return `${(Ve = Qe.site) == null ? void 0 : Ve.address} (${Qe.shift})`;
+                }).join(", ")}`,
+              );
+          }
+          for (const xe of w.foreman_ids) {
+            const ke = p.foremen.find((Qe) => Number(Qe.id) === Number(xe)),
+              Le = s.filter((Qe) => Qe.id !== S && ar(Qe).some((Ve) => Number(Ve.id) === Number(xe)));
+            Le.length &&
+              V.push(
+                `${kgNameNick(ke) || "Foreman"} is already at ${Le.map((Qe) => {
                   var Ve;
                   return `${(Ve = Qe.site) == null ? void 0 : Ve.address} (${Qe.shift})`;
                 }).join(", ")}`,
@@ -35886,7 +35995,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           const xe = U();
           if (
             xe.length &&
-            !window.confirm(`Same worker selected for more than one site on ${D0(n)}:
+            !window.confirm(`Same worker/foreman selected for more than one site on ${D0(n)}:
 
 ${xe.join(`
 `)}
@@ -35894,66 +36003,49 @@ ${xe.join(`
 Press OK to assign them to both sites, or Cancel to go back.`)
           )
             return;
+          const kgSelectedLorries = (w.lorry_ids || []).map((Qe) => Number(Qe)).filter(Boolean);
           const ke = {
             plan_date: n,
             site_id: Number(w.site_id),
-            lorry_id: w.lorry_id ? Number(w.lorry_id) : null,
+            lorry_id: kgSelectedLorries.length ? Number(kgSelectedLorries[0]) : null,
             foreman_id: w.foreman_ids.length ? Number(w.foreman_ids[0]) : null,
             shift: w.shift,
+            job_status: w.job_status || "NEW",
+            pic: w.pic || null,
+            is_confirmed: !!w.is_confirmed,
             notes: w.notes || null,
           };
           let Le = S;
           if (S === "new") {
-            const { data: Qe, error: Ve } = await qe
-              .from("site_assignments")
-              .insert(ke)
-              .select("id")
-              .single();
+            const { data: Qe, error: Ve } = await qe.from("site_assignments").insert(ke).select("id").single();
             if (Ve) return j(Ve.message);
             Le = Qe.id;
           } else {
-            const { error: Qe } = await qe
-              .from("site_assignments")
-              .update(ke)
-              .eq("id", S);
+            const { error: Qe } = await qe.from("site_assignments").update(ke).eq("id", S);
             if (Qe) return j(Qe.message);
-            const { error: Ve } = await qe
-              .from("assignment_workers")
-              .delete()
-              .eq("assignment_id", S);
+            const { error: Ve } = await qe.from("assignment_workers").delete().eq("assignment_id", S);
             if (Ve) return j(Ve.message);
-            const { error: Re } = await qe
-              .from("assignment_foremen")
-              .delete()
-              .eq("assignment_id", S);
+            const { error: Re } = await qe.from("assignment_foremen").delete().eq("assignment_id", S);
             if (Re) return j(Re.message);
+            const { error: At } = await qe.from("assignment_lorries").delete().eq("assignment_id", S);
+            if (At) return j(At.message);
+          }
+          if (kgSelectedLorries.length) {
+            const Qe = kgSelectedLorries.map((Re, At) => ({ assignment_id: Le, lorry_id: Number(Re), sort_order: At })),
+              { error: Ve } = await qe.from("assignment_lorries").insert(Qe);
+            if (Ve) return j(Ve.message);
           }
           if (w.foreman_ids.length) {
-            const Qe = w.foreman_ids.map((Re, At) => ({
-                assignment_id: Le,
-                foreman_id: Number(Re),
-                sort_order: At,
-              })),
+            const Qe = w.foreman_ids.map((Re, At) => ({ assignment_id: Le, foreman_id: Number(Re), sort_order: At })),
               { error: Ve } = await qe.from("assignment_foremen").insert(Qe);
             if (Ve) return j(Ve.message);
           }
           if (w.worker_ids.length) {
-            const Qe = w.worker_ids.map((Re, At) => ({
-                assignment_id: Le,
-                worker_id: Number(Re),
-                sort_order: At,
-              })),
+            const Qe = w.worker_ids.map((Re, At) => ({ assignment_id: Le, worker_id: Number(Re), sort_order: At })),
               { error: Ve } = await qe.from("assignment_workers").insert(Qe);
             if (Ve) return j(Ve.message);
           }
-          (E(null),
-            _(Bo),
-            await oe(),
-            He(
-              xe.length
-                ? "Saved. Duplicate worker assignment confirmed."
-                : "Assignment saved.",
-            ));
+          (E(null), _(Bo), await oe(), He(xe.length ? "Saved. Duplicate assignment confirmed." : "Assignment saved."));
         }
         async function B(V) {
           if (!window.confirm("Delete this site assignment?")) return;
@@ -35990,13 +36082,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }
         async function ee(V, xe = !1) {
           const ke = V === 1 ? mC(n, s, c) : xC(n, s);
-          xe
-            ? window.open(
-                `https://wa.me/?text=${encodeURIComponent(ke)}`,
-                "_blank",
-                "noopener,noreferrer",
-              )
-            : (await vC(ke), He(`Copy ${V} copied.`));
+          (await vC(ke), He(`Copy ${V} ready. Edit box first if needed.`));
         }
         return d.jsxs("div", {
           className: "page",
@@ -36314,7 +36400,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1: lorry @ driver, address and workers. Copy 2: sites and foremen. Build Copy1 manual fix.",
+                        "Copy 1: lorry @ driver, address and workers. Copy 2: only sites with foremen. Edit the copy box before copying if needed.",
                     }),
                   ],
                 }),
@@ -36382,17 +36468,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "empty-state",
                               children: "No assignments for this day.",
                             })
-                          : s.map((V) => {
+                          : kgRows.map((V) => {
                               var Qe, Ve;
-                              const xe = (V.assignment_workers || [])
-                                  .map((Re) => {
-                                    var At;
-                                    return kgNameNick(Re.worker);
-                                  })
-                                  .filter(Boolean),
-                                ke = ar(V)
-                                  .map((Re) => kgNameNick(Re))
-                                  .filter(Boolean),
+                              const xe = kgWorkerNamesForAssignment(V, kgRankMap),
+                                ke = kgForemanNamesForAssignment(V, kgRankMap),
                                 Le = Te.has(
                                   Number(
                                     (Qe = V.site) == null ? void 0 : Qe.id,
@@ -36401,7 +36480,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               return d.jsxs(
                                 "article",
                                 {
-                                  className: "assignment-card",
+                                  className: `assignment-card ${V.is_confirmed ? "site-confirmed" : ""}`,
                                   children: [
                                     d.jsxs("div", {
                                       className: "assignment-main",
@@ -36420,6 +36499,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               className: "shift-pill",
                                               children: V.shift,
                                             }),
+                                            d.jsx("span", {
+                                              className: `confirm-pill ${V.is_confirmed ? "sent" : "not-sent"}`,
+                                              children: V.is_confirmed ? "Site confirm" : "Not confirm",
+                                            }),
                                             d.jsxs("span", {
                                               className: `do-pill ${Le ? "sent" : "not-sent"}`,
                                               children: [
@@ -36435,11 +36518,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             d.jsxs("span", {
                                               children: [
                                                 d.jsx(b0, { size: 15 }),
-                                                V.lorry
-                                                  ? `${V.lorry.registration_no} @${V.lorry.driver_name || "No driver"}`
-                                                  : "No lorry",
+                                                kgLorryCopyList(V),
                                               ],
                                             }),
+                                            d.jsxs("span", { children: ["Status: ", V.job_status || "NEW"] }),
+                                            d.jsxs("span", { children: ["P.I.C.: ", V.pic || "-"] }),
                                             d.jsxs("span", {
                                               children: [
                                                 d.jsx(ei, { size: 15 }),
@@ -36633,31 +36716,73 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     }),
                     d.jsxs("label", {
                       children: [
-                        "Lorry",
+                        "Job status",
                         d.jsxs("select", {
-                          value: w.lorry_id,
-                          onChange: (V) =>
-                            _({ ...w, lorry_id: V.target.value }),
+                          value: w.job_status || "NEW",
+                          onChange: (V) => _({ ...w, job_status: V.target.value }),
                           children: [
-                            d.jsx("option", {
-                              value: "",
-                              children: "No lorry",
-                            }),
-                            p.lorries.map((V) =>
-                              d.jsxs(
-                                "option",
-                                {
-                                  value: V.id,
-                                  children: [
-                                    V.registration_no,
-                                    " @ ",
-                                    V.driver_name || "No driver",
-                                  ],
-                                },
-                                V.id,
-                              ),
-                            ),
+                            d.jsx("option", { value: "NEW", children: "NEW" }),
+                            d.jsx("option", { value: "CONTINUE JOB", children: "CONTINUE JOB" }),
+                            d.jsx("option", { value: "PAUSE", children: "PAUSE" }),
+                            d.jsx("option", { value: "DONE", children: "DONE" }),
                           ],
+                        }),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      children: [
+                        "P.I.C.",
+                        d.jsx("input", {
+                          value: w.pic || "",
+                          onChange: (V) => _({ ...w, pic: V.target.value }),
+                          placeholder: "P.I.C.",
+                        }),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      className: "confirm-check",
+                      children: [
+                        "Site confirm",
+                        d.jsxs("span", {
+                          className: "inline-check",
+                          children: [
+                            d.jsx("input", {
+                              type: "checkbox",
+                              checked: !!w.is_confirmed,
+                              onChange: (V) => _({ ...w, is_confirmed: V.target.checked }),
+                            }),
+                            " Highlight this site as confirmed",
+                          ],
+                        }),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      className: "wide",
+                      children: [
+                        "Lorries ",
+                        d.jsx("span", {
+                          className: "field-help",
+                          children: "Can tick more than one lorry for the same site.",
+                        }),
+                        d.jsx("div", {
+                          className: "check-grid",
+                          children: p.lorries.map((V) =>
+                            d.jsxs(
+                              "label",
+                              {
+                                className: "check-card",
+                                children: [
+                                  d.jsx("input", {
+                                    type: "checkbox",
+                                    checked: (w.lorry_ids || []).includes(Number(V.id)),
+                                    onChange: () => kgToggleLorry(V.id),
+                                  }),
+                                  d.jsx("span", { children: `${V.registration_no} @ ${V.driver_name || "No driver"}` }),
+                                ],
+                              },
+                              V.id,
+                            ),
+                          ),
                         }),
                       ],
                     }),
@@ -38779,6 +38904,67 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           defaults: { category: "material", default_unit_cost: 0 },
         },
       };
+
+      function kC({ profile: t }) {
+        const [r, n] = q.useState([]),
+          [l, s] = q.useState(!0),
+          [f, c] = q.useState("");
+        q.useEffect(() => {
+          m();
+        }, []);
+        async function m() {
+          (s(!0), c(""));
+          const { data: E, error: w } = await qe.from("edit_backlog").select("*").order("created_at", { ascending: !1 }).limit(200);
+          (w ? c(w.message || "Cannot load backlog. Run the backlog SQL first.") : n(E || []), s(!1));
+        }
+        if (t.role !== "admin") return d.jsx(Dx, { to: "/", replace: !0 });
+        const v = {
+            sites: "Site / address",
+            workers: "Worker",
+            foremen: "Foreman",
+            lorries: "Lorry",
+            site_assignments: "Planner site detail",
+            assignment_workers: "Planner worker list",
+            assignment_foremen: "Planner foreman list",
+            assignment_lorries: "Planner lorry list",
+            delivery_orders: "Delivery order",
+            delivery_order_items: "Delivery item",
+            plan_sections: "Extra Copy 1 section",
+            delivery_catalog: "Item master",
+          },
+          x = {
+            address: "Address", name: "Name", nickname: "Nickname", phone: "Phone", pass: "Pass", license: "License", status: "Status",
+            registration_no: "Lorry number", driver_name: "Driver", foreman_type: "Foreman type", plan_date: "Date", site_id: "Site", lorry_id: "Lorry",
+            worker_id: "Worker", foreman_id: "Foreman", shift: "Shift", job_status: "Job status", pic: "P.I.C.", is_confirmed: "Site confirm", notes: "Notes",
+            title: "Title", body: "Text", sent_on: "DO sent", item_name: "Item", quantity_delivered: "Delivered", quantity_returned: "Returned", unit_cost: "Unit price",
+          };
+        function p(E) {
+          if (E == null || E === "") return "blank";
+          if (typeof E == "boolean") return E ? "Yes" : "No";
+          if (typeof E == "object") return JSON.stringify(E);
+          return String(E);
+        }
+        function g(E) {
+          return (E && (E.address || E.name || E.nickname || E.registration_no || E.item_name || E.title || E.username || E.id || E.assignment_id || E.site_id)) || "record";
+        }
+        function S(E) {
+          const w = E.details || {}, _ = w.old || {}, T = w.new || {}, D = v[E.table_name] || E.table_name || "Record", I = String(E.action || "").toUpperCase();
+          if (I === "INSERT") return `Added ${D}: ${g(T)}`;
+          if (I === "DELETE") return `Deleted ${D}: ${g(_)}`;
+          const L = new Set(["created_at", "updated_at", "created_by", "updated_by", "id", "sort_order"]),
+            W = Object.keys({ ..._, ...T }).filter((J) => !L.has(J) && p(_[J]) !== p(T[J])).slice(0, 6);
+          if (!W.length) return `Updated ${D}: ${g(T)}`;
+          return `Changed ${D}: ${W.map((J) => `${x[J] || J} from ${p(_[J])} to ${p(T[J])}`).join("; ")}`;
+        }
+        return d.jsxs("div", { className: "page", children: [
+          d.jsxs("header", { className: "page-header", children: [
+            d.jsxs("div", { children: [d.jsx("p", { className: "eyebrow", children: "Admin only" }), d.jsx("h1", { children: "Backlog" }), d.jsx("p", { children: "Simple list showing who changed what. Newest change is on top." })] }),
+            d.jsx("button", { className: "primary-button", onClick: m, children: "Refresh" }),
+          ] }),
+          f && d.jsx("div", { className: "error-box", children: f }),
+          d.jsx("section", { className: "panel", children: l ? d.jsx("div", { className: "empty-state", children: "Loading backlog…" }) : r.length === 0 ? d.jsx("div", { className: "empty-state", children: "No changes recorded yet." }) : d.jsx("div", { className: "backlog-list", children: r.map((E) => d.jsxs("article", { className: "backlog-item", children: [d.jsx("strong", { children: S(E) }), d.jsxs("span", { children: [new Date(E.created_at).toLocaleString("en-SG"), " · edited by ", E.username || "unknown user", E.role ? ` (${E.role})` : ""] }), d.jsxs("small", { children: [v[E.table_name] || E.table_name, " · ", E.action] })] }, E.id)) }) }),
+        ] });
+      }
       function SC() {
         const [t, r] = q.useState(null),
           [n, l] = q.useState(!0);
@@ -38859,6 +39045,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             : d.jsx(Dx, { to: "/", replace: !0 }),
                       }),
                       d.jsx(jn, {
+                        path: "/backlog",
+                        element:
+                          t.role === "admin"
+                            ? d.jsx(kC, { profile: t })
+                            : d.jsx(Dx, { to: "/", replace: !0 }),
+                      }),
+                      d.jsx(jn, {
                         path: "*",
                         element: d.jsx(Dx, { to: "/", replace: !0 }),
                       }),
@@ -38918,13 +39111,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         async function kgFetchDay(sourceDate) {
           const { data: assignments, error: aErr } = await qe
             .from("site_assignments")
-            .select("id,site_id,lorry_id,foreman_id,shift,notes")
+            .select("id,site_id,lorry_id,foreman_id,shift,notes,job_status,pic,is_confirmed")
             .eq("plan_date", sourceDate)
             .order("id");
           if (aErr) throw new Error(aErr.message);
           const ids = (assignments || []).map((a) => a.id);
           let workers = [],
-            foremen = [];
+            foremen = [],
+            lorries = [];
           if (ids.length) {
             const { data: w, error: wErr } = await qe
               .from("assignment_workers")
@@ -38940,6 +39134,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               .order("sort_order");
             if (fErr) throw new Error(fErr.message);
             foremen = f || [];
+            const { data: l, error: lErr } = await qe
+              .from("assignment_lorries")
+              .select("assignment_id,lorry_id,sort_order")
+              .in("assignment_id", ids)
+              .order("sort_order");
+            if (lErr) throw new Error(lErr.message);
+            lorries = l || [];
           }
           const { data: sections, error: sErr } = await qe
             .from("plan_sections")
@@ -38951,6 +39152,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             assignments: assignments || [],
             workers,
             foremen,
+            lorries,
             sections: sections || [],
           };
         }
@@ -38972,6 +39174,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               .delete()
               .in("assignment_id", ids);
             if (fDel) throw new Error(fDel.message);
+            const { error: lDel } = await qe
+              .from("assignment_lorries")
+              .delete()
+              .in("assignment_id", ids);
+            if (lDel) throw new Error(lDel.message);
             const { error: aDel } = await qe
               .from("site_assignments")
               .delete()
@@ -38999,6 +39206,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               lorry_id: assignment.lorry_id || null,
               foreman_id: assignment.foreman_id || null,
               shift: assignment.shift || "day",
+              job_status: assignment.job_status || "NEW",
+              pic: assignment.pic || null,
+              is_confirmed: !!assignment.is_confirmed,
               notes: assignment.notes || null,
             };
             const { data: inserted, error: insErr } = await qe
@@ -39008,6 +39218,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               .single();
             if (insErr) throw new Error(insErr.message);
             idMap.set(assignment.id, inserted.id);
+          }
+          const lorryRows = (payload.lorries || [])
+            .map((l) => ({
+              assignment_id: idMap.get(l.assignment_id),
+              lorry_id: l.lorry_id,
+              sort_order: l.sort_order || 0,
+            }))
+            .filter((l) => l.assignment_id);
+          if (lorryRows.length) {
+            const { error: lErr } = await qe.from("assignment_lorries").insert(lorryRows);
+            if (lErr) throw new Error(lErr.message);
           }
           const workerRows = payload.workers
             .map((w) => ({
@@ -40955,6 +41176,56 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           width: 100%;
         }
       }
+
+      .assignment-card.site-confirmed {
+        border-color: #22c55e;
+        background: linear-gradient(135deg, #ecfdf5, #ffffff 70%);
+        box-shadow: 0 14px 30px rgba(34, 197, 94, 0.12);
+      }
+      .confirm-pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 800;
+        border: 1px solid #cbd5e1;
+      }
+      .confirm-pill.sent {
+        background: #dcfce7;
+        border-color: #86efac;
+        color: #166534;
+      }
+      .confirm-pill.not-sent {
+        background: #f8fafc;
+        color: #64748b;
+      }
+      .inline-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: white;
+        font-weight: 700;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--ink);
+      }
+      .backlog-list { display: grid; gap: 10px; }
+      .backlog-item {
+        display: grid;
+        gap: 5px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #ffffff;
+      }
+      .backlog-item strong { color: var(--ink); line-height: 1.35; }
+      .backlog-item span { color: var(--muted); font-size: 13px; }
+      .backlog-item small { color: #64748b; font-weight: 700; }
     </style>
   </head>
   <body>
