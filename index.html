@@ -35809,6 +35809,22 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           })
           .filter(Boolean);
       }
+      function kgAlreadyAssignedForemanSites(t, r, n) {
+        return (t || []).filter(
+          (l) =>
+            l.id !== r &&
+            ar(l).some((s) => Number(s.id) === Number(n)),
+        );
+      }
+      function kgAssignmentSiteAddressList(t) {
+        return (t || [])
+          .map((r) => {
+            var n;
+            return (n = r.site) == null ? void 0 : n.address;
+          })
+          .filter(Boolean)
+          .join(", ");
+      }
       const kgDailyExcelRows = (t, r = []) => {
         const n = kgSortAssignmentsByLorry(t || []).map((l) => {
           var s;
@@ -35848,10 +35864,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
           const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean);
-          const x = kgAssignmentLorries(m);
-          // Copy 1 rule: show if got worker OR got lorry. Skip foreman-only sites with no lorry.
+          const x = kgAssignmentLorries(m), p = x.length ? x : [null];
+          // Copy 1 rule: show site if got worker OR got lorry. Skip if only foreman.
           if (!v.length && !x.length) continue;
-          const p = x.length ? x : [null];
           for (const g of p) {
             const S = g && g.id ? `lorry-${g.id}` : "unassigned";
             (l.has(S) || l.set(S, { lorry: g, items: [] }), l.get(S).items.push({ assignment: m, workers: v }));
@@ -35863,9 +35878,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               const x = m ? `*${kgLorryText(m)}*` : "*No lorry*",
                 p = v.map(({ assignment: g, workers: S }) => {
                   var E;
-                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
-                  const _workers = S.length ? ` - ${S.join(" + ")}` : "";
-                  return `* ${Ca((E = g.site) == null ? void 0 : E.address)}${w}${_workers}`;
+                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "",
+                    k = Ca((E = g.site) == null ? void 0 : E.address);
+                  return S.length ? `* ${k}${w} - ${S.join(" + ")}` : `* ${k}${w}`;
                 });
               return [x, ...p].join(`
 `);
@@ -35885,8 +35900,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           .filter((l) => ar(l).length > 0)
           .map((l) => {
             var f;
-            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + ");
-            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s}`;
+            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + "),
+              c = (l.assignment_workers || []).length,
+              m = `${c} worker${c === 1 ? "" : "s"}`;
+            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s} (${m})`;
           });
         return [`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
 `);
@@ -36602,7 +36619,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1: lorry @ driver, address and workers. Copy 2: only sites with foremen. Edit the copy box before copying if needed.",
+                        "Copy 1: shows sites with workers or lorry. Foreman-only sites are skipped. Copy 2: sites with foremen and worker count only. Edit the copy box before copying if needed.",
                     }),
                   ],
                 }),
@@ -36904,7 +36921,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     }),
                     kgSelectedSite &&
                       d.jsxs("div", {
-                        className: "wide site-history-box",
+                        className: "site-history-box site-history-sticky",
                         children: [
                           d.jsx("strong", { children: "Site detail" }),
                           d.jsxs("div", { className: "site-history-line", children: ["Foreman: ", kgSiteForemanText(kgSelectedSite)] }),
@@ -37039,11 +37056,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "check-grid",
                               children: p.foremen
                                 .filter((V) => kgForemanType(V) === "boss")
-                                .map((V) =>
-                                  d.jsxs(
+                                .map((V) => {
+                                  const xe = kgAlreadyAssignedForemanSites(s, S, V.id);
+                                  return d.jsxs(
                                     "label",
                                     {
-                                      className: "check-card",
+                                      className: `check-card ${xe.length ? "duplicate-worker duplicate-foreman" : ""}`,
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -37052,12 +37070,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           ),
                                           onChange: () => z(V.id),
                                         }),
-                                        d.jsx("span", { children: kgNameNick(V) }),
+                                        d.jsxs("span", {
+                                          children: [
+                                            kgNameNick(V),
+                                            xe.length > 0 &&
+                                              d.jsxs("small", {
+                                                children: ["Already: ", kgAssignmentSiteAddressList(xe)],
+                                              }),
+                                          ],
+                                        }),
                                       ],
                                     },
                                     V.id,
-                                  ),
-                                ),
+                                  );
+                                }),
                             }),
                           ],
                         }),
@@ -37073,11 +37099,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "check-grid",
                               children: p.foremen
                                 .filter((V) => kgForemanType(V) === "project")
-                                .map((V) =>
-                                  d.jsxs(
+                                .map((V) => {
+                                  const xe = kgAlreadyAssignedForemanSites(s, S, V.id);
+                                  return d.jsxs(
                                     "label",
                                     {
-                                      className: "check-card",
+                                      className: `check-card ${xe.length ? "duplicate-worker duplicate-foreman" : ""}`,
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -37086,12 +37113,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           ),
                                           onChange: () => z(V.id),
                                         }),
-                                        d.jsx("span", { children: kgNameNick(V) }),
+                                        d.jsxs("span", {
+                                          children: [
+                                            kgNameNick(V),
+                                            xe.length > 0 &&
+                                              d.jsxs("small", {
+                                                children: ["Already: ", kgAssignmentSiteAddressList(xe)],
+                                              }),
+                                          ],
+                                        }),
                                       ],
                                     },
                                     V.id,
-                                  ),
-                                ),
+                                  );
+                                }),
                             }),
                           ],
                         }),
@@ -41466,6 +41501,45 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
       .site-history-item b {
         color: #0f766e;
+      }
+
+      .modal:has(.site-history-sticky) {
+        width: min(1160px, 100%);
+      }
+      .form-grid:has(.site-history-sticky) {
+        grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
+        align-items: start;
+      }
+      .site-history-sticky {
+        grid-column: 1 / 2 !important;
+        position: sticky;
+        top: 0;
+        align-self: start;
+        max-height: calc(90vh - 130px);
+        overflow-y: auto;
+        z-index: 2;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      }
+      .site-history-sticky .site-history-list {
+        max-height: none;
+      }
+      .duplicate-foreman {
+        border-color: #e9b66d !important;
+        background: #fffaf0;
+      }
+      @media (max-width: 820px) {
+        .modal:has(.site-history-sticky) {
+          width: min(96vw, 100%);
+        }
+        .form-grid:has(.site-history-sticky) {
+          grid-template-columns: 1fr;
+        }
+        .site-history-sticky {
+          grid-column: auto !important;
+          position: sticky;
+          top: 0;
+          max-height: 42vh;
+        }
       }
       .calendar-export-bar {
         margin-bottom: 14px;
