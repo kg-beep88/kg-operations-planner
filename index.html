@@ -36066,7 +36066,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .eq("site_id", Number(w.site_id))
                 .lte("plan_date", ri(0))
                 .order("plan_date", { ascending: !1 })
-                .limit(20);
+                .limit(10);
               if (!V) {
                 Le ? (j(Le.message), kgSetSiteHistory([])) : kgSetSiteHistory(ke || []);
                 kgSetSiteHistoryLoading(!1);
@@ -36923,10 +36923,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       d.jsxs("div", {
                         className: "site-history-box site-history-sticky",
                         children: [
-                          d.jsx("strong", { children: "Site detail" }),
+                          d.jsx("strong", { children: "Site detail / recent 10 days" }),
                           d.jsxs("div", { className: "site-history-line", children: ["Foreman: ", kgSiteForemanText(kgSelectedSite)] }),
                           d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
                           d.jsx("strong", { children: "Previous manpower / foreman went before" }),
+                          d.jsx("div", { className: "site-history-empty", children: "Shows latest 10 past records for this site." }),
                           kgSiteHistoryLoading
                             ? d.jsx("div", { className: "site-history-empty", children: "Loading site history…" })
                             : kgSiteHistory.length === 0
@@ -41504,21 +41505,30 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
 
       .modal:has(.site-history-sticky) {
-        width: min(1160px, 100%);
+        width: min(1280px, 100%);
       }
       .form-grid:has(.site-history-sticky) {
-        grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
+        grid-template-columns: minmax(520px, 1fr) minmax(360px, 420px);
         align-items: start;
       }
+      .form-grid:has(.site-history-sticky) > .wide,
+      .form-grid:has(.site-history-sticky) > label,
+      .form-grid:has(.site-history-sticky) > .foreman-split,
+      .form-grid:has(.site-history-sticky) > .form-actions {
+        grid-column: 1 / 2;
+      }
       .site-history-sticky {
-        grid-column: 1 / 2 !important;
+        grid-column: 2 / 3 !important;
+        grid-row: 1 / span 30;
         position: sticky;
         top: 0;
         align-self: start;
         max-height: calc(90vh - 130px);
+        min-height: 360px;
         overflow-y: auto;
         z-index: 2;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+        border: 2px solid #99d6cf;
       }
       .site-history-sticky .site-history-list {
         max-height: none;
@@ -41534,11 +41544,19 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         .form-grid:has(.site-history-sticky) {
           grid-template-columns: 1fr;
         }
+        .form-grid:has(.site-history-sticky) > .wide,
+        .form-grid:has(.site-history-sticky) > label,
+        .form-grid:has(.site-history-sticky) > .foreman-split,
+        .form-grid:has(.site-history-sticky) > .form-actions {
+          grid-column: auto;
+        }
         .site-history-sticky {
           grid-column: auto !important;
+          grid-row: auto;
           position: sticky;
           top: 0;
           max-height: 42vh;
+          min-height: 0;
         }
       }
       .calendar-export-bar {
