@@ -16489,14 +16489,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       const _s = `
   id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed, lorry_id,
-  site:sites(id,address,status,pic,foreman_detail),
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status))
 `,
         w0 = `
   id, delivery_date, sent_on, notes, created_at, updated_at,
-  site:sites(id,address,status),
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge),
   delivery_order_items(
     id, catalog_item_id, category, item_name, size,
     quantity_delivered, quantity_returned, unit_cost, sort_order
@@ -33876,68 +33876,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }
         W6(n, t, { compression: !0 });
       }
-      const kgBackupTables = [
-        "sites",
-        "workers",
-        "foremen",
-        "lorries",
-        "delivery_catalog",
-        "site_assignments",
-        "assignment_lorries",
-        "assignment_foremen",
-        "assignment_workers",
-        "delivery_orders",
-        "delivery_order_items",
-        "plan_sections",
-      ];
-      const kgBackupConflict = {
-        assignment_lorries: "assignment_id,lorry_id",
-        assignment_foremen: "assignment_id,foreman_id",
-        assignment_workers: "assignment_id,worker_id",
-      };
-      function kgDownloadTextFile(t, r, n = "application/json") {
-        const l = new Blob([r], { type: n }),
-          s = URL.createObjectURL(l),
-          f = document.createElement("a");
-        ((f.href = s), (f.download = t), document.body.appendChild(f), f.click(), f.remove(), URL.revokeObjectURL(s));
-      }
-      async function kgFetchRawBackupTable(t) {
-        const { data: r, error: n } = await qe.from(t).select("*").limit(1e5);
-        if (n) throw new Error(`${t}: ${n.message}`);
-        return r || [];
-      }
-      async function kgExportAllJson(t) {
-        const r = { exported_at: new Date().toISOString(), app: "KG Operations Planner", version: "site-history-backup", data: {}, note: "Passwords and password hashes are not exported." };
-        for (const n of kgBackupTables) r.data[n] = await kgFetchRawBackupTable(n);
-        if ((t == null ? void 0 : t.role) === "admin") {
-          const { data: n, error: l } = await qe.rpc("app_admin_list_users");
-          r.data.users = l ? [] : (n || []).map((s) => ({ username: s.username, full_name: s.full_name || "", role: s.role, is_active: !!s.is_active }));
-        }
-        kgDownloadTextFile(`KG-Full-Backup-${ri(0)}.json`, JSON.stringify(r, null, 2));
-      }
-      async function kgUpsertBackupRows(t, r) {
-        if (!Array.isArray(r) || !r.length) return 0;
-        const n = kgBackupConflict[t] || "id",
-          l = new URL(`${Z0}/rest/v1/${encodeURIComponent(t)}`);
-        l.searchParams.set("on_conflict", n);
-        const s = VS();
-        s.Prefer = "resolution=merge-duplicates,return=minimal";
-        const f = await fetch(l.toString(), { method: "POST", headers: s, body: JSON.stringify(r), mode: "cors", cache: "no-store" }),
-          c = await f.text();
-        if (!f.ok) {
-          let m = c;
-          try { const v = JSON.parse(c); m = v.message || v.details || c; } catch {}
-          throw new Error(`${t}: ${m}`);
-        }
-        return r.length;
-      }
-      async function kgImportAllJsonFile(t) {
-        const r = JSON.parse(await t.text()),
-          n = r.data || r.tables || r;
-        let l = 0;
-        for (const s of kgBackupTables) l += await kgUpsertBackupRows(s, n[s] || []);
-        return l;
-      }
       function S0(t) {
         return (
           ((t == null ? void 0 : t.delivery_order_items) || [])
@@ -34439,8 +34377,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   rows: V.map((Pe) => ({
                     ID: Pe.id,
                     Address: Pe.address,
-                    Foreman: Pe.foreman_detail || "",
-                    PIC: Pe.pic || "",
                     Status: Pe.status,
                     Notes: Pe.notes || "",
                     Created: Pe.created_at,
@@ -34538,39 +34474,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             he(!1);
           }
         }
-        async function kgDoExportJson() {
-          (he(!0), j(""));
-          try {
-            await kgExportAllJson(t);
-          } catch (B) {
-            j(B instanceof Error ? B.message : String(B));
-          } finally {
-            he(!1);
-          }
-        }
-        function kgDoImportJson() {
-          if (!(t.role === "admin" || t.role === "operation")) return;
-          const B = document.createElement("input");
-          B.type = "file";
-          B.accept = ".json,application/json";
-          B.onchange = async () => {
-            const me = B.files && B.files[0];
-            if (!me) return;
-            if (!window.confirm("Import this KG JSON backup? It will update matching records and add missing records. It will not delete old data.")) return;
-            (he(!0), j(""));
-            try {
-              const ue = await kgImportAllJsonFile(me);
-              alert(`Import completed. ${ue} records added/updated. Refreshing summary now.`);
-              await fe();
-              await G();
-            } catch (ue) {
-              j(ue instanceof Error ? ue.message : String(ue));
-            } finally {
-              he(!1);
-            }
-          };
-          B.click();
-        }
         return d.jsxs("div", {
           className: "page",
           children: [
@@ -34611,19 +34514,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                         W ? "Preparing…" : "Full backup Excel",
                       ],
                     }),
-                    d.jsxs("button", {
-                      className: "secondary-button",
-                      onClick: kgDoExportJson,
-                      disabled: W,
-                      children: [d.jsx(tE, { size: 17 }), "Export all JSON"],
-                    }),
-                    (t.role === "admin" || t.role === "operation") &&
-                      d.jsxs("button", {
-                        className: "secondary-button",
-                        onClick: kgDoImportJson,
-                        disabled: W,
-                        children: [d.jsx(nE, { size: 17 }), "Import JSON"],
-                      }),
                   ],
                 }),
               ],
@@ -35421,14 +35311,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [l, s] = q.useState([]),
           [f, c] = q.useState([]),
           [m, v] = q.useState(!0),
-          [x, p] = q.useState(""),
-          [kgCalSites, kgSetCalSites] = q.useState([]),
-          [kgCalSite, kgSetCalSite] = q.useState(""),
-          [kgCalDay, kgSetCalDay] = q.useState(ri(0));
+          [x, p] = q.useState("");
         async function g() {
           (v(!0), p(""));
           const { start: T, endExclusive: D } = lh(r),
-            [I, L, he] = await Promise.all([
+            [I, L] = await Promise.all([
               qe
                 .from("site_assignments")
                 .select(_s)
@@ -35437,14 +35324,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .order("plan_date"),
               qe
                 .from("delivery_orders")
-                .select("id,delivery_date,sent_on,site:sites(id,address,pic,foreman_detail)")
+                .select("id,delivery_date,sent_on,site:sites(id,address)")
                 .gte("delivery_date", T)
                 .lt("delivery_date", D)
                 .order("delivery_date"),
-              qe.from("sites").select("*").order("address").limit(1e4),
             ]),
-            W = I.error || L.error || he.error;
-          (W && p(W.message), s(I.data || []), c(L.data || []), kgSetCalSites(he.data || []), !kgCalSite && he.data && he.data[0] && kgSetCalSite(String(he.data[0].id)), v(!1));
+            W = I.error || L.error;
+          (W && p(W.message), s(I.data || []), c(L.data || []), v(!1));
         }
         q.useEffect(() => {
           g();
@@ -35487,43 +35373,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           w = ri(0);
         function _(T) {
           (window.sessionStorage.setItem("kg_selected_date", T), t("/"));
-        }
-        async function kgExportCalendarDay() {
-          p("");
-          const [T, D] = await Promise.all([
-            qe.from("site_assignments").select(_s).eq("plan_date", kgCalDay).order("sort_order"),
-            qe.from("delivery_orders").select(w0).eq("delivery_date", kgCalDay).order("created_at"),
-          ]);
-          const I = T.error || D.error;
-          if (I) return p(I.message);
-          Tv(`KG-Calendar-Day-${kgCalDay}.xlsx`, [
-            { name: "Day assignments", rows: wv(T.data || []) },
-            { name: "Delivery orders", rows: Av(D.data || []) },
-            { name: "Delivery items", rows: Cv(D.data || []) },
-          ]);
-        }
-        function kgExportCalendarMonth() {
-          Tv(`KG-Calendar-Month-${r}.xlsx`, [
-            { name: "Month assignments", rows: wv(l) },
-            { name: "Delivery orders", rows: Av(f) },
-            { name: "Delivery items", rows: Cv(f) },
-          ]);
-        }
-        async function kgExportCalendarSiteAll() {
-          if (!kgCalSite) return p("Choose one site first.");
-          p("");
-          const today = ri(0), site = kgCalSites.find((T) => Number(T.id) === Number(kgCalSite));
-          const [T, D] = await Promise.all([
-            qe.from("site_assignments").select(_s).eq("site_id", Number(kgCalSite)).lte("plan_date", today).order("plan_date").limit(1e4),
-            qe.from("delivery_orders").select(w0).eq("site_id", Number(kgCalSite)).lte("delivery_date", today).order("delivery_date").limit(1e4),
-          ]);
-          const I = T.error || D.error;
-          if (I) return p(I.message);
-          Tv(`KG-Calendar-Site-${(site && site.address ? site.address : kgCalSite).slice(0, 24)}-${today}.xlsx`, [
-            { name: "Site assignments", rows: wv(T.data || []) },
-            { name: "Delivery orders", rows: Av(D.data || []) },
-            { name: "Delivery items", rows: Cv(D.data || []) },
-          ]);
         }
         return d.jsxs("div", {
           className: "page calendar-page",
@@ -35573,16 +35422,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               ],
             }),
             d.jsx("div", { className: "month-title", children: fp(r) }),
-            d.jsxs("div", {
-              className: "calendar-export-bar panel",
-              children: [
-                d.jsxs("label", { children: ["Export day", d.jsx("input", { type: "date", value: kgCalDay, onChange: (T) => kgSetCalDay(T.target.value) })] }),
-                d.jsx("button", { className: "secondary-button", onClick: kgExportCalendarDay, children: "Export day" }),
-                d.jsx("button", { className: "secondary-button", onClick: kgExportCalendarMonth, children: "Export this month all sites" }),
-                d.jsxs("label", { children: ["One site start till today", d.jsx("select", { value: kgCalSite, onChange: (T) => kgSetCalSite(T.target.value), children: kgCalSites.map((T) => d.jsx("option", { value: T.id, children: T.address }, T.id)) })] }),
-                d.jsx("button", { className: "primary-button", onClick: kgExportCalendarSiteAll, children: "Export selected site" }),
-              ],
-            }),
             x && d.jsx("div", { className: "error-box", children: x }),
             d.jsxs("section", {
               className: "month-calendar panel",
@@ -35716,17 +35555,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const [r, n, l] = String(t).split("-");
         return `${l}.${n}.${r} (${kgDayShort(t)})`;
       }
-      function kgHistoryDate(t) {
-        if (!t) return "-";
-        const [r, n, l] = String(t).split("-");
-        return `${l}.${n} (${kgDayShort(t)})`;
-      }
-      function kgSitePicText(t) {
-        return Ca((t == null ? void 0 : t.pic) || (t == null ? void 0 : t.site_pic), "-");
-      }
-      function kgSiteForemanText(t) {
-        return Ca((t == null ? void 0 : t.foreman_detail) || (t == null ? void 0 : t.site_foreman) || (t == null ? void 0 : t.foreman), "-");
-      }
       function kgAssignmentLorries(t) {
         const r = (t.assignment_lorries || [])
           .filter((n) => n && n.lorry && n.lorry.id)
@@ -35809,22 +35637,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           })
           .filter(Boolean);
       }
-      function kgAlreadyAssignedForemanSites(t, r, n) {
-        return (t || []).filter(
-          (l) =>
-            l.id !== r &&
-            ar(l).some((s) => Number(s.id) === Number(n)),
-        );
-      }
-      function kgAssignmentSiteAddressList(t) {
-        return (t || [])
-          .map((r) => {
-            var n;
-            return (n = r.site) == null ? void 0 : n.address;
-          })
-          .filter(Boolean)
-          .join(", ");
-      }
       const kgDailyExcelRows = (t, r = []) => {
         const n = kgSortAssignmentsByLorry(t || []).map((l) => {
           var s;
@@ -35834,7 +35646,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             Foremen: kgForemanNames(l),
             Date: l.plan_date ? cp(l.plan_date).replaceAll(".", "/") : "",
             "Job status": l.job_status || l.jobStatus || "",
-            PIC: l.pic || l.pic_name || l.picName || ((s = l.site) == null ? void 0 : s.pic) || "",
+            PIC: l.pic || l.pic_name || l.picName || "",
             Address: Ca((s = l.site) == null ? void 0 : s.address, ""),
           };
         });
@@ -35864,9 +35676,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
           const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean);
+          if (!v.length) continue;
           const x = kgAssignmentLorries(m), p = x.length ? x : [null];
-          // Copy 1 rule: show site if got worker OR got lorry. Skip if only foreman.
-          if (!v.length && !x.length) continue;
           for (const g of p) {
             const S = g && g.id ? `lorry-${g.id}` : "unassigned";
             (l.has(S) || l.set(S, { lorry: g, items: [] }), l.get(S).items.push({ assignment: m, workers: v }));
@@ -35878,9 +35689,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               const x = m ? `*${kgLorryText(m)}*` : "*No lorry*",
                 p = v.map(({ assignment: g, workers: S }) => {
                   var E;
-                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "",
-                    k = Ca((E = g.site) == null ? void 0 : E.address);
-                  return S.length ? `* ${k}${w} - ${S.join(" + ")}` : `* ${k}${w}`;
+                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
+                  return `* ${Ca((E = g.site) == null ? void 0 : E.address)}${w} - ${S.join(" + ")}`;
                 });
               return [x, ...p].join(`
 `);
@@ -35900,10 +35710,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           .filter((l) => ar(l).length > 0)
           .map((l) => {
             var f;
-            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + "),
-              c = (l.assignment_workers || []).length,
-              m = `${c} worker${c === 1 ? "" : "s"}`;
-            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s} (${m})`;
+            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + ");
+            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s}`;
           });
         return [`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
 `);
@@ -36009,9 +35817,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [I, L] = q.useState({ title: "", body: "" }),
           [W, he] = q.useState(""),
           [J, j] = q.useState(""),
-          [fe, G] = q.useState(!0),
-          [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
-          [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1);
+          [fe, G] = q.useState(!0);
         async function de() {
           const V = await sh();
           (V.error && j(V.error.message), g(V.data));
@@ -36051,32 +35857,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }, []),
           q.useEffect(() => {
             oe();
-          }, [n]),
-          q.useEffect(() => {
-            let V = !1;
-            async function xe() {
-              if (!S || !w.site_id) {
-                kgSetSiteHistory([]);
-                return;
-              }
-              kgSetSiteHistoryLoading(!0);
-              const { data: ke, error: Le } = await qe
-                .from("site_assignments")
-                .select(_s)
-                .eq("site_id", Number(w.site_id))
-                .lte("plan_date", ri(0))
-                .order("plan_date", { ascending: !1 })
-                .limit(10);
-              if (!V) {
-                Le ? (j(Le.message), kgSetSiteHistory([])) : kgSetSiteHistory(ke || []);
-                kgSetSiteHistoryLoading(!1);
-              }
-            }
-            xe();
-            return () => {
-              V = !0;
-            };
-          }, [S, w.site_id]));
+          }, [n]));
         const ge = q.useMemo(() => Go(s), [s]),
           Ne = q.useMemo(() => op(s), [s]),
           Ye = q.useMemo(
@@ -36130,12 +35911,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           ),
           kgRows = q.useMemo(() => kgSortAssignmentsByLorry(s), [s]),
           kgRankMap = q.useMemo(() => kgBuildRankMap(kgRows), [kgRows]),
-          kgSelectedSite = p.sites.find((V) => Number(V.id) === Number(w.site_id));
+          kgSelectedSite = q.useMemo(
+            () => p.sites.find((V) => Number(V.id) === Number(w.site_id)) || null,
+            [p.sites, w.site_id],
+          );
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
         function P(V = "") {
-          (E("new"), _({ ...Bo, site_id: V ? String(V) : "" }));
+          const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
+          (E("new"), _({ ...Bo, site_id: V ? String(V) : "", pic: xe && xe.pic ? xe.pic : "" }));
         }
         function N(V) {
           var xe;
@@ -36619,7 +36404,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1: shows sites with workers or lorry. Foreman-only sites are skipped. Copy 2: sites with foremen and worker count only. Edit the copy box before copying if needed.",
+                        "Copy 1: lorry @ driver, address and workers. Copy 2: only sites with foremen. Edit the copy box before copying if needed.",
                     }),
                   ],
                 }),
@@ -36742,12 +36527,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             }),
                                             d.jsxs("span", { children: ["Status: ", V.job_status || "NEW"] }),
                                             d.jsxs("span", { children: ["P.I.C.: ", V.pic || ((V.site || {}).pic) || "-"] }),
+                                            d.jsxs("span", { children: ["Foreman in charge: ", ((V.site || {}).foreman_in_charge) || "-"] }),
                                             d.jsxs("span", {
                                               children: [
                                                 d.jsx(ei, { size: 15 }),
                                                 ke.length
                                                   ? ke.join(", ")
-                                                  : ((V.site || {}).foreman_detail ? `Site foreman: ${(V.site || {}).foreman_detail}` : "No foreman"),
+                                                  : "No foreman",
                                                 " · ",
                                                 ke.length,
                                                 " shift",
@@ -36900,7 +36686,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           value: w.site_id,
                           onChange: (V) => {
                             const xe = p.sites.find((ke) => Number(ke.id) === Number(V.target.value));
-                            _({ ...w, site_id: V.target.value, pic: w.pic || (xe && xe.pic) || "" });
+                            _({ ...w, site_id: V.target.value, pic: w.pic || (xe && xe.pic ? xe.pic : "") });
                           },
                           required: !0,
                           children: [
@@ -36921,35 +36707,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     }),
                     kgSelectedSite &&
                       d.jsxs("div", {
-                        className: "site-history-box site-history-sticky",
+                        className: "site-detail-box wide",
                         children: [
-                          d.jsx("strong", { children: "Site detail / recent 10 days" }),
-                          d.jsxs("div", { className: "site-history-line", children: ["Foreman: ", kgSiteForemanText(kgSelectedSite)] }),
-                          d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
-                          d.jsx("strong", { children: "Previous manpower / foreman went before" }),
-                          d.jsx("div", { className: "site-history-empty", children: "Shows latest 10 past records for this site." }),
-                          kgSiteHistoryLoading
-                            ? d.jsx("div", { className: "site-history-empty", children: "Loading site history…" })
-                            : kgSiteHistory.length === 0
-                              ? d.jsx("div", { className: "site-history-empty", children: "No past record for this site yet." })
-                              : d.jsx("div", {
-                                  className: "site-history-list",
-                                  children: kgSiteHistory.map((V) =>
-                                    d.jsxs(
-                                      "div",
-                                      {
-                                        className: "site-history-item",
-                                        children: [
-                                          d.jsx("b", { children: kgHistoryDate(V.plan_date) }),
-                                          d.jsxs("span", { children: ["Foreman: ", kgForemanNames(V) || "-"] }),
-                                          d.jsxs("span", { children: ["Worker: ", kgWorkerNames(V) || "-"] }),
-                                          d.jsxs("span", { children: ["P.I.C.: ", V.pic || kgSitePicText(V.site)] }),
-                                        ],
-                                      },
-                                      V.id,
-                                    ),
-                                  ),
-                                }),
+                          d.jsx("strong", { children: "Site detail" }),
+                          d.jsxs("span", { children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
+                          d.jsxs("span", { children: ["Foreman detail: ", kgSelectedSite.foreman_detail || "-"] }),
+                          d.jsxs("span", { children: ["P.I.C.: ", kgSelectedSite.pic || "-"] }),
                         ],
                       }),
                     d.jsxs("label", {
@@ -37057,12 +36820,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "check-grid",
                               children: p.foremen
                                 .filter((V) => kgForemanType(V) === "boss")
-                                .map((V) => {
-                                  const xe = kgAlreadyAssignedForemanSites(s, S, V.id);
-                                  return d.jsxs(
+                                .map((V) =>
+                                  d.jsxs(
                                     "label",
                                     {
-                                      className: `check-card ${xe.length ? "duplicate-worker duplicate-foreman" : ""}`,
+                                      className: "check-card",
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -37071,20 +36833,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           ),
                                           onChange: () => z(V.id),
                                         }),
-                                        d.jsxs("span", {
-                                          children: [
-                                            kgNameNick(V),
-                                            xe.length > 0 &&
-                                              d.jsxs("small", {
-                                                children: ["Already: ", kgAssignmentSiteAddressList(xe)],
-                                              }),
-                                          ],
-                                        }),
+                                        d.jsx("span", { children: kgNameNick(V) }),
                                       ],
                                     },
                                     V.id,
-                                  );
-                                }),
+                                  ),
+                                ),
                             }),
                           ],
                         }),
@@ -37100,12 +36854,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "check-grid",
                               children: p.foremen
                                 .filter((V) => kgForemanType(V) === "project")
-                                .map((V) => {
-                                  const xe = kgAlreadyAssignedForemanSites(s, S, V.id);
-                                  return d.jsxs(
+                                .map((V) =>
+                                  d.jsxs(
                                     "label",
                                     {
-                                      className: `check-card ${xe.length ? "duplicate-worker duplicate-foreman" : ""}`,
+                                      className: "check-card",
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -37114,20 +36867,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           ),
                                           onChange: () => z(V.id),
                                         }),
-                                        d.jsxs("span", {
-                                          children: [
-                                            kgNameNick(V),
-                                            xe.length > 0 &&
-                                              d.jsxs("small", {
-                                                children: ["Already: ", kgAssignmentSiteAddressList(xe)],
-                                              }),
-                                          ],
-                                        }),
+                                        d.jsx("span", { children: kgNameNick(V) }),
                                       ],
                                     },
                                     V.id,
-                                  );
-                                }),
+                                  ),
+                                ),
                             }),
                           ],
                         }),
@@ -39063,13 +38808,15 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             "Maintain addresses and whether each site is active, paused or closed.",
           columns: [
             { key: "address", label: "Address" },
-            { key: "foreman_detail", label: "Foreman" },
+            { key: "foreman_in_charge", label: "Foreman in charge" },
+            { key: "foreman_detail", label: "Foreman detail" },
             { key: "pic", label: "P.I.C." },
             { key: "notes", label: "Notes" },
           ],
           fields: [
             { name: "address", label: "Address", required: !0, wide: !0 },
-            { name: "foreman_detail", label: "Foreman detail", wide: !0 },
+            { name: "foreman_in_charge", label: "Foreman in charge" },
+            { name: "foreman_detail", label: "Foreman detail", type: "textarea", wide: !0 },
             { name: "pic", label: "P.I.C." },
             { name: "notes", label: "Notes", type: "textarea", wide: !0 },
           ],
@@ -39670,19 +39417,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         setInterval(kgAddCopyPanel, 800);
         window.addEventListener("hashchange", kgAddCopyPanel);
         window.addEventListener("popstate", kgAddCopyPanel);
-      })();
-
-      (function KgHideExtraCopy1Sections() {
-        function hide() {
-          document.querySelectorAll("section.panel").forEach((el) => {
-            const h2 = el.querySelector("h2");
-            if (h2 && h2.textContent && h2.textContent.trim() === "Extra Copy 1 sections") el.style.display = "none";
-          });
-        }
-        setInterval(hide, 800);
-        window.addEventListener("hashchange", hide);
-        window.addEventListener("popstate", hide);
-        setTimeout(hide, 300);
       })();
 
       c_.createRoot(document.getElementById("root")).render(
@@ -41468,123 +41202,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }
       }
 
-
-      .site-history-box {
-        border: 1px solid #dbe8e5;
-        border-radius: 14px;
-        background: #f8fcfb;
-        padding: 12px;
-        display: grid;
-        gap: 8px;
-      }
-      .site-history-box > strong {
-        color: #143d38;
-      }
-      .site-history-line,
-      .site-history-empty {
-        color: var(--muted);
-        font-size: 13px;
-      }
-      .site-history-list {
-        display: grid;
-        gap: 7px;
-        max-height: 220px;
-        overflow-y: auto;
-      }
-      .site-history-item {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: #fff;
-        padding: 8px;
-        display: grid;
-        gap: 3px;
-        font-size: 12px;
-      }
-      .site-history-item b {
-        color: #0f766e;
-      }
-
-      .modal:has(.site-history-sticky) {
-        width: min(1280px, 100%);
-      }
-      .form-grid:has(.site-history-sticky) {
-        grid-template-columns: minmax(520px, 1fr) minmax(360px, 420px);
-        align-items: start;
-      }
-      .form-grid:has(.site-history-sticky) > .wide,
-      .form-grid:has(.site-history-sticky) > label,
-      .form-grid:has(.site-history-sticky) > .foreman-split,
-      .form-grid:has(.site-history-sticky) > .form-actions {
-        grid-column: 1 / 2;
-      }
-      .site-history-sticky {
-        grid-column: 2 / 3 !important;
-        grid-row: 1 / span 30;
-        position: sticky;
-        top: 0;
-        align-self: start;
-        max-height: calc(90vh - 130px);
-        min-height: 360px;
-        overflow-y: auto;
-        z-index: 2;
-        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
-        border: 2px solid #99d6cf;
-      }
-      .site-history-sticky .site-history-list {
-        max-height: none;
-      }
-      .duplicate-foreman {
-        border-color: #e9b66d !important;
-        background: #fffaf0;
-      }
-      @media (max-width: 820px) {
-        .modal:has(.site-history-sticky) {
-          width: min(96vw, 100%);
-        }
-        .form-grid:has(.site-history-sticky) {
-          grid-template-columns: 1fr;
-        }
-        .form-grid:has(.site-history-sticky) > .wide,
-        .form-grid:has(.site-history-sticky) > label,
-        .form-grid:has(.site-history-sticky) > .foreman-split,
-        .form-grid:has(.site-history-sticky) > .form-actions {
-          grid-column: auto;
-        }
-        .site-history-sticky {
-          grid-column: auto !important;
-          grid-row: auto;
-          position: sticky;
-          top: 0;
-          max-height: 42vh;
-          min-height: 0;
-        }
-      }
-      .calendar-export-bar {
-        margin-bottom: 14px;
-        padding: 12px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: end;
-      }
-      .calendar-export-bar label {
-        display: grid;
-        gap: 5px;
-        min-width: 180px;
-        font-size: 12px;
-        font-weight: 800;
-        color: var(--muted);
-      }
-      .calendar-export-bar input,
-      .calendar-export-bar select {
-        height: 42px;
-        border-radius: 10px;
-        border: 1px solid var(--line);
-        padding: 0 10px;
-        background: #fff;
-        color: var(--ink);
-        font-weight: 700;
-      }
       .assignment-card.site-confirmed {
         border-color: #22c55e;
         background: linear-gradient(135deg, #ecfdf5, #ffffff 70%);
@@ -41622,6 +41239,18 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         letter-spacing: 0;
         color: var(--ink);
       }
+
+      .site-detail-box {
+        display: grid;
+        gap: 6px;
+        padding: 12px 14px;
+        border: 1px solid #99f6e4;
+        border-radius: 16px;
+        background: #f0fdfa;
+        color: #134e4a;
+      }
+      .site-detail-box strong { color: #0f766e; font-size: 15px; }
+      .site-detail-box span { font-size: 14px; font-weight: 700; line-height: 1.35; }
       .backlog-list { display: grid; gap: 10px; }
       .backlog-item {
         display: grid;
