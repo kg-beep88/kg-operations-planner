@@ -38036,7 +38036,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           (x("new"), g({ ...l }));
         }
         function L(J) {
-          (x(J.id), g({ ...J }));
+          (x(J.id),
+            g({
+              ...l,
+              ...J,
+              ...(r.table === "foremen"
+                ? { foreman_type: J.foreman_type || "project" }
+                : {}),
+            }));
         }
         async function W(J) {
           (J.preventDefault(), _(""));
@@ -38080,12 +38087,30 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             );
           await T();
         }
+        async function kgToggleForemanType(J) {
+          if (r.table !== "foremen" || !n) return;
+          const j = kgForemanType(J) === "boss" ? "project" : "boss",
+            fe = j === "boss" ? "Boss foreman" : "Project foreman",
+            G = J.nickname || J.name || "this foreman";
+          if (!window.confirm(`Change ${G} to ${fe}?`)) return;
+          _("");
+          const { error: de } = await qe
+            .from("foremen")
+            .update({ foreman_type: j })
+            .eq("id", J.id);
+          if (de) return _(de.message);
+          await T();
+        }
         function he(J, j) {
-          return j.format === "money"
-            ? rr(J[j.key])
-            : J[j.key] === 0
-              ? "0"
-              : J[j.key] || "—";
+          return j.key === "foreman_type"
+            ? kgForemanType(J) === "boss"
+              ? "Boss foreman"
+              : "Project foreman"
+            : j.format === "money"
+              ? rr(J[j.key])
+              : J[j.key] === 0
+                ? "0"
+                : J[j.key] || "—";
         }
         return d.jsxs("div", {
           className: "page",
@@ -38205,6 +38230,18 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               flexWrap: "wrap",
                                             },
                                             children: [
+                                              r.table === "foremen" &&
+                                                d.jsx("button", {
+                                                  type: "button",
+                                                  className:
+                                                    "secondary-button small-button",
+                                                  onClick: () =>
+                                                    kgToggleForemanType(J),
+                                                  children:
+                                                    kgForemanType(J) === "boss"
+                                                      ? "Make Project"
+                                                      : "Make Boss",
+                                                }),
                                               d.jsx("button", {
                                                 className: "icon-button",
                                                 onClick: () => L(J),
@@ -38957,12 +38994,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "foremen",
           orderBy: "nickname",
           description:
-            "Maintain foremen available for site assignment. Add nickname, pass and license details. Lists are arranged by nickname.",
+            "Maintain foremen available for site assignment. Add nickname, pass, license and choose Boss foreman or Project foreman. Lists are arranged by nickname.",
           searchPlaceholder:
-            "Search name, nickname, phone, pass, license — type pass or license to show only those records…",
+            "Search name, nickname, phone, pass, license, boss or project — type pass or license to show only those records…",
           columns: [
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
+            { key: "foreman_type", label: "Foreman type" },
             { key: "phone", label: "Phone" },
             { key: "pass", label: "Pass" },
             { key: "license", label: "License" },
@@ -38970,10 +39008,21 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           fields: [
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Foreman full name", required: !0 },
+            {
+              name: "foreman_type",
+              label: "Foreman type",
+              type: "select",
+              required: !0,
+              options: [
+                ["project", "Project foreman"],
+                ["boss", "Boss foreman"],
+              ],
+            },
             { name: "phone", label: "Phone" },
             { name: "pass", label: "Pass" },
             { name: "license", label: "License" },
           ],
+          defaults: { foreman_type: "project" },
         },
         catalog: {
           title: "Delivery Items",
