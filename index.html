@@ -34666,7 +34666,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                           re.length === 0
                             ? d.jsx("div", {
                                 className: "warning-empty",
-                                children: "All active sites have workers.",
+                                children: "All active sites are already added for this day.",
                               })
                             : re.map((B) =>
                                 d.jsxs(
@@ -35637,6 +35637,39 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           })
           .filter(Boolean);
       }
+      function kgHistoryDate(t) {
+        if (!t) return "-";
+        const [r, n, l] = String(t).split("-");
+        return `${l}.${n} (${kgDayShort(t)})`;
+      }
+      function kgSitePicText(t) {
+        return Ca((t == null ? void 0 : t.pic) || (t == null ? void 0 : t.site_pic), "-");
+      }
+      function kgSiteForemanText(t) {
+        return Ca(
+          (t == null ? void 0 : t.foreman_in_charge) ||
+            (t == null ? void 0 : t.foreman_detail) ||
+            (t == null ? void 0 : t.site_foreman) ||
+            (t == null ? void 0 : t.foreman),
+          "-",
+        );
+      }
+      function kgAlreadyAssignedForemanSites(t, r, n) {
+        return (t || []).filter(
+          (l) =>
+            l.id !== r &&
+            ar(l).some((s) => Number(s.id) === Number(n)),
+        );
+      }
+      function kgAssignmentSiteAddressList(t) {
+        return (t || [])
+          .map((r) => {
+            var n;
+            return (n = r.site) == null ? void 0 : n.address;
+          })
+          .filter(Boolean)
+          .join(", ");
+      }
       const kgDailyExcelRows = (t, r = []) => {
         const n = kgSortAssignmentsByLorry(t || []).map((l) => {
           var s;
@@ -35675,9 +35708,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
-          const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean);
-          if (!v.length) continue;
-          const x = kgAssignmentLorries(m), p = x.length ? x : [null];
+          const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean),
+            x = kgAssignmentLorries(m);
+          if (!v.length && !x.length) continue;
+          const p = x.length ? x : [null];
           for (const g of p) {
             const S = g && g.id ? `lorry-${g.id}` : "unassigned";
             (l.has(S) || l.set(S, { lorry: g, items: [] }), l.get(S).items.push({ assignment: m, workers: v }));
@@ -35689,8 +35723,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               const x = m ? `*${kgLorryText(m)}*` : "*No lorry*",
                 p = v.map(({ assignment: g, workers: S }) => {
                   var E;
-                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "";
-                  return `* ${Ca((E = g.site) == null ? void 0 : E.address)}${w} - ${S.join(" + ")}`;
+                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "",
+                    _ = Ca((E = g.site) == null ? void 0 : E.address);
+                  return S.length ? `* ${_}${w} - ${S.join(" + ")}` : `* ${_}${w}`;
                 });
               return [x, ...p].join(`
 `);
@@ -35710,8 +35745,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           .filter((l) => ar(l).length > 0)
           .map((l) => {
             var f;
-            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + ");
-            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s}`;
+            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + "),
+              c = (l.assignment_workers || []).length,
+              m = `${c} worker${c === 1 ? "" : "s"}`;
+            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s} (${m})`;
           });
         return [`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
 `);
@@ -35817,7 +35854,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [I, L] = q.useState({ title: "", body: "" }),
           [W, he] = q.useState(""),
           [J, j] = q.useState(""),
-          [fe, G] = q.useState(!0);
+          [fe, G] = q.useState(!0),
+          [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
+          [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1);
         async function de() {
           const V = await sh();
           (V.error && j(V.error.message), g(V.data));
@@ -35857,18 +35896,43 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }, []),
           q.useEffect(() => {
             oe();
-          }, [n]));
+          }, [n]),
+          q.useEffect(() => {
+            let V = !1;
+            async function xe() {
+              if (!S || !w.site_id) {
+                kgSetSiteHistory([]);
+                return;
+              }
+              kgSetSiteHistoryLoading(!0);
+              const { data: ke, error: Le } = await qe
+                .from("site_assignments")
+                .select(_s)
+                .eq("site_id", Number(w.site_id))
+                .lt("plan_date", n)
+                .order("plan_date", { ascending: !1 })
+                .limit(10);
+              if (!V) {
+                Le ? (j(Le.message), kgSetSiteHistory([])) : kgSetSiteHistory(ke || []);
+                kgSetSiteHistoryLoading(!1);
+              }
+            }
+            xe();
+            return () => {
+              V = !0;
+            };
+          }, [S, w.site_id, n]));
         const ge = q.useMemo(() => Go(s), [s]),
           Ne = q.useMemo(() => op(s), [s]),
           Ye = q.useMemo(
             () =>
               new Set(
                 s
-                  .filter((V) => (V.assignment_workers || []).length > 0)
                   .map((V) => {
                     var xe;
                     return Number((xe = V.site) == null ? void 0 : xe.id);
-                  }),
+                  })
+                  .filter(Boolean),
               ),
             [s],
           ),
@@ -36158,7 +36222,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         d.jsxs("div", {
                           children: [
                             d.jsx("strong", {
-                              children: "Active sites without workers",
+                              children: "Active sites not added today",
                             }),
                             d.jsxs("span", {
                               children: [
@@ -36675,7 +36739,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   S === "new" ? "Add site assignment" : "Edit site assignment",
                 onClose: () => E(null),
                 children: d.jsxs("form", {
-                  className: "form-grid",
+                  className: "form-grid site-history-layout",
                   onSubmit: se,
                   children: [
                     d.jsxs("label", {
@@ -36694,25 +36758,51 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               value: "",
                               children: "Choose active site",
                             }),
-                            p.sites.map((V) =>
-                              d.jsx(
-                                "option",
-                                { value: V.id, children: V.address },
-                                V.id,
+                            p.sites
+                              .filter((V) => S !== "new" || !Ye.has(Number(V.id)) || Number(w.site_id) === Number(V.id))
+                              .map((V) =>
+                                d.jsx(
+                                  "option",
+                                  { value: V.id, children: V.address },
+                                  V.id,
+                                ),
                               ),
-                            ),
                           ],
                         }),
                       ],
                     }),
                     kgSelectedSite &&
                       d.jsxs("div", {
-                        className: "site-detail-box wide",
+                        className: "site-history-box site-history-sticky",
                         children: [
                           d.jsx("strong", { children: "Site detail" }),
-                          d.jsxs("span", { children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
-                          d.jsxs("span", { children: ["Foreman detail: ", kgSelectedSite.foreman_detail || "-"] }),
-                          d.jsxs("span", { children: ["P.I.C.: ", kgSelectedSite.pic || "-"] }),
+                          d.jsxs("div", { className: "site-history-line", children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
+                          d.jsxs("div", { className: "site-history-line", children: ["Foreman: ", kgSiteForemanText(kgSelectedSite)] }),
+                          d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
+                          d.jsx("strong", { children: "Previous manpower / foreman went before" }),
+                          d.jsx("small", { className: "site-history-note", children: "Latest 10 past records for this site" }),
+                          kgSiteHistoryLoading
+                            ? d.jsx("div", { className: "site-history-empty", children: "Loading site history…" })
+                            : kgSiteHistory.length === 0
+                              ? d.jsx("div", { className: "site-history-empty", children: "No past record for this site yet." })
+                              : d.jsx("div", {
+                                  className: "site-history-list",
+                                  children: kgSiteHistory.map((V) =>
+                                    d.jsxs(
+                                      "div",
+                                      {
+                                        className: "site-history-item",
+                                        children: [
+                                          d.jsx("b", { children: kgHistoryDate(V.plan_date) }),
+                                          d.jsxs("span", { children: ["Foreman: ", kgForemanNames(V) || "-"] }),
+                                          d.jsxs("span", { children: ["Worker: ", kgWorkerNames(V) || "-"] }),
+                                          d.jsxs("span", { children: ["P.I.C.: ", V.pic || kgSitePicText(V.site)] }),
+                                        ],
+                                      },
+                                      V.id,
+                                    ),
+                                  ),
+                                }),
                         ],
                       }),
                     d.jsxs("label", {
@@ -41251,6 +41341,54 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
       .site-detail-box strong { color: #0f766e; font-size: 15px; }
       .site-detail-box span { font-size: 14px; font-weight: 700; line-height: 1.35; }
+      .site-history-box {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 2px solid #14b8a6;
+        border-radius: 18px;
+        background: #ecfdf5;
+        color: #134e4a;
+      }
+      .site-history-box > strong { color: #0f766e; font-size: 16px; }
+      .site-history-line,
+      .site-history-empty {
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.35;
+      }
+      .site-history-note { color: #64748b; font-weight: 800; }
+      .site-history-list { display: grid; gap: 8px; }
+      .site-history-item {
+        display: grid;
+        gap: 4px;
+        padding: 10px 12px;
+        border: 1px solid #99f6e4;
+        border-radius: 14px;
+        background: white;
+      }
+      .site-history-item b { color: #0f766e; }
+      .site-history-item span { font-size: 13px; font-weight: 750; }
+      .modal:has(.site-history-sticky) { width: min(1180px, 100%); }
+      .site-history-layout { grid-template-columns: minmax(360px, 1fr) minmax(360px, 0.8fr); align-items: start; }
+      .site-history-layout > label.wide:first-child { grid-column: 1; }
+      .site-history-layout > .wide:not(.site-history-sticky) { grid-column: 1; }
+      .site-history-sticky {
+        grid-column: 2;
+        grid-row: 1 / span 16;
+        position: sticky;
+        top: 0;
+        max-height: calc(90vh - 120px);
+        overflow-y: auto;
+      }
+      @media (max-width: 900px) {
+        .modal:has(.site-history-sticky) { width: min(780px, 100%); }
+        .site-history-layout { grid-template-columns: 1fr; }
+        .site-history-layout > label.wide:first-child,
+        .site-history-layout > .wide:not(.site-history-sticky),
+        .site-history-sticky { grid-column: auto; grid-row: auto; }
+        .site-history-sticky { position: relative; max-height: 360px; }
+      }
       .backlog-list { display: grid; gap: 10px; }
       .backlog-item {
         display: grid;
