@@ -35605,12 +35605,18 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return Ca(t && t.site && t.site.address, "ZZZ");
       }
       function kgSortPlannerRows(t) {
-        return [...(t || [])].sort((r, n) =>
-          kgPlannerNameKey(r).localeCompare(kgPlannerNameKey(n), void 0, {
+        return [...(t || [])].sort((r, n) => {
+          const l = Number(r.sort_order), s = Number(n.sort_order),
+            f = Number.isFinite(l) && l > 0,
+            c = Number.isFinite(s) && s > 0;
+          if (f && c && l !== s) return l - s;
+          if (f && !c) return -1;
+          if (!f && c) return 1;
+          return kgPlannerNameKey(r).localeCompare(kgPlannerNameKey(n), void 0, {
             numeric: !0,
             sensitivity: "base",
-          }),
-        );
+          });
+        });
       }
       function kgBuildRankMap(t) {
         const r = new Map();
@@ -36046,6 +36052,17 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             [Re] = Ve.splice(Le, 1);
           Ve.splice(Qe, 0, Re);
           kgSavePlannerOrder(Ve);
+        }
+        function kgMovePlannerRow(V, xe) {
+          if (!r) return;
+          const ke = kgRows.findIndex((Le) => Number(Le.id) === Number(V));
+          if (ke < 0) return;
+          const Le = ke + xe;
+          if (Le < 0 || Le >= kgRows.length) return;
+          const Qe = [...kgRows],
+            [Ve] = Qe.splice(ke, 1);
+          Qe.splice(Le, 0, Ve);
+          kgSavePlannerOrder(Qe);
         }
         function P(V = "") {
           const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
@@ -36603,7 +36620,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "empty-state",
                               children: "No assignments for this day.",
                             })
-                          : kgRows.map((V) => {
+                          : kgRows.map((V, kgRowIndex) => {
                               var Qe, Ve;
                               const xe = kgWorkerNamesForAssignment(V, kgRankMap),
                                 ke = kgForemanNamesForAssignment(V, kgRankMap),
@@ -36647,10 +36664,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     kgSetDragOverId(null);
                                   },
                                   children: [
-                                    false && d.jsx("button", {
+                                    r && d.jsx("button", {
                                       type: "button",
                                       className: "kg-desktop-drag-button",
-                                      title: "Computer only: drag to arrange this site",
+                                      title: "Computer only: drag this site up or down",
+                                      draggable: !0,
+                                      onDragStart: (At) => {
+                                        kgPlannerDragId.current = V.id;
+                                        if (At.dataTransfer) {
+                                          At.dataTransfer.effectAllowed = "move";
+                                          try {
+                                            At.dataTransfer.setData("text/plain", String(V.id));
+                                          } catch {}
+                                        }
+                                      },
                                       children: "☰ DRAG",
                                     }),
                                     d.jsxs("div", {
@@ -36732,6 +36759,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                       d.jsxs("div", {
                                         className: "card-actions",
                                         children: [
+                                          d.jsx("button", {
+                                            className: "icon-button kg-shift-button",
+                                            title: "Shift site up",
+                                            disabled: kgRowIndex === 0,
+                                            onClick: () => kgMovePlannerRow(V.id, -1),
+                                            children: "↑",
+                                          }),
+                                          d.jsx("button", {
+                                            className: "icon-button kg-shift-button",
+                                            title: "Shift site down",
+                                            disabled: kgRowIndex === kgRows.length - 1,
+                                            onClick: () => kgMovePlannerRow(V.id, 1),
+                                            children: "↓",
+                                          }),
                                           d.jsx("button", {
                                             className: "icon-button",
                                             onClick: () => N(V),
@@ -38316,14 +38357,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         children: S
                           ? d.jsx("tr", {
                               children: d.jsx("td", {
-                                colSpan: r.columns.length + 1 + (n ? 1 : 0),
+                                colSpan: "8",
                                 children: "Loading…",
                               }),
                             })
                           : D.length === 0
                             ? d.jsx("tr", {
                                 children: d.jsx("td", {
-                                  colSpan: r.columns.length + 1 + (n ? 1 : 0),
+                                  colSpan: "8",
                                   className: "empty-cell",
                                   children: "No records found.",
                                 }),
@@ -40160,6 +40201,36 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .assignment-card:hover {
         border-color: #b9d2ce;
         box-shadow: 0 5px 16px #143a340f;
+      }
+      .assignment-card.kg-drag-over {
+        border-color: #0f766e;
+        background: #ecfdf5;
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.16);
+      }
+      .kg-desktop-drag-button {
+        align-self: flex-start;
+        border: 1px solid #0f766e;
+        border-radius: 12px;
+        background: #ccfbf1;
+        color: #115e59;
+        font-weight: 900;
+        cursor: grab;
+        padding: 10px 12px;
+        min-width: 88px;
+        touch-action: none;
+        user-select: none;
+      }
+      .kg-desktop-drag-button:active {
+        cursor: grabbing;
+      }
+      .kg-shift-button {
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1;
+      }
+      .kg-shift-button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
       }
       .assignment-main {
         min-width: 0;
