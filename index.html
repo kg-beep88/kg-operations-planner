@@ -35532,6 +35532,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         });
       }
       const Ca = (t, r = "-") => String(t || "").trim() || r;
+      const kgCopyNoParentheses = (t, r = "-") => {
+        const n = Ca(t, r)
+          .replace(/\s*\(\s*SL\s*\)\s*/gi, " ")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+        return n || r;
+      };
       const kgNameNick = (t) =>
         Ca((t == null ? void 0 : t.nickname) || (t == null ? void 0 : t.name));
       const kgForemanType = (t) =>
@@ -35751,8 +35758,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               const x = m ? `*${kgLorryText(m)}*` : "*No lorry*",
                 p = v.map(({ assignment: g, workers: S }) => {
                   var E;
-                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "",
-                    _ = Ca((E = g.site) == null ? void 0 : E.address);
+                  const w = g.shift && g.shift !== "day" ? ` - ${g.shift}` : "",
+                    _ = kgCopyNoParentheses((E = g.site) == null ? void 0 : E.address);
                   return S.length ? `* ${_}${w} - ${S.join(" + ")}` : `* ${_}${w}`;
                 });
               return [x, ...p].join(`
@@ -35776,7 +35783,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + "),
               c = (l.assignment_workers || []).length,
               m = `${c} worker${c === 1 ? "" : "s"}`;
-            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s} (${m})`;
+            return `* ${kgCopyNoParentheses((f = l.site) == null ? void 0 : f.address)} - ${s} - ${m}`;
           });
         return [`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
 `);
