@@ -36008,65 +36008,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           (he(V), window.setTimeout(() => he(""), 2400));
         }
         function kgSortPlannerRowsSafe(V) {
-          const xe = [...(V || [])],
-            ke = xe.some((Le) => Number(Le.sort_order || 0) > 0);
-          return xe.sort((Le, Qe) => {
-            if (ke) {
-              const Ve = Number(Le.sort_order || 0) > 0 ? Number(Le.sort_order) : 999999,
-                Re = Number(Qe.sort_order || 0) > 0 ? Number(Qe.sort_order) : 999999;
-              if (Ve !== Re) return Ve - Re;
-            }
-            const Ve = Ca(Le.site && Le.site.address, "ZZZ"),
-              Re = Ca(Qe.site && Qe.site.address, "ZZZ");
-            return Ve.localeCompare(Re, void 0, { numeric: !0, sensitivity: "base" });
+          return [...(V || [])].sort((xe, ke) => {
+            const Le = Ca(xe.site && xe.site.address, "ZZZ"),
+              Qe = Ca(ke.site && ke.site.address, "ZZZ");
+            return Le.localeCompare(Qe, void 0, { numeric: !0, sensitivity: "base" });
           });
-        }
-        async function kgSetPlannerRowNo(V, xe) {
-          const ke = String(xe ?? "").trim(),
-            Le = ke === "" ? 0 : Number(ke);
-          if (ke !== "" && (!Number.isFinite(Le) || Le < 0)) {
-            j("Please type a valid Planner No.");
-            return;
-          }
-          f((Qe) => Qe.map((Ve) => Number(Ve.id) === Number(V) ? { ...Ve, sort_order: Le } : Ve));
-          const { error: Qe } = await qe.from("site_assignments").update({ sort_order: Le }).eq("id", V);
-          if (Qe) {
-            j(Qe.message);
-            await oe();
-            return;
-          }
-          He("Planner No. saved. Everyone will see the same order.");
-        }
-        async function kgSavePlannerOrder(V) {
-          const xe = V || [];
-          if (!xe.length) return;
-          f(xe);
-          const ke = await Promise.all(
-              xe.map((Le, Qe) =>
-                qe
-                  .from("site_assignments")
-                  .update({ sort_order: Qe + 1 })
-                  .eq("id", Le.id),
-              ),
-            ),
-            Le = ke.find((Qe) => Qe.error);
-          if (Le && Le.error) {
-            j(Le.error.message);
-            await oe();
-            return;
-          }
-          He("Site order saved. Everyone will see the same order.");
-        }
-        async function kgMovePlannerRow(V, xe) {
-          const ke = kgSortPlannerRowsSafe(s),
-            Le = ke.findIndex((Qe) => Number(Qe.id) === Number(V)),
-            Qe = Le + Number(xe);
-          if (Le < 0 || Qe < 0 || Qe >= ke.length) return;
-          const Ve = [...ke],
-            Re = Ve[Le];
-          Ve[Le] = Ve[Qe];
-          Ve[Qe] = Re;
-          await kgSavePlannerOrder(Ve);
         }
         function P(V = "") {
           const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
@@ -36642,46 +36588,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                         d.jsxs("div", {
                                           className: "assignment-title",
                                           children: [
-                                            r &&
-                                              d.jsxs("label", {
-                                                className: "planner-order-box",
-                                                title: "Planner order number",
-                                                children: [
-                                                  d.jsx("span", { children: "No." }),
-                                                  d.jsx("input", {
-                                                    type: "number",
-                                                    min: "0",
-                                                    inputMode: "numeric",
-                                                    defaultValue: Number(V.sort_order || 0) > 0 ? V.sort_order : "",
-                                                    onBlur: (Re) => kgSetPlannerRowNo(V.id, Re.target.value),
-                                                    onKeyDown: (Re) => {
-                                                      if (Re.key === "Enter") Re.currentTarget.blur();
-                                                    },
-                                                  }),
-                                                ],
-                                              }),
-                                            r &&
-                                              d.jsxs("span", {
-                                                className: "planner-shift-buttons",
-                                                children: [
-                                                  d.jsx("button", {
-                                                    type: "button",
-                                                    className: "order-shift-button",
-                                                    title: "Move site up",
-                                                    disabled: kgRows.findIndex((Re) => Number(Re.id) === Number(V.id)) === 0,
-                                                    onClick: () => kgMovePlannerRow(V.id, -1),
-                                                    children: "↑",
-                                                  }),
-                                                  d.jsx("button", {
-                                                    type: "button",
-                                                    className: "order-shift-button",
-                                                    title: "Move site down",
-                                                    disabled: kgRows.findIndex((Re) => Number(Re.id) === Number(V.id)) === kgRows.length - 1,
-                                                    onClick: () => kgMovePlannerRow(V.id, 1),
-                                                    children: "↓",
-                                                  }),
-                                                ],
-                                              }),
                                             d.jsx(al, { size: 18 }),
                                             d.jsx("strong", {
                                               children:
@@ -40161,28 +40067,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         gap: 8px;
         align-items: flex-start;
         color: #172a27;
-      }
-      .planner-order-box {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 7px;
-        border: 1px solid #bfd7d2;
-        border-radius: 9px;
-        background: #f8fffe;
-        color: #33524d;
-        font-size: 11px;
-        font-weight: 800;
-        white-space: nowrap;
-      }
-      .planner-order-box input {
-        width: 54px;
-        min-height: 30px;
-        padding: 4px 6px;
-        border: 1px solid #b9d2ce;
-        border-radius: 7px;
-        font-weight: 800;
-        text-align: center;
       }
       .planner-shift-buttons {
         display: inline-flex;
