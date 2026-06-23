@@ -16541,10 +16541,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return {
           data: {
             sites: t.data || [],
-            workers: kgSortNick(r.data || []),
+            workers: kgSortMasterRows(r.data || [], "workers", "nickname"),
             lorries: n.data || [],
-            foremen: kgSortNick(l.data || []),
-            catalog: s.data || [],
+            foremen: kgSortMasterRows(l.data || [], "foremen", "nickname"),
+            catalog: kgSortMasterRows(s.data || [], "delivery_catalog", "item_name"),
           },
           error: f || null,
         };
@@ -35605,14 +35605,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const r = [...(t || [])],
           n = r.some((l) => Number(l.sort_order || 0) !== 0);
         return r.sort((l, s) => {
-          const f = Number(l.sort_order || 0),
-            c = Number(s.sort_order || 0);
-          if (n && f !== c) return f - c;
-          const m = kgAssignmentLorryKey(l).localeCompare(kgAssignmentLorryKey(s), void 0, {
+          if (n) {
+            const f = Number(l.sort_order || 999999),
+              c = Number(s.sort_order || 999999);
+            if (f !== c) return f - c;
+          }
+          const f = kgAssignmentLorryKey(l).localeCompare(kgAssignmentLorryKey(s), void 0, {
             numeric: !0,
             sensitivity: "base",
           });
-          if (m) return m;
+          if (f) return f;
           return Ca(l.site && l.site.address, "ZZZ").localeCompare(
             Ca(s.site && s.site.address, "ZZZ"),
             void 0,
@@ -35724,6 +35726,31 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             sensitivity: "base",
           }),
         );
+      function kgSortMasterRows(t, r, n) {
+        const l = [...(t || [])],
+          s = l.some((f) => Number(f.sort_order || 0) !== 0);
+        return l.sort((f, c) => {
+          if (s) {
+            const m = Number(f.sort_order || 999999),
+              v = Number(c.sort_order || 999999);
+            if (m !== v) return m - v;
+          }
+          if (r === "workers" || r === "foremen")
+            return kgNameNick(f).localeCompare(kgNameNick(c), void 0, {
+              numeric: !0,
+              sensitivity: "base",
+            });
+          if (r === "delivery_catalog") {
+            const m = `${f.category || ""}-${f.item_name || ""}-${f.size || ""}`,
+              v = `${c.category || ""}-${c.item_name || ""}-${c.size || ""}`;
+            return m.localeCompare(v, void 0, { numeric: !0, sensitivity: "base" });
+          }
+          return String(f[n] || "").localeCompare(String(c[n] || ""), void 0, {
+            numeric: !0,
+            sensitivity: "base",
+          });
+        });
+      }
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
@@ -36018,41 +36045,46 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           const ke = document.querySelector(`.assignment-card[data-assignment-id="${Number(V)}"]`);
           ke && ke.classList.add(xe);
         }
-        function kgReorderPlannerDraft(V) {
+        function kgBuildPlannerOrder(V) {
           const xe = Number(kgDragId.current),
             ke = Number(V);
-          if (!xe || !ke || xe === ke) return;
-          const Le = kgSortPlannerRows(kgPendingOrder.current || kgRows),
-            Qe = Le.findIndex((vn) => Number(vn.id) === xe),
-            Ve = Le.findIndex((vn) => Number(vn.id) === ke);
-          if (Qe < 0 || Ve < 0 || Qe === Ve) return;
+          if (!xe || !ke || xe === ke) return null;
+          const Le = kgPendingOrder.current && kgPendingOrder.current.length
+              ? kgPendingOrder.current
+              : kgSortPlannerRows(s),
+            Qe = Le.findIndex((At) => Number(At.id) === xe),
+            Ve = Le.findIndex((At) => Number(At.id) === ke);
+          if (Qe < 0 || Ve < 0 || Qe === Ve) return null;
           const Re = [...Le],
             [At] = Re.splice(Qe, 1);
           Re.splice(Ve, 0, At);
-          const ln = Re.map((vn, Nn) => ({ ...vn, sort_order: Nn }));
-          kgPendingOrder.current = ln;
-          const Ct = new Map(ln.map((vn) => [Number(vn.id), vn]));
-          f((vn) => vn.map((Nn) => Ct.get(Number(Nn.id)) || Nn));
+          return Re.map((ln, vn) => ({ ...ln, sort_order: vn + 1 }));
         }
-        async function kgSavePlannerOrder() {
-          const V = kgPendingOrder.current;
+        function kgApplyPlannerOrder(V) {
           if (!V || !V.length) return;
+          kgPendingOrder.current = V;
+          const xe = new Map(V.map((ke) => [Number(ke.id), ke]));
+          f((ke) => ke.map((Le) => xe.get(Number(Le.id)) || Le));
+        }
+        async function kgSavePlannerOrder(V) {
+          const xe = V || kgPendingOrder.current;
+          if (!xe || !xe.length) return;
           kgPendingOrder.current = null;
-          const xe = await Promise.all(
-              V.map((ke, Le) =>
+          const ke = await Promise.all(
+              xe.map((Le) =>
                 qe
                   .from("site_assignments")
-                  .update({ sort_order: Le })
-                  .eq("id", ke.id),
+                  .update({ sort_order: Number(Le.sort_order || 0) })
+                  .eq("id", Le.id),
               ),
             ),
-            ke = xe.find((Le) => Le.error);
-          if (ke && ke.error) {
-            j(ke.error.message);
+            Le = ke.find((Qe) => Qe.error);
+          if (Le && Le.error) {
+            j(Le.error.message);
             await oe();
             return;
           }
-          He("Site order saved.");
+          He("Site order saved. Everyone will see the same order.");
         }
         function kgStartDrag(V, xe) {
           kgDragId.current = Number(xe);
@@ -36064,6 +36096,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           window.setTimeout(() => kgMarkDragCard(xe, "dragging"), 0);
         }
         function kgDragOver(V, xe) {
+          if (!kgDragId.current) return;
           V.preventDefault();
           try {
             V.dataTransfer.dropEffect = "move";
@@ -36072,10 +36105,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           Number(kgDragId.current) !== Number(xe) && kgMarkDragCard(xe, "drag-over");
         }
         async function kgDrop(V, xe) {
+          if (!kgDragId.current) return;
           V.preventDefault();
-          kgReorderPlannerDraft(xe);
+          const ke = kgBuildPlannerOrder(xe);
+          kgApplyPlannerOrder(ke);
           kgClearDragMarks();
-          await kgSavePlannerOrder();
+          await kgSavePlannerOrder(ke);
           kgDragId.current = null;
         }
         async function kgEndDrag() {
@@ -36099,7 +36134,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             Qe = Le ? Number(Le.getAttribute("data-assignment-id")) : 0;
           if (!Qe || Qe === Number(kgDragId.current) || Qe === Number(kgLastTouchTargetId.current)) return;
           kgLastTouchTargetId.current = Qe;
-          kgReorderPlannerDraft(Qe);
+          kgClearDragOver();
+          kgMarkDragCard(Qe, "drag-over");
+          const Ve = kgBuildPlannerOrder(Qe);
+          kgApplyPlannerOrder(Ve);
         }
         async function kgTouchEnd() {
           kgClearDragMarks();
@@ -36207,8 +36245,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             pic: w.pic || null,
             is_confirmed: !!w.is_confirmed,
             notes: w.notes || null,
+            sort_order: S === "new" ? s.length + 1 : void 0,
           };
-          S === "new" && (ke.sort_order = s.length);
           let Le = S;
           if (S === "new") {
             const { data: Qe, error: Ve } = await qe.from("site_assignments").insert(ke).select("id").single();
@@ -36676,6 +36714,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 {
                                   className: `assignment-card ${V.is_confirmed ? "site-confirmed" : ""}`,
                                   "data-assignment-id": V.id,
+                                  draggable: r ? !0 : void 0,
+                                  onDragStart: r ? (Re) => kgStartDrag(Re, V.id) : void 0,
+                                  onDragEnd: r ? kgEndDrag : void 0,
                                   onDragOver: r ? (Re) => kgDragOver(Re, V.id) : void 0,
                                   onDrop: r ? (Re) => kgDrop(Re, V.id) : void 0,
                                   children: [
@@ -38128,16 +38169,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           kgQ =
             r.table === "workers" || r.table === "foremen"
               ? kgQ.order("nickname", { nullsFirst: !1 }).order("name")
-              : kgQ.order(r.orderBy);
+              : r.table === "delivery_catalog"
+                ? kgQ.order("category").order("item_name")
+                : kgQ.order(r.orderBy);
           const { data: J, error: j } = await kgQ;
-          (j
-            ? _(j.message)
-            : f(
-                r.table === "workers" || r.table === "foremen"
-                  ? kgSortNick(J || [])
-                  : J || [],
-              ),
-            E(!1));
+          (j ? _(j.message) : f(kgSortMasterRows(J || [], r.table, r.orderBy)), E(!1));
         }
         q.useEffect(() => {
           T();
@@ -38205,6 +38241,35 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (G) return _(G.message);
           (x(null), await T());
         }
+        function kgChangeSortNumber(J, j) {
+          f((fe) =>
+            fe.map((G) =>
+              Number(G.id) === Number(J.id)
+                ? { ...G, sort_order: j === "" ? "" : Number(j) }
+                : G,
+            ),
+          );
+        }
+        async function kgSaveSortNumber(J, j) {
+          if (!(r.table === "workers" || r.table === "foremen" || r.table === "delivery_catalog") || !n) return;
+          const fe = Number(j || 0);
+          _(""),
+            f((G) =>
+              kgSortMasterRows(
+                G.map((de) => (Number(de.id) === Number(J.id) ? { ...de, sort_order: fe } : de)),
+                r.table,
+                r.orderBy,
+              ),
+            );
+          const { error: G } = await qe
+            .from(r.table)
+            .update({ sort_order: fe })
+            .eq("id", J.id);
+          if (G) {
+            _(G.message);
+            await T();
+          }
+        }
         async function kgDeleteMaster(J) {
           if (!kgCanDelete) return;
           const j =
@@ -38243,6 +38308,24 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await T();
         }
         function he(J, j) {
+          if (j.key === "sort_order")
+            return n && (r.table === "workers" || r.table === "foremen" || r.table === "delivery_catalog")
+              ? d.jsx("input", {
+                  className: "sort-input",
+                  type: "number",
+                  min: "0",
+                  step: "1",
+                  value: J.sort_order ?? "",
+                  title: "Type number. Smaller number shows first.",
+                  onChange: (fe) => kgChangeSortNumber(J, fe.target.value),
+                  onBlur: (fe) => kgSaveSortNumber(J, fe.target.value),
+                  onKeyDown: (fe) => {
+                    fe.key === "Enter" && (fe.preventDefault(), fe.currentTarget.blur());
+                  },
+                })
+              : J.sort_order === 0
+                ? "0"
+                : J.sort_order || "—";
           return j.key === "foreman_type"
             ? kgForemanType(J) === "boss"
               ? "Boss foreman"
@@ -38326,14 +38409,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         children: S
                           ? d.jsx("tr", {
                               children: d.jsx("td", {
-                                colSpan: "8",
+                                colSpan: r.columns.length + (n ? 2 : 1),
                                 children: "Loading…",
                               }),
                             })
                           : D.length === 0
                             ? d.jsx("tr", {
                                 children: d.jsx("td", {
-                                  colSpan: "8",
+                                  colSpan: r.columns.length + (n ? 2 : 1),
                                   className: "empty-cell",
                                   children: "No records found.",
                                 }),
@@ -39099,6 +39182,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           searchPlaceholder:
             "Search name, nickname, phone, pass, license — type pass or license to show only those records…",
           columns: [
+            { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "phone", label: "Phone" },
@@ -39106,6 +39190,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "license", label: "License" },
           ],
           fields: [
+            { name: "sort_order", label: "List number", type: "number", min: "0", step: "1" },
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Worker full name", required: !0 },
             { name: "phone", label: "Phone" },
@@ -39139,6 +39224,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           searchPlaceholder:
             "Search name, nickname, phone, pass, license, boss or project — type pass or license to show only those records…",
           columns: [
+            { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "foreman_type", label: "Foreman type" },
@@ -39147,6 +39233,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "license", label: "License" },
           ],
           fields: [
+            { name: "sort_order", label: "List number", type: "number", min: "0", step: "1" },
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Foreman full name", required: !0 },
             {
@@ -39163,7 +39250,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "pass", label: "Pass" },
             { name: "license", label: "License" },
           ],
-          defaults: { foreman_type: "project" },
+          defaults: { foreman_type: "project", sort_order: 0 },
         },
         catalog: {
           title: "Delivery Items",
@@ -39173,6 +39260,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           description:
             "Maintain material, scaffold and ladder sizes with their normal unit cost.",
           columns: [
+            { key: "sort_order", label: "No." },
             { key: "category", label: "Category" },
             { key: "item_name", label: "Item" },
             { key: "size", label: "Size" },
@@ -39183,6 +39271,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             },
           ],
           fields: [
+            { name: "sort_order", label: "List number", type: "number", min: "0", step: "1" },
             {
               name: "category",
               label: "Category",
@@ -39206,7 +39295,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               required: !0,
             },
           ],
-          defaults: { category: "material", default_unit_cost: 0 },
+          defaults: { category: "material", default_unit_cost: 0, sort_order: 0 },
         },
       };
 
@@ -40168,31 +40257,34 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         border-color: #b9d2ce;
         box-shadow: 0 5px 16px #143a340f;
       }
+      .assignment-card[draggable="true"] {
+        cursor: grab;
+      }
       .assignment-card.dragging {
         opacity: 0.55;
         border-color: var(--brand);
-        box-shadow: 0 12px 28px rgba(15, 118, 110, 0.18);
       }
       .assignment-card.drag-over {
-        border-color: #f97316;
-        background: #fff7ed;
+        border-color: var(--brand);
+        background: #ecfdf5;
+        transform: translateY(2px);
       }
       .drag-handle {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
         border-radius: 10px;
-        background: #e6fffb;
-        border: 1px solid #99f6e4;
+        border: 1px solid #bddbd6;
+        background: #f0fdfa;
         color: #0f766e;
+        cursor: grab;
         font-size: 20px;
         font-weight: 900;
         line-height: 1;
-        cursor: grab;
-        user-select: none;
         touch-action: none;
+        user-select: none;
         flex: 0 0 auto;
       }
       .drag-handle:active {
@@ -40344,6 +40436,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       textarea:focus {
         border-color: #58a89f;
         box-shadow: 0 0 0 3px #0f766e1a;
+      }
+      .sort-input {
+        width: 76px;
+        min-width: 76px;
+        padding: 7px 8px;
+        font-weight: 800;
+        text-align: center;
       }
       textarea {
         resize: vertical;
