@@ -35705,6 +35705,31 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             sensitivity: "base",
           }),
         );
+      function kgSortMasterRows(t, r, n) {
+        const l = [...(t || [])],
+          s = l.some((f) => Number(f.sort_order || 0) !== 0);
+        return l.sort((f, c) => {
+          if (s) {
+            const m = Number(f.sort_order || 0),
+              v = Number(c.sort_order || 0);
+            if (m !== v) return m - v;
+          }
+          if (r === "workers" || r === "foremen")
+            return kgNameNick(f).localeCompare(kgNameNick(c), void 0, {
+              numeric: !0,
+              sensitivity: "base",
+            });
+          if (r === "delivery_catalog") {
+            const m = `${f.category || ""}-${f.item_name || ""}-${f.size || ""}`,
+              v = `${c.category || ""}-${c.item_name || ""}-${c.size || ""}`;
+            return m.localeCompare(v, void 0, { numeric: !0, sensitivity: "base" });
+          }
+          return String(f[n] || "").localeCompare(String(c[n] || ""), void 0, {
+            numeric: !0,
+            sensitivity: "base",
+          });
+        });
+      }
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
@@ -35922,20 +35947,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               V = !0;
             };
           }, [S, w.site_id, n]));
-        function kgSortPlannerRowsSafe(V) {
-          const xe = [...(V || [])],
-            ke = xe.some((Le) => Number(Le.sort_order || 0) > 0);
-          return xe.sort((Le, Qe) => {
-            if (ke) {
-              const Ve = Number(Le.sort_order || 999999),
-                Re = Number(Qe.sort_order || 999999);
-              if (Ve !== Re) return Ve - Re;
-            }
-            const Ve = Ca(Le.site && Le.site.address, "ZZZ"),
-              Re = Ca(Qe.site && Qe.site.address, "ZZZ");
-            return Ve.localeCompare(Re, void 0, { numeric: !0, sensitivity: "base" });
-          });
-        }
         const ge = q.useMemo(() => Go(s), [s]),
           Ne = q.useMemo(() => op(s), [s]),
           Ye = q.useMemo(
@@ -35996,19 +36007,45 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
-        function kgApplyPlannerOrder(V) {
-          if (!V || !V.length) return;
-          const xe = new Map(V.map((ke) => [Number(ke.id), ke]));
-          f((ke) => ke.map((Le) => xe.get(Number(Le.id)) || Le));
+        function kgSortPlannerRowsSafe(V) {
+          const xe = [...(V || [])],
+            ke = xe.some((Le) => Number(Le.sort_order || 0) > 0);
+          return xe.sort((Le, Qe) => {
+            if (ke) {
+              const Ve = Number(Le.sort_order || 0) > 0 ? Number(Le.sort_order) : 999999,
+                Re = Number(Qe.sort_order || 0) > 0 ? Number(Qe.sort_order) : 999999;
+              if (Ve !== Re) return Ve - Re;
+            }
+            const Ve = Ca(Le.site && Le.site.address, "ZZZ"),
+              Re = Ca(Qe.site && Qe.site.address, "ZZZ");
+            return Ve.localeCompare(Re, void 0, { numeric: !0, sensitivity: "base" });
+          });
+        }
+        async function kgSetPlannerRowNo(V, xe) {
+          const ke = String(xe ?? "").trim(),
+            Le = ke === "" ? 0 : Number(ke);
+          if (ke !== "" && (!Number.isFinite(Le) || Le < 0)) {
+            j("Please type a valid Planner No.");
+            return;
+          }
+          f((Qe) => Qe.map((Ve) => Number(Ve.id) === Number(V) ? { ...Ve, sort_order: Le } : Ve));
+          const { error: Qe } = await qe.from("site_assignments").update({ sort_order: Le }).eq("id", V);
+          if (Qe) {
+            j(Qe.message);
+            await oe();
+            return;
+          }
+          He("Planner No. saved. Everyone will see the same order.");
         }
         async function kgSavePlannerOrder(V) {
           const xe = V || [];
           if (!xe.length) return;
+          f(xe);
           const ke = await Promise.all(
-              xe.map((Le) =>
+              xe.map((Le, Qe) =>
                 qe
                   .from("site_assignments")
-                  .update({ sort_order: Number(Le.sort_order || 0) })
+                  .update({ sort_order: Qe + 1 })
                   .eq("id", Le.id),
               ),
             ),
@@ -36029,9 +36066,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             Re = Ve[Le];
           Ve[Le] = Ve[Qe];
           Ve[Qe] = Re;
-          const At = Ve.map((ln, vn) => ({ ...ln, sort_order: vn + 1 }));
-          kgApplyPlannerOrder(At);
-          await kgSavePlannerOrder(At);
+          await kgSavePlannerOrder(Ve);
         }
         function P(V = "") {
           const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
@@ -36587,7 +36622,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "empty-state",
                               children: "No assignments for this day.",
                             })
-                          : kgRows.map((V, kgRowIndex) => {
+                          : kgRows.map((V) => {
                               var Qe, Ve;
                               const xe = kgWorkerNamesForAssignment(V, kgRankMap),
                                 ke = kgForemanNamesForAssignment(V, kgRankMap),
@@ -36608,6 +36643,24 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           className: "assignment-title",
                                           children: [
                                             r &&
+                                              d.jsxs("label", {
+                                                className: "planner-order-box",
+                                                title: "Planner order number",
+                                                children: [
+                                                  d.jsx("span", { children: "No." }),
+                                                  d.jsx("input", {
+                                                    type: "number",
+                                                    min: "0",
+                                                    inputMode: "numeric",
+                                                    defaultValue: Number(V.sort_order || 0) > 0 ? V.sort_order : "",
+                                                    onBlur: (Re) => kgSetPlannerRowNo(V.id, Re.target.value),
+                                                    onKeyDown: (Re) => {
+                                                      if (Re.key === "Enter") Re.currentTarget.blur();
+                                                    },
+                                                  }),
+                                                ],
+                                              }),
+                                            r &&
                                               d.jsxs("span", {
                                                 className: "planner-shift-buttons",
                                                 children: [
@@ -36615,7 +36668,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                     type: "button",
                                                     className: "order-shift-button",
                                                     title: "Move site up",
-                                                    disabled: kgRowIndex === 0,
+                                                    disabled: kgRows.findIndex((Re) => Number(Re.id) === Number(V.id)) === 0,
                                                     onClick: () => kgMovePlannerRow(V.id, -1),
                                                     children: "↑",
                                                   }),
@@ -36623,7 +36676,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                     type: "button",
                                                     className: "order-shift-button",
                                                     title: "Move site down",
-                                                    disabled: kgRowIndex === kgRows.length - 1,
+                                                    disabled: kgRows.findIndex((Re) => Number(Re.id) === Number(V.id)) === kgRows.length - 1,
                                                     onClick: () => kgMovePlannerRow(V.id, 1),
                                                     children: "↓",
                                                   }),
@@ -36900,7 +36953,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       children: [
                         "Job status",
                         d.jsxs("select", {
-                          value: w.job_status || "NEW",
+                          value: w.job_status || "CONTINUE JOB",
                           onChange: (V) => _({ ...w, job_status: V.target.value }),
                           children: [
                             d.jsx("option", { value: "NEW", children: "NEW" }),
@@ -38175,22 +38228,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await T();
         }
         function he(J, j) {
-          if (j.key === "sort_order")
-            return n
-              ? d.jsx("input", {
-                  className: "sort-order-input",
-                  type: "number",
-                  min: "0",
-                  value: J.sort_order ?? "",
-                  onChange: (fe) => kgChangeSortNumber(J, fe.target.value),
-                  onBlur: () => kgSaveSortNumber(J),
-                  onKeyDown: (fe) => {
-                    if (fe.key === "Enter") fe.currentTarget.blur();
-                  },
-                })
-              : J.sort_order === 0
-                ? "0"
-                : J.sort_order || "—";
           return j.key === "foreman_type"
             ? kgForemanType(J) === "boss"
               ? "Boss foreman"
@@ -39047,7 +39084,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           searchPlaceholder:
             "Search name, nickname, phone, pass, license — type pass or license to show only those records…",
           columns: [
-            { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "phone", label: "Phone" },
@@ -39088,7 +39124,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           searchPlaceholder:
             "Search name, nickname, phone, pass, license, boss or project — type pass or license to show only those records…",
           columns: [
-            { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "foreman_type", label: "Foreman type" },
@@ -39123,7 +39158,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           description:
             "Maintain material, scaffold and ladder sizes with their normal unit cost.",
           columns: [
-            { key: "sort_order", label: "No." },
             { key: "category", label: "Category" },
             { key: "item_name", label: "Item" },
             { key: "size", label: "Size" },
@@ -39462,7 +39496,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               lorry_id: assignment.lorry_id || null,
               foreman_id: assignment.foreman_id || null,
               shift: assignment.shift || "day",
-              job_status: assignment.job_status || "CONTINUE JOB",
+              job_status: assignment.job_status || "NEW",
               pic: assignment.pic || null,
               is_confirmed: !!assignment.is_confirmed,
               notes: assignment.notes || null,
@@ -40127,6 +40161,48 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         gap: 8px;
         align-items: flex-start;
         color: #172a27;
+      }
+      .planner-order-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 7px;
+        border: 1px solid #bfd7d2;
+        border-radius: 9px;
+        background: #f8fffe;
+        color: #33524d;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      .planner-order-box input {
+        width: 54px;
+        min-height: 30px;
+        padding: 4px 6px;
+        border: 1px solid #b9d2ce;
+        border-radius: 7px;
+        font-weight: 800;
+        text-align: center;
+      }
+      .planner-shift-buttons {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .order-shift-button {
+        min-width: 34px;
+        min-height: 34px;
+        border: 1px solid #bfd7d2;
+        border-radius: 9px;
+        background: #e9f7f4;
+        color: #17443d;
+        font-size: 17px;
+        font-weight: 900;
+        padding: 0;
+      }
+      .order-shift-button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
       }
       .assignment-title svg {
         color: var(--brand);
@@ -41542,36 +41618,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .backlog-item strong { color: var(--ink); line-height: 1.35; }
       .backlog-item span { color: var(--muted); font-size: 13px; }
       .backlog-item small { color: #64748b; font-weight: 700; }
-    
-      .planner-shift-buttons {
-        display: inline-flex;
-        gap: 4px;
-        align-items: center;
-        flex: 0 0 auto;
-      }
-      .order-shift-button {
-        width: 34px;
-        height: 32px;
-        border-radius: 9px;
-        border: 1px solid #cbd5e1;
-        background: #ffffff;
-        color: #0f172a;
-        font-weight: 900;
-        cursor: pointer;
-      }
-      .order-shift-button:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-      }
-      .sort-order-input {
-        width: 76px;
-        min-height: 36px;
-        border: 1px solid #cbd5e1;
-        border-radius: 9px;
-        padding: 6px 8px;
-        font-weight: 800;
-      }
-</style>
+    </style>
   </head>
   <body>
     <div id="root"></div>
