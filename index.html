@@ -37166,8 +37166,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [v, x] = q.useState(!0),
           [p, g] = q.useState(""),
           [S, E] = q.useState(""),
-          [w, _] = q.useState(null),
-          [T, D] = q.useState(null);
+          [w, _] = q.useState({});
         function I(Le) {
           (l(Le), window.sessionStorage.setItem("kg_selected_date", Le));
         }
@@ -37195,88 +37194,214 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           (E(Le), window.setTimeout(() => E(""), 2400));
         }
         function he(Le) {
-          const Qe = kgAssignmentLorries(Le)[0];
-          return Qe && Qe.id ? Number(Qe.id) : null;
+          return kgAssignmentLorries(Le).map((Qe) => Number(Qe.id)).filter(Boolean);
         }
         function J(Le) {
           return (Le.assignment_workers || []).length;
         }
-        const j = q.useMemo(() => {
-            const Le = (c.lorries || []).map((At) => ({
-                id: Number(At.id),
-                title: kgLorryCopy(At),
+        function j(Le) {
+          const Qe = (c.lorries || []).findIndex((Ve) => Number(Ve.id) === Number(Le));
+          return Qe >= 0 ? Qe + 1 : "";
+        }
+        const fe = q.useMemo(() => {
+            const Le = new Map();
+            kgSortAssignmentsByLorry(s || []).forEach((Qe, Ve) => Le.set(Number(Qe.id), Ve + 1));
+            return Le;
+          }, [s]),
+          G = q.useMemo(() => {
+            const Le = (c.lorries || []).map((Re, At) => ({
+                id: Number(Re.id),
+                no: At + 1,
+                lorry: Re,
+                title: `Lorry ${At + 1} - ${kgLorryCopy(Re)}`,
                 rows: [],
               })),
-              Qe = { id: null, title: "No lorry yet", rows: [] };
-            for (const At of s) {
-              const lt = kgAssignmentLorries(At)[0] || null,
-                qn = lt && lt.id ? Number(lt.id) : null;
-              let In = qn == null ? Qe : Le.find((Pn) => Number(Pn.id) === qn);
-              if (!In && lt) {
-                In = { id: qn, title: kgLorryCopy(lt), rows: [] };
-                Le.push(In);
+              Qe = [],
+              Ve = [];
+            for (const Re of s) {
+              const At = kgAssignmentLorries(Re);
+              At.length ? Ve.push(Re) : Qe.push(Re);
+              for (const lt of At) {
+                const qn = Number(lt.id);
+                let In = Le.find((Pn) => Number(Pn.id) === qn);
+                if (!In) {
+                  In = {
+                    id: qn,
+                    no: Le.length + 1,
+                    lorry: lt,
+                    title: `Lorry ${Le.length + 1} - ${kgLorryCopy(lt)}`,
+                    rows: [],
+                  };
+                  Le.push(In);
+                }
+                In.rows.push(Re);
               }
-              (In || Qe).rows.push(At);
             }
-            const Ve = (At, lt) => {
-              const qn = Number(At.sort_order || 0) - Number(lt.sort_order || 0);
+            const At = (Re, lt) => {
+              const qn = Number(Re.sort_order || 0) - Number(lt.sort_order || 0);
               if (qn) return qn;
-              return Ca(At.site && At.site.address, "ZZZ").localeCompare(
+              return Ca(Re.site && Re.site.address, "ZZZ").localeCompare(
                 Ca(lt.site && lt.site.address, "ZZZ"),
                 void 0,
                 { numeric: !0, sensitivity: "base" },
               );
             };
-            for (const At of Le) At.rows.sort(Ve);
-            Qe.rows.sort(Ve);
-            return [...Le, Qe];
+            (Le.forEach((Re) => Re.rows.sort(At)), Qe.sort(At), Ve.sort(At));
+            return { lorryGroups: Le, noLorry: Qe, withLorry: Ve };
           }, [c.lorries, s]),
-          fe = q.useMemo(
+          de = q.useMemo(
             () => ({
               sites: s.length,
-              assigned: s.filter((Le) => he(Le) != null).length,
-              unassigned: s.filter((Le) => he(Le) == null).length,
+              assigned: s.filter((Le) => he(Le).length > 0).length,
+              unassigned: s.filter((Le) => he(Le).length === 0).length,
               workers: s.reduce((Le, Qe) => Le + J(Qe), 0),
             }),
             [s],
           );
-        async function G(Le, Qe) {
-          if (!r) return;
-          const Ve = s.find((At) => Number(At.id) === Number(Le));
+        function oe(Le, Qe) {
+          const Ve = he(Le);
+          return Qe == null ? Ve.length === 0 : Ve.includes(Number(Qe));
+        }
+        async function ge(Le, Qe) {
+          if (!r || !Le || !Qe) return;
+          const Ve = s.find((qn) => Number(qn.id) === Number(Le));
           if (!Ve) return;
-          const Re = Qe == null ? null : Number(Qe);
-          if (he(Ve) === Re) return;
-          (g(""), W("Updating lorry plan…"));
-          const At =
-              s
-                .filter((lt) => Number(lt.id) !== Number(Le) && he(lt) === Re)
-                .reduce((lt, qn) => Math.max(lt, Number(qn.sort_order || 0)), 0) + 10,
-            { error: lt } = await qe
-              .from("site_assignments")
-              .update({ lorry_id: Re, sort_order: At })
-              .eq("id", Number(Le));
+          const Re = Number(Qe),
+            At = he(Ve);
+          if (At.includes(Re)) return W("This site is already under this lorry.");
+          (g(""), W("Adding site to lorry…"));
+          const { error: lt } = await qe.from("assignment_lorries").insert({
+            assignment_id: Number(Le),
+            lorry_id: Re,
+            sort_order: At.length * 10,
+          });
           if (lt) return (g(lt.message), W(""));
-          const { error: qn } = await qe
+          if (!At.length || !Ve.lorry_id) {
+            const { error: qn } = await qe
+              .from("site_assignments")
+              .update({ lorry_id: Re })
+              .eq("id", Number(Le));
+            if (qn) return (g(qn.message), W(""));
+          }
+          (_((qn) => ({ ...qn, [Re]: "" })), await L(), W("Site added to lorry. Multiple lorries can go same site."));
+        }
+        async function Ne(Le, Qe) {
+          if (!r || !Le || !Qe) return;
+          const Ve = s.find((In) => Number(In.id) === Number(Le));
+          if (!Ve) return;
+          const Re = Number(Qe),
+            At = he(Ve).filter((In) => Number(In) !== Re);
+          (g(""), W("Removing site from lorry…"));
+          const { error: lt } = await qe
             .from("assignment_lorries")
             .delete()
-            .eq("assignment_id", Number(Le));
+            .eq("assignment_id", Number(Le))
+            .eq("lorry_id", Re);
+          if (lt) return (g(lt.message), W(""));
+          const { error: qn } = await qe
+            .from("site_assignments")
+            .update({ lorry_id: At[0] || null })
+            .eq("id", Number(Le));
           if (qn) return (g(qn.message), W(""));
-          if (Re != null) {
-            const { error: In } = await qe
-              .from("assignment_lorries")
-              .insert({
-                assignment_id: Number(Le),
-                lorry_id: Re,
-                sort_order: 0,
-              });
-            if (In) return (g(In.message), W(""));
-          }
-          (_(null), D(null), await L(), W("Lorry plan updated. Planner will follow this lorry order."));
+          (await L(), W("Site removed from this lorry."));
         }
-        function de(Le, Qe) {
-          Le.preventDefault();
-          const Ve = Le.dataTransfer.getData("text/plain") || T;
-          Ve && G(Ve, Qe);
+        function Ye(Le, Qe = null) {
+          var Ve;
+          const Re = ((Ve = Le.site) == null ? void 0 : Ve.address) || "No address",
+            At = fe.get(Number(Le.id)) || "-";
+          return d.jsxs(
+            "article",
+            {
+              className: "logistics-site",
+              children: [
+                d.jsxs("div", {
+                  className: "logistics-site-main",
+                  children: [
+                    d.jsx("span", { className: "logistics-site-no", children: At }),
+                    d.jsx("strong", { className: "logistics-address", children: Re }),
+                  ],
+                }),
+                d.jsxs("div", {
+                  className: "logistics-site-meta",
+                  children: [
+                    d.jsxs("span", {
+                      className: "logistics-workers",
+                      children: [J(Le), " worker", J(Le) === 1 ? "" : "s"],
+                    }),
+                    Qe == null
+                      ? null
+                      : d.jsx("span", {
+                          className: "logistics-lorry-chip",
+                          children: `Lorry ${j(Qe) || ""}`,
+                        }),
+                  ],
+                }),
+                Qe != null && r
+                  ? d.jsx("button", {
+                      className: "danger-button logistics-remove-button",
+                      onClick: () => Ne(Le.id, Qe),
+                      children: "Remove from this lorry",
+                    })
+                  : null,
+              ],
+            },
+            `${Le.id}-${Qe == null ? "none" : Qe}`,
+          );
+        }
+        function je(Le) {
+          const Qe = (s || []).filter((Ve) => !oe(Ve, Le.id));
+          return d.jsxs(
+            "section",
+            {
+              className: "logistics-lorry",
+              children: [
+                d.jsxs("div", {
+                  className: "logistics-lorry-head",
+                  children: [
+                    d.jsxs("strong", { children: [d.jsx(b0, { size: 15 }), Le.title] }),
+                    d.jsxs("span", { children: [Le.rows.length, " site", Le.rows.length === 1 ? "" : "s"] }),
+                  ],
+                }),
+                r &&
+                  d.jsxs("div", {
+                    className: "logistics-add-row",
+                    children: [
+                      d.jsxs("select", {
+                        value: w[Le.id] || "",
+                        onChange: (Ve) => _((Re) => ({ ...Re, [Le.id]: Ve.target.value })),
+                        children: [
+                          d.jsx("option", { value: "", children: "Choose site no." }),
+                          ...Qe.map((Ve) =>
+                            d.jsx(
+                              "option",
+                              {
+                                value: Ve.id,
+                                children: `${fe.get(Number(Ve.id)) || "-"} - ${((Ve.site && Ve.site.address) || "No address")}`,
+                              },
+                              Ve.id,
+                            ),
+                          ),
+                        ],
+                      }),
+                      d.jsx("button", {
+                        className: "primary-button compact-button",
+                        onClick: () => ge(w[Le.id], Le.id),
+                        disabled: !w[Le.id],
+                        children: "Add",
+                      }),
+                    ],
+                  }),
+                d.jsx("div", {
+                  className: "logistics-site-list",
+                  children:
+                    Le.rows.length === 0
+                      ? d.jsx("div", { className: "logistics-empty", children: "No site under this lorry yet" })
+                      : Le.rows.map((Ve) => Ye(Ve, Le.id)),
+                }),
+              ],
+            },
+            Le.id,
+          );
         }
         return d.jsxs("div", {
           className: "page logistics-page",
@@ -37291,34 +37416,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Logistics" }),
                     d.jsx("p", {
                       children:
-                        "Drag each site card into the lorry box. This updates Planner and Planner will sort Site assignments by lorry.",
+                        "No drag needed. Choose a site number under each lorry and press Add. Same site can be added to more than one lorry.",
                     }),
                   ],
                 }),
                 d.jsxs("div", {
                   className: "date-controls",
                   children: [
-                    d.jsx("button", {
-                      className: "icon-button",
-                      onClick: () => I(wr(n, -1)),
-                      children: d.jsx(bs, {}),
-                    }),
+                    d.jsx("button", { className: "icon-button", onClick: () => I(wr(n, -1)), children: d.jsx(bs, {}) }),
                     d.jsxs("label", {
                       className: "date-picker",
                       children: [
                         d.jsx(fl, { size: 18 }),
-                        d.jsx("input", {
-                          type: "date",
-                          value: n,
-                          onChange: (Le) => I(Le.target.value),
-                        }),
+                        d.jsx("input", { type: "date", value: n, onChange: (Le) => I(Le.target.value) }),
                       ],
                     }),
-                    d.jsx("button", {
-                      className: "icon-button",
-                      onClick: () => I(wr(n, 1)),
-                      children: d.jsx(Os, {}),
-                    }),
+                    d.jsx("button", { className: "icon-button", onClick: () => I(wr(n, 1)), children: d.jsx(Os, {}) }),
                   ],
                 }),
               ],
@@ -37327,28 +37440,16 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               className: "date-banner",
               children: [
                 d.jsx("strong", { children: D0(n) }),
-                d.jsx("span", { children: r ? "Drag on computer, or tap a site then press Move here." : "View only" }),
+                d.jsx("span", { children: r ? "Dropdown only. Same site can go to many lorries." : "View only" }),
               ],
             }),
             d.jsxs("div", {
               className: "summary-grid logistics-summary",
               children: [
-                d.jsxs("div", {
-                  className: "summary-card",
-                  children: [d.jsx(al, {}), d.jsxs("div", { children: [d.jsx("strong", { children: fe.sites }), d.jsx("span", { children: "Sites" })] })],
-                }),
-                d.jsxs("div", {
-                  className: "summary-card",
-                  children: [d.jsx(b0, {}), d.jsxs("div", { children: [d.jsx("strong", { children: fe.assigned }), d.jsx("span", { children: "With lorry" })] })],
-                }),
-                d.jsxs("div", {
-                  className: "summary-card",
-                  children: [d.jsx(lp, {}), d.jsxs("div", { children: [d.jsx("strong", { children: fe.unassigned }), d.jsx("span", { children: "No lorry" })] })],
-                }),
-                d.jsxs("div", {
-                  className: "summary-card",
-                  children: [d.jsx(Rs, {}), d.jsxs("div", { children: [d.jsx("strong", { children: fe.workers }), d.jsx("span", { children: "Workers" })] })],
-                }),
+                d.jsxs("div", { className: "summary-card", children: [d.jsx(al, {}), d.jsxs("div", { children: [d.jsx("strong", { children: de.sites }), d.jsx("span", { children: "Sites" })] })] }),
+                d.jsxs("div", { className: "summary-card", children: [d.jsx(b0, {}), d.jsxs("div", { children: [d.jsx("strong", { children: de.assigned }), d.jsx("span", { children: "With lorry" })] })] }),
+                d.jsxs("div", { className: "summary-card", children: [d.jsx(lp, {}), d.jsxs("div", { children: [d.jsx("strong", { children: de.unassigned }), d.jsx("span", { children: "No lorry" })] })] }),
+                d.jsxs("div", { className: "summary-card", children: [d.jsx(Rs, {}), d.jsxs("div", { children: [d.jsx("strong", { children: de.workers }), d.jsx("span", { children: "Workers" })] })] }),
               ],
             }),
             p && d.jsx("div", { className: "error-box", children: p }),
@@ -37356,88 +37457,63 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               ? d.jsx("div", { className: "empty-state", children: "Loading logistics…" })
               : s.length === 0
                 ? d.jsx("div", { className: "empty-state", children: "No sites added for this day." })
-                : d.jsx("div", {
-                    className: "logistics-board",
-                    children: j.map((Le) =>
-                      d.jsxs(
-                        "section",
-                        {
-                          className: `logistics-lorry ${Le.id == null ? "no-lorry" : ""}`,
-                          onDragOver: (Qe) => Qe.preventDefault(),
-                          onDrop: (Qe) => de(Qe, Le.id),
-                          children: [
-                            d.jsxs("div", {
-                              className: "logistics-lorry-head",
-                              children: [
-                                d.jsxs("strong", {
-                                  children: [
-                                    d.jsx(b0, { size: 15 }),
-                                    Le.title,
-                                  ],
-                                }),
-                                d.jsxs("span", {
-                                  children: [
-                                    Le.rows.length,
-                                    " site",
-                                    Le.rows.length === 1 ? "" : "s",
-                                  ],
-                                }),
-                              ],
-                            }),
-                            r &&
-                              w &&
-                              d.jsx("button", {
-                                className: "logistics-move-button",
-                                onClick: () => G(w, Le.id),
-                                children: "Move selected here",
+                : d.jsxs(d.Fragment, {
+                    children: [
+                      d.jsx("div", { className: "logistics-board", children: G.lorryGroups.map((Le) => je(Le)) }),
+                      d.jsxs("div", {
+                        className: "logistics-bottom-grid",
+                        children: [
+                          d.jsxs("section", {
+                            className: "logistics-bottom-card no-lorry",
+                            children: [
+                              d.jsxs("div", { className: "logistics-lorry-head", children: [d.jsx("strong", { children: "No lorry yet" }), d.jsxs("span", { children: [G.noLorry.length, " site", G.noLorry.length === 1 ? "" : "s"] })] }),
+                              d.jsx("div", {
+                                className: "logistics-site-list",
+                                children: G.noLorry.length
+                                  ? G.noLorry.map((Le) => Ye(Le, null))
+                                  : d.jsx("div", { className: "logistics-empty", children: "All sites already have lorry" }),
                               }),
-                            d.jsx("div", {
-                              className: "logistics-site-list",
-                              children:
-                                Le.rows.length === 0
-                                  ? d.jsx("div", {
-                                      className: "logistics-empty",
-                                      children: "Drop site here",
-                                    })
-                                  : Le.rows.map((Qe) => {
-                                      var Ve;
-                                      const Re = Number(w) === Number(Qe.id);
-                                      return d.jsxs(
+                            ],
+                          }),
+                          d.jsxs("section", {
+                            className: "logistics-bottom-card with-lorry",
+                            children: [
+                              d.jsxs("div", { className: "logistics-lorry-head", children: [d.jsx("strong", { children: "Site with lorry" }), d.jsxs("span", { children: [G.withLorry.length, " site", G.withLorry.length === 1 ? "" : "s"] })] }),
+                              d.jsx("div", {
+                                className: "logistics-site-list",
+                                children: G.withLorry.length
+                                  ? G.withLorry.map((Le) =>
+                                      d.jsxs(
                                         "article",
                                         {
-                                          className: `logistics-site ${Re ? "selected" : ""}`,
-                                          draggable: r,
-                                          onDragStart: (At) => {
-                                            (D(Qe.id),
-                                              At.dataTransfer.setData("text/plain", String(Qe.id)),
-                                              (At.dataTransfer.effectAllowed = "move"));
-                                          },
-                                          onDragEnd: () => D(null),
-                                          onClick: () => r && _(Qe.id),
+                                          className: "logistics-site",
                                           children: [
-                                            d.jsx("strong", {
-                                              className: "logistics-address",
-                                              children: ((Ve = Qe.site) == null ? void 0 : Ve.address) || "No address",
-                                            }),
-                                            d.jsxs("span", {
-                                              className: "logistics-workers",
+                                            d.jsxs("div", {
+                                              className: "logistics-site-main",
                                               children: [
-                                                J(Qe),
-                                                " worker",
-                                                J(Qe) === 1 ? "" : "s",
+                                                d.jsx("span", { className: "logistics-site-no", children: fe.get(Number(Le.id)) || "-" }),
+                                                d.jsx("strong", { className: "logistics-address", children: (Le.site && Le.site.address) || "No address" }),
+                                              ],
+                                            }),
+                                            d.jsxs("div", {
+                                              className: "logistics-site-meta",
+                                              children: [
+                                                d.jsx("span", { className: "logistics-workers", children: `${J(Le)} worker${J(Le) === 1 ? "" : "s"}` }),
+                                                d.jsx("span", { className: "logistics-lorry-chip", children: kgAssignmentLorries(Le).map((Qe) => `Lorry ${j(Qe.id) || "?"}`).join(" + ") }),
                                               ],
                                             }),
                                           ],
                                         },
-                                        Qe.id,
-                                      );
-                                    }),
-                            }),
-                          ],
-                        },
-                        Le.id == null ? "no-lorry" : Le.id,
-                      ),
-                    ),
+                                        `with-${Le.id}`,
+                                      ),
+                                    )
+                                  : d.jsx("div", { className: "logistics-empty", children: "No site with lorry yet" }),
+                              }),
+                            ],
+                          }),
+                        ],
+                      }),
+                    ],
                   }),
           ],
         });
@@ -41810,7 +41886,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
       .logistics-board {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
         gap: 10px;
         align-items: start;
       }
@@ -41856,18 +41932,59 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         display: grid;
         gap: 7px;
       }
+      .logistics-add-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 7px;
+      }
+      .logistics-add-row select {
+        min-width: 0;
+        height: 38px;
+        border: 1px solid #99f6e4;
+        border-radius: 12px;
+        background: #ffffff;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .compact-button {
+        min-height: 38px;
+        padding: 0 10px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
       .logistics-site {
         display: grid;
-        gap: 5px;
+        gap: 6px;
         padding: 8px 9px;
         border: 1px solid #dbeafe;
         border-radius: 13px;
         background: #ffffff;
-        cursor: grab;
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
       }
-      .logistics-site:active {
-        cursor: grabbing;
+      .logistics-site-main {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 7px;
+        align-items: start;
+      }
+      .logistics-site-no {
+        display: inline-grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        background: #0f766e;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 900;
+      }
+      .logistics-site-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding-left: 35px;
       }
       .logistics-site.selected {
         border-color: #0f766e;
@@ -41888,6 +42005,44 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #155e75;
         font-size: 11px;
         font-weight: 900;
+      }
+      .logistics-lorry-chip {
+        display: inline-flex;
+        width: fit-content;
+        border-radius: 999px;
+        padding: 3px 7px;
+        background: #f0fdfa;
+        color: #0f766e;
+        font-size: 11px;
+        font-weight: 900;
+      }
+      .logistics-remove-button {
+        min-height: 30px;
+        border-radius: 10px;
+        font-size: 11.5px;
+        font-weight: 900;
+      }
+      .logistics-bottom-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(260px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .logistics-bottom-card {
+        display: grid;
+        gap: var(--logistics-card-gap);
+        padding: 10px;
+        border: 2px solid #bae6fd;
+        border-radius: 18px;
+        background: #f8fafc;
+      }
+      .logistics-bottom-card.no-lorry {
+        border-color: #fecaca;
+        background: #fff7ed;
+      }
+      .logistics-bottom-card.with-lorry {
+        border-color: #99f6e4;
+        background: #f0fdfa;
       }
       .logistics-empty {
         min-height: 42px;
@@ -41923,6 +42078,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           grid-template-columns: 1fr 1fr;
         }
         .logistics-board {
+          grid-template-columns: 1fr;
+        }
+        .logistics-bottom-grid {
           grid-template-columns: 1fr;
         }
       }
