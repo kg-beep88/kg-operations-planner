@@ -37306,17 +37306,41 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         function handleDropdownChange(lorryId, value) {
           setSelectedByLorry((prev) => ({ ...prev, [lorryId]: value }));
         }
+        function renderSiteLorryPicker(row, siteNo, options = {}) {
+          const currentLorryId = options.currentLorryId ? String(options.currentLorryId) : "";
+          if (!canEdit)
+            return d.jsx("span", { className: "logistics-site-no", children: siteNo });
+          return d.jsxs("select", {
+            className: "logistics-site-lorry-select",
+            value: currentLorryId,
+            title: "Choose lorry number for this site",
+            onChange: (event) => {
+              const value = event.target.value;
+              if (!value) return;
+              addSiteToLorry(value, row.id);
+            },
+            children: [
+              d.jsx("option", { value: "", children: "Lorry" }),
+              ...lorryColumns.map((column) =>
+                d.jsx("option", { value: column.id, children: `Lorry ${column.no}` }, column.id),
+              ),
+            ],
+          });
+        }
         function renderSiteLine(row, options = {}) {
           const siteNo = siteNoMap.get(Number(row.id)) || "-",
-            lorryList = getLorries(row).map((lorry) => kgLorryCopy(lorry)).join(" + "),
-            showLorry = options.showLorry !== !1;
+            rowLorries = getLorries(row),
+            firstLorryId = rowLorries[0] && rowLorries[0].id ? Number(rowLorries[0].id) : "",
+            lorryList = rowLorries.map((lorry) => kgLorryCopy(lorry)).join(" + "),
+            showLorry = options.showLorry !== !1,
+            currentLorryId = options.currentLorryId || firstLorryId || "";
           return d.jsxs("article", {
             className: "logistics-site logistics-site-plain",
             children: [
               d.jsxs("div", {
                 className: "logistics-site-top",
                 children: [
-                  d.jsx("span", { className: "logistics-site-no", children: siteNo }),
+                  renderSiteLorryPicker(row, siteNo, { currentLorryId }),
                   d.jsx("strong", { className: "logistics-address", children: siteAddress(row) }),
                 ],
               }),
@@ -37368,7 +37392,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Logistics" }),
                     d.jsx("p", {
                       children:
-                        "No drag needed. Each lorry has a number. Choose a site number from the dropdown and press Add. The same site can be added to more than one lorry.",
+                        "No drag needed. Each lorry has a number. Choose a site from the lorry dropdown, or use the lorry selector inside each site card. The same site can be added to more than one lorry.",
                     }),
                   ],
                 }),
@@ -37404,7 +37428,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               className: "date-banner",
               children: [
                 d.jsx("strong", { children: D0(planDate) }),
-                d.jsx("span", { children: canEdit ? "Choose site number under lorry. Planner updates automatically." : "View only" }),
+                d.jsx("span", { children: canEdit ? "Choose lorry number inside the site card, or add site under lorry. Planner updates automatically." : "View only" }),
               ],
             }),
             d.jsxs("div", {
@@ -37493,7 +37517,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                   {
                                                     className: "logistics-site logistics-site-plain",
                                                     children: [
-                                                      renderSiteLine(row, { showLorry: !1 }),
+                                                      renderSiteLine(row, { showLorry: !1, currentLorryId: column.id }),
                                                       canEdit &&
                                                         d.jsx("button", {
                                                           type: "button",
@@ -41998,7 +42022,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         gap: 7px;
         align-items: flex-start;
       }
-      .logistics-site-no {
+      .logistics-site-no,
+      .logistics-site-lorry-select {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -42010,6 +42035,19 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         font-size: 12px;
         font-weight: 950;
       }
+      .logistics-site-lorry-select {
+        width: 78px;
+        min-width: 78px;
+        border: 0;
+        outline: 0;
+        padding: 0 7px;
+        cursor: pointer;
+        appearance: auto;
+      }
+      .logistics-site-lorry-select:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
       .logistics-address {
         color: var(--ink);
         font-size: 12.5px;
@@ -42020,7 +42058,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        padding-left: 33px;
+        padding-left: 85px;
       }
       .logistics-workers,
       .logistics-lorry-chip {
