@@ -35601,25 +35601,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           );
         });
       }
+      function kgPlannerNameKey(t) {
+        return Ca(t && t.site && t.site.address, "ZZZ");
+      }
       function kgSortPlannerRows(t) {
-        const r = [...(t || [])],
-          n = r.some((l) => Number.isFinite(Number(l.sort_order)) && Number(l.sort_order) > 0);
-        if (!n) return kgSortAssignmentsByLorry(r);
-        return r.sort((l, s) => {
-          const f = Number.isFinite(Number(l.sort_order)) && Number(l.sort_order) > 0 ? Number(l.sort_order) : 999999,
-            c = Number.isFinite(Number(s.sort_order)) && Number(s.sort_order) > 0 ? Number(s.sort_order) : 999999;
-          if (f !== c) return f - c;
-          const m = kgAssignmentLorryKey(l).localeCompare(kgAssignmentLorryKey(s), void 0, {
+        return [...(t || [])].sort((r, n) =>
+          kgPlannerNameKey(r).localeCompare(kgPlannerNameKey(n), void 0, {
             numeric: !0,
             sensitivity: "base",
-          });
-          if (m) return m;
-          return Ca(l.site && l.site.address, "ZZZ").localeCompare(
-            Ca(s.site && s.site.address, "ZZZ"),
-            void 0,
-            { numeric: !0, sensitivity: "base" },
-          );
-        });
+          }),
+        );
       }
       function kgBuildRankMap(t) {
         const r = new Map();
@@ -35629,7 +35620,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           r.has(c) || r.set(c, []);
           r.get(c).push({ assignmentId: f, index: r.get(c).length + 1 });
         }
-        for (const l of kgSortAssignmentsByLorry(t || [])) {
+        for (const l of kgSortPlannerRows(t || [])) {
           for (const s of l.assignment_workers || []) n("worker", s.worker_id || (s.worker && s.worker.id), l.id);
           for (const s of ar(l)) n("foreman", s.id, l.id);
         }
@@ -35725,6 +35716,27 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             sensitivity: "base",
           }),
         );
+      function kgMasterNameKey(t, r) {
+        if (r === "delivery_catalog") return Ca(t && t.item_name, "ZZZ");
+        if (r === "lorries") return Ca(t && t.registration_no, "ZZZ");
+        return kgNameNick(t);
+      }
+      function kgSortMasterRows(t, r) {
+        const n = r === "workers" || r === "foremen" || r === "delivery_catalog";
+        return [...(t || [])].sort((l, s) => {
+          if (n) {
+            const f = Number(l.sort_order), c = Number(s.sort_order),
+              m = Number.isFinite(f) && f > 0, v = Number.isFinite(c) && c > 0;
+            if (m && v && f !== c) return f - c;
+            if (m && !v) return -1;
+            if (!m && v) return 1;
+          }
+          return kgMasterNameKey(l, r).localeCompare(kgMasterNameKey(s, r), void 0, {
+            numeric: !0,
+            sensitivity: "base",
+          });
+        });
+      }
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
@@ -35849,7 +35861,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         lorry_ids: [],
         foreman_ids: [],
         shift: "day",
-        job_status: "NEW",
+        job_status: "CONTINUE JOB",
         pic: "",
         is_confirmed: !1,
         notes: "",
@@ -36049,7 +36061,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               lorry_ids: ke,
               foreman_ids: ar(V).map((Le) => Number(Le.id)),
               shift: V.shift || "day",
-              job_status: V.job_status || "NEW",
+              job_status: V.job_status || "CONTINUE JOB",
               pic: V.pic || "",
               is_confirmed: !!V.is_confirmed,
               notes: V.notes || "",
@@ -36131,7 +36143,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             lorry_id: kgSelectedLorries.length ? Number(kgSelectedLorries[0]) : null,
             foreman_id: w.foreman_ids.length ? Number(w.foreman_ids[0]) : null,
             shift: w.shift,
-            job_status: w.job_status || "NEW",
+            job_status: w.job_status || "CONTINUE JOB",
             pic: w.pic || null,
             is_confirmed: !!w.is_confirmed,
             notes: w.notes || null,
@@ -36604,7 +36616,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 "article",
                                 {
                                   className: `assignment-card ${V.is_confirmed ? "site-confirmed" : ""} ${kgDragOverId === V.id ? "kg-drag-over" : ""}`,
-                                  draggable: r,
+                                  draggable: !1,
                                   onDragStart: (At) => {
                                     if (!r) return At.preventDefault();
                                     const kn = At.target && At.target.closest ? At.target.closest(".kg-desktop-drag-button") : null;
@@ -36635,7 +36647,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     kgSetDragOverId(null);
                                   },
                                   children: [
-                                    r && d.jsx("button", {
+                                    false && d.jsx("button", {
                                       type: "button",
                                       className: "kg-desktop-drag-button",
                                       title: "Computer only: drag to arrange this site",
@@ -36680,7 +36692,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                 kgLorryCopyList(V),
                                               ],
                                             }),
-                                            d.jsxs("span", { children: ["Status: ", V.job_status || "NEW"] }),
+                                            d.jsxs("span", { children: ["Status: ", V.job_status || "CONTINUE JOB"] }),
                                             d.jsxs("span", { children: ["P.I.C.: ", V.pic || ((V.site || {}).pic) || "-"] }),
                                             d.jsxs("span", { children: ["Foreman in charge: ", ((V.site || {}).foreman_in_charge) || "-"] }),
                                             d.jsxs("span", {
@@ -36918,7 +36930,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       children: [
                         "Job status",
                         d.jsxs("select", {
-                          value: w.job_status || "NEW",
+                          value: w.job_status || "CONTINUE JOB",
                           onChange: (V) => _({ ...w, job_status: V.target.value }),
                           children: [
                             d.jsx("option", { value: "NEW", children: "NEW" }),
@@ -38080,14 +38092,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               ? kgQ.order("nickname", { nullsFirst: !1 }).order("name")
               : kgQ.order(r.orderBy);
           const { data: J, error: j } = await kgQ;
-          (j
-            ? _(j.message)
-            : f(
-                r.table === "workers" || r.table === "foremen"
-                  ? kgSortNick(J || [])
-                  : J || [],
-              ),
-            E(!1));
+          (j ? _(j.message) : f(kgSortMasterRows(J || [], r.table)), E(!1));
         }
         q.useEffect(() => {
           T();
@@ -38178,6 +38183,27 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             );
           await T();
         }
+        async function kgSaveManualSortOrder(J, j) {
+          if (!n) return;
+          const fe = String(j || "").trim(),
+            G = fe === "" ? null : Number(fe);
+          if (fe !== "" && (!Number.isFinite(G) || G < 0)) {
+            _("No. must be a number 0 or bigger.");
+            return;
+          }
+          _("");
+          const { error: de } = await qe
+            .from(r.table)
+            .update({ sort_order: G })
+            .eq("id", J.id);
+          if (de) return _(de.message);
+          f((oe) =>
+            kgSortMasterRows(
+              oe.map((ge) => (Number(ge.id) === Number(J.id) ? { ...ge, sort_order: G } : ge)),
+              r.table,
+            ),
+          );
+        }
         async function kgToggleForemanType(J) {
           if (r.table !== "foremen" || !n) return;
           const j = kgForemanType(J) === "boss" ? "project" : "boss",
@@ -38193,6 +38219,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await T();
         }
         function he(J, j) {
+          if (j.type === "sort_order")
+            return d.jsx("input", {
+              className: "sort-order-input",
+              type: "number",
+              min: "0",
+              inputMode: "numeric",
+              defaultValue: J.sort_order ?? "",
+              disabled: !n,
+              onBlur: (fe) => kgSaveManualSortOrder(J, fe.target.value),
+              onKeyDown: (fe) => {
+                if (fe.key === "Enter") fe.currentTarget.blur();
+              },
+              title: "Type number then press Enter. Smaller number shows first.",
+            });
           return j.key === "foreman_type"
             ? kgForemanType(J) === "boss"
               ? "Boss foreman"
@@ -38276,14 +38316,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         children: S
                           ? d.jsx("tr", {
                               children: d.jsx("td", {
-                                colSpan: "8",
+                                colSpan: r.columns.length + 1 + (n ? 1 : 0),
                                 children: "Loading…",
                               }),
                             })
                           : D.length === 0
                             ? d.jsx("tr", {
                                 children: d.jsx("td", {
-                                  colSpan: "8",
+                                  colSpan: r.columns.length + 1 + (n ? 1 : 0),
                                   className: "empty-cell",
                                   children: "No records found.",
                                 }),
@@ -39045,10 +39085,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Add nickname, pass and license details. Lists are arranged by nickname.",
+            "Maintain workers available for deployment. Type No. in the list to arrange manually; blank records sort by name A–Z.",
           searchPlaceholder:
             "Search name, nickname, phone, pass, license — type pass or license to show only those records…",
           columns: [
+            { key: "sort_order", label: "No.", type: "sort_order" },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "phone", label: "Phone" },
@@ -39085,10 +39126,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "foremen",
           orderBy: "nickname",
           description:
-            "Maintain foremen available for site assignment. Add nickname, pass, license and choose Boss foreman or Project foreman. Lists are arranged by nickname.",
+            "Maintain foremen available for site assignment. Type No. in the list to arrange manually; blank records sort by name A–Z.",
           searchPlaceholder:
             "Search name, nickname, phone, pass, license, boss or project — type pass or license to show only those records…",
           columns: [
+            { key: "sort_order", label: "No.", type: "sort_order" },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "foreman_type", label: "Foreman type" },
@@ -39121,8 +39163,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "delivery_catalog",
           orderBy: "item_name",
           description:
-            "Maintain material, scaffold and ladder sizes with their normal unit cost.",
+            "Maintain material, scaffold and ladder sizes with their normal unit cost. Type No. in the list to arrange manually; blank records sort by item name A–Z.",
           columns: [
+            { key: "sort_order", label: "No.", type: "sort_order" },
             { key: "category", label: "Category" },
             { key: "item_name", label: "Item" },
             { key: "size", label: "Size" },
@@ -39461,7 +39504,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               lorry_id: assignment.lorry_id || null,
               foreman_id: assignment.foreman_id || null,
               shift: assignment.shift || "day",
-              job_status: assignment.job_status || "NEW",
+              job_status: assignment.job_status || "CONTINUE JOB",
               pic: assignment.pic || null,
               is_confirmed: !!assignment.is_confirmed,
               notes: assignment.notes || null,
@@ -40118,26 +40161,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         border-color: #b9d2ce;
         box-shadow: 0 5px 16px #143a340f;
       }
-      .kg-desktop-drag-button {
-        align-self: stretch;
-        min-width: 82px;
-        border: 0;
-        border-radius: 12px;
-        background: #0f766e;
-        color: #fff;
-        font-weight: 900;
-        letter-spacing: 0.03em;
-        cursor: grab;
-        touch-action: none;
-      }
-      .kg-desktop-drag-button:active {
-        cursor: grabbing;
-      }
-      .assignment-card.kg-drag-over {
-        outline: 3px dashed #0f766e;
-        outline-offset: 4px;
-        background: #f0fdfa;
-      }
       .assignment-main {
         min-width: 0;
       }
@@ -40150,6 +40173,19 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .assignment-title svg {
         color: var(--brand);
         flex: 0 0 auto;
+      }
+      .sort-order-input {
+        width: 76px;
+        max-width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-weight: 800;
+        text-align: center;
+      }
+      .sort-order-input:focus {
+        outline: 3px solid #99f6e433;
+        border-color: var(--brand);
       }
       .assignment-details {
         display: flex;
@@ -40557,9 +40593,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }
         .assignment-card {
           padding: 13px;
-        }
-        .kg-desktop-drag-button {
-          display: none;
         }
         .assignment-details {
           display: grid;
