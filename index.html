@@ -37155,7 +37155,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [p, g] = q.useState(""),
           [S, E] = q.useState(""),
           [w, _] = q.useState(null),
-          [T, D] = q.useState(null);
+          [T, D] = q.useState(null),
+          oe = q.useRef({ id: null, startX: 0, startY: 0, moved: !1 });
         function I(Le) {
           (l(Le), window.sessionStorage.setItem("kg_selected_date", Le));
         }
@@ -37266,6 +37267,46 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           const Ve = Le.dataTransfer.getData("text/plain") || T;
           Ve && G(Ve, Qe);
         }
+        function ge(Le, Qe) {
+          if (!r) return;
+          oe.current = {
+            id: Qe,
+            startX: Le.clientX || 0,
+            startY: Le.clientY || 0,
+            moved: !1,
+          };
+          D(Qe);
+          try {
+            Le.currentTarget.setPointerCapture && Le.currentTarget.setPointerCapture(Le.pointerId);
+          } catch {}
+        }
+        function Ne(Le) {
+          const Qe = oe.current;
+          if (!Qe.id) return;
+          if (Math.abs((Le.clientX || 0) - Qe.startX) > 6 || Math.abs((Le.clientY || 0) - Qe.startY) > 6) {
+            Qe.moved = !0;
+            Le.preventDefault();
+          }
+        }
+        function Ye(Le) {
+          const Qe = oe.current;
+          if (!Qe.id) return;
+          try {
+            Le.currentTarget.releasePointerCapture && Le.currentTarget.releasePointerCapture(Le.pointerId);
+          } catch {}
+          const Ve = Qe.id,
+            Re = Qe.moved;
+          oe.current = { id: null, startX: 0, startY: 0, moved: !1 };
+          D(null);
+          if (!Re) return;
+          Le.preventDefault();
+          const At = document.elementFromPoint(Le.clientX || 0, Le.clientY || 0),
+            lt = At && At.closest ? At.closest("[data-logistics-lorry]") : null;
+          if (!lt) return;
+          const qn = lt.getAttribute("data-logistics-lorry"),
+            In = qn === "none" || qn == null ? null : Number(qn);
+          G(Ve, In);
+        }
         return d.jsxs("div", {
           className: "page logistics-page",
           children: [
@@ -37279,7 +37320,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Logistics" }),
                     d.jsx("p", {
                       children:
-                        "Drag each site card into the lorry box. This updates Planner and Planner will sort Site assignments by lorry.",
+                        "Drag each site card into the lorry box. If drag does not catch, tap a site then press Move selected here.",
                     }),
                   ],
                 }),
@@ -37351,6 +37392,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         "section",
                         {
                           className: `logistics-lorry ${Le.id == null ? "no-lorry" : ""}`,
+                          "data-logistics-lorry": Le.id == null ? "none" : String(Le.id),
                           onDragOver: (Qe) => Qe.preventDefault(),
                           onDrop: (Qe) => de(Qe, Le.id),
                           children: [
@@ -37389,11 +37431,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     })
                                   : Le.rows.map((Qe) => {
                                       var Ve;
-                                      const Re = Number(w) === Number(Qe.id);
+                                      const Re = Number(w) === Number(Qe.id),
+                                        At = Number(T) === Number(Qe.id);
                                       return d.jsxs(
                                         "article",
                                         {
-                                          className: `logistics-site ${Re ? "selected" : ""}`,
+                                          className: `logistics-site ${Re ? "selected" : ""} ${At ? "dragging" : ""}`,
                                           draggable: r,
                                           onDragStart: (At) => {
                                             (D(Qe.id),
@@ -37401,6 +37444,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               (At.dataTransfer.effectAllowed = "move"));
                                           },
                                           onDragEnd: () => D(null),
+                                          onPointerDown: (At) => ge(At, Qe.id),
+                                          onPointerMove: Ne,
+                                          onPointerUp: Ye,
+                                          onPointerCancel: () => {
+                                            (oe.current = { id: null, startX: 0, startY: 0, moved: !1 }, D(null));
+                                          },
                                           onClick: () => r && _(Qe.id),
                                           children: [
                                             d.jsx("strong", {
@@ -41852,6 +41901,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         border-radius: 13px;
         background: #ffffff;
         cursor: grab;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
       }
       .logistics-site:active {
@@ -41860,6 +41912,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .logistics-site.selected {
         border-color: #0f766e;
         box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+      }
+      .logistics-site.dragging {
+        opacity: 0.7;
+        transform: scale(0.98);
       }
       .logistics-address {
         color: var(--ink);
