@@ -35532,15 +35532,18 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         });
       }
       const Ca = (t, r = "-") => String(t || "").trim() || r;
-      const kgCopyNoParentheses = (t, r = "-") => {
+      const kgCleanNoSl = (t, r = "-") => {
         const n = Ca(t, r)
-          .replace(/\s*\(\s*SL\s*\)\s*/gi, " ")
+          .replace(/[\s\u00a0]*[\(\[（【]\s*S[\s\.\/\-]*L\.?\s*[\)\]）】][\s\u00a0]*/gi, " ")
           .replace(/\s{2,}/g, " ")
           .trim();
         return n || r;
       };
+      const kgCopyNoParentheses = kgCleanNoSl;
+      const kgCleanCopyOutput = (t) => kgCleanNoSl(String(t || ""), "");
       const kgNameNick = (t) =>
         Ca((t == null ? void 0 : t.nickname) || (t == null ? void 0 : t.name));
+      const kgCopyPersonName = (t) => kgCleanNoSl(kgNameNick(t), "");
       const kgForemanType = (t) =>
         String((t == null ? void 0 : t.foreman_type) || "project").toLowerCase() === "boss"
           ? "boss"
@@ -35743,7 +35746,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
-          const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean),
+          const v = (m.assignment_workers || []).map((p) => kgCopyPersonName(p.worker)).filter(Boolean),
             x = kgAssignmentLorries(m);
           if (!v.length && !x.length) continue;
           const p = x.length ? x : [null];
@@ -35771,27 +35774,28 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             return [m.title, ...v.map((x) => (x.startsWith("*") || x.startsWith("-") ? x : `* ${x}`))].filter(Boolean).join(`
 `);
           });
-        return [`*${kgCopyDateTitle(t)} - Job*`, ...s, ...f].filter(Boolean).join(`
+        return kgCleanCopyOutput([`*${kgCopyDateTitle(t)} - Job*`, ...s, ...f].filter(Boolean).join(`
 
-`);
+`));
       }
       function xC(t, r) {
         const n = kgSortAssignmentsByLorry(r)
           .filter((l) => ar(l).length > 0)
           .map((l) => {
             var f;
-            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + "),
+            const s = ar(l).map((c) => kgCopyPersonName(c)).filter(Boolean).join(" + "),
               c = (l.assignment_workers || []).length,
               m = `${c} worker${c === 1 ? "" : "s"}`;
             return `* ${kgCopyNoParentheses((f = l.site) == null ? void 0 : f.address)} - ${s} - ${m}`;
           });
-        return [`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
-`);
+        return kgCleanCopyOutput([`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
+`));
       }
       async function vC(t) {
+        t = typeof kgCleanCopyOutput == "function" ? kgCleanCopyOutput(t) : String(t || "");
         let r = !1;
         async function n(ke) {
-          const Le = ke == null ? t : String(ke);
+          const Le = typeof kgCleanCopyOutput == "function" ? kgCleanCopyOutput(ke == null ? t : String(ke)) : ke == null ? t : String(ke);
           try {
             (navigator.clipboard && (await navigator.clipboard.writeText(Le)),
               (r = !0));
@@ -35828,7 +35832,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           await n(s.value);
         };
         l.querySelector("#kg-copy-whatsapp").onclick = () => {
-          window.open(`https://wa.me/?text=${encodeURIComponent(s.value)}`, "_blank", "noopener,noreferrer");
+          const f = typeof kgCleanCopyOutput == "function" ? kgCleanCopyOutput(s.value) : s.value;
+          window.open(`https://wa.me/?text=${encodeURIComponent(f)}`, "_blank", "noopener,noreferrer");
         };
       }
       function hl({ title: t, children: r, onClose: n }) {
