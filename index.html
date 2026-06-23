@@ -16541,10 +16541,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return {
           data: {
             sites: t.data || [],
-            workers: kgSortMasterRows(r.data || [], "workers", "nickname"),
+            workers: kgSortNick(r.data || []),
             lorries: n.data || [],
-            foremen: kgSortMasterRows(l.data || [], "foremen", "nickname"),
-            catalog: kgSortMasterRows(s.data || [], "delivery_catalog", "item_name"),
+            foremen: kgSortNick(l.data || []),
+            catalog: s.data || [],
           },
           error: f || null,
         };
@@ -35603,18 +35603,17 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       function kgSortPlannerRows(t) {
         const r = [...(t || [])],
-          n = r.some((l) => Number(l.sort_order || 0) > 0);
+          n = r.some((l) => Number.isFinite(Number(l.sort_order)) && Number(l.sort_order) > 0);
+        if (!n) return kgSortAssignmentsByLorry(r);
         return r.sort((l, s) => {
-          if (n) {
-            const f = Number(l.sort_order || 0) || 999999,
-              c = Number(s.sort_order || 0) || 999999;
-            if (f !== c) return f - c;
-          }
-          const f = kgAssignmentLorryKey(l).localeCompare(kgAssignmentLorryKey(s), void 0, {
+          const f = Number.isFinite(Number(l.sort_order)) && Number(l.sort_order) > 0 ? Number(l.sort_order) : 999999,
+            c = Number.isFinite(Number(s.sort_order)) && Number(s.sort_order) > 0 ? Number(s.sort_order) : 999999;
+          if (f !== c) return f - c;
+          const m = kgAssignmentLorryKey(l).localeCompare(kgAssignmentLorryKey(s), void 0, {
             numeric: !0,
             sensitivity: "base",
           });
-          if (f) return f;
+          if (m) return m;
           return Ca(l.site && l.site.address, "ZZZ").localeCompare(
             Ca(s.site && s.site.address, "ZZZ"),
             void 0,
@@ -35726,31 +35725,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             sensitivity: "base",
           }),
         );
-      function kgSortMasterRows(t, r, n) {
-        const l = [...(t || [])],
-          s = l.some((f) => Number(f.sort_order || 0) !== 0);
-        return l.sort((f, c) => {
-          if (s) {
-            const m = Number(f.sort_order || 0),
-              v = Number(c.sort_order || 0);
-            if (m !== v) return m - v;
-          }
-          if (r === "workers" || r === "foremen")
-            return kgNameNick(f).localeCompare(kgNameNick(c), void 0, {
-              numeric: !0,
-              sensitivity: "base",
-            });
-          if (r === "delivery_catalog") {
-            const m = `${f.category || ""}-${f.item_name || ""}-${f.size || ""}`,
-              v = `${c.category || ""}-${c.item_name || ""}-${c.size || ""}`;
-            return m.localeCompare(v, void 0, { numeric: !0, sensitivity: "base" });
-          }
-          return String(f[n] || "").localeCompare(String(c[n] || ""), void 0, {
-            numeric: !0,
-            sensitivity: "base",
-          });
-        });
-      }
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
@@ -35903,9 +35877,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [fe, G] = q.useState(!0),
           [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
           [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1),
-          kgDragId = q.useRef(null),
-          kgPendingOrder = q.useRef(null),
-          kgLastTouchTargetId = q.useRef(null);
+          kgPlannerDragId = q.useRef(null),
+          [kgDragOverId, kgSetDragOverId] = q.useState(null);
         async function de() {
           const V = await sh();
           (V.error && j(V.error.message), g(V.data));
@@ -36031,51 +36004,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
-        function kgClearDragMarks() {
-          document
-            .querySelectorAll(".assignment-card.drag-over, .assignment-card.dragging")
-            .forEach((V) => V.classList.remove("drag-over", "dragging"));
-        }
-        function kgClearDragOver() {
-          document
-            .querySelectorAll(".assignment-card.drag-over")
-            .forEach((V) => V.classList.remove("drag-over"));
-        }
-        function kgMarkDragCard(V, xe) {
-          const ke = document.querySelector(`.assignment-card[data-assignment-id="${Number(V)}"]`);
-          ke && ke.classList.add(xe);
-        }
-        function kgBuildPlannerOrder(V) {
-          const xe = Number(kgDragId.current),
-            ke = Number(V);
-          if (!xe || !ke || xe === ke) return null;
-          const Le = kgPendingOrder.current && kgPendingOrder.current.length
-              ? kgPendingOrder.current
-              : kgSortPlannerRows(s),
-            Qe = Le.findIndex((At) => Number(At.id) === xe),
-            Ve = Le.findIndex((At) => Number(At.id) === ke);
-          if (Qe < 0 || Ve < 0 || Qe === Ve) return null;
-          const Re = [...Le],
-            [At] = Re.splice(Qe, 1);
-          Re.splice(Ve, 0, At);
-          return Re.map((ln, vn) => ({ ...ln, sort_order: vn + 1 }));
-        }
-        function kgApplyPlannerOrder(V) {
-          if (!V || !V.length) return;
-          kgPendingOrder.current = V;
-          const xe = new Map(V.map((ke) => [Number(ke.id), ke]));
-          f((ke) => ke.map((Le) => xe.get(Number(Le.id)) || Le));
-        }
         async function kgSavePlannerOrder(V) {
-          const xe = V || kgPendingOrder.current;
-          if (!xe || !xe.length) return;
-          kgPendingOrder.current = null;
+          if (!r) return;
+          const xe = V.map((ke, Le) => ({ ...ke, sort_order: (Le + 1) * 10 }));
+          f(xe);
           const ke = await Promise.all(
-              xe.map((Le) =>
-                qe
-                  .from("site_assignments")
-                  .update({ sort_order: Number(Le.sort_order || 0) })
-                  .eq("id", Le.id),
+              xe.map((Le, Qe) =>
+                qe.from("site_assignments").update({ sort_order: (Qe + 1) * 10 }).eq("id", Le.id),
               ),
             ),
             Le = ke.find((Qe) => Qe.error);
@@ -36086,107 +36021,19 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           }
           He("Site order saved. Everyone will see the same order.");
         }
-        function kgStartDrag(V, xe) {
-          kgDragId.current = Number(xe);
-          kgPendingOrder.current = null;
-          try {
-            V.dataTransfer.effectAllowed = "move";
-            V.dataTransfer.setData("text/plain", String(xe));
-          } catch {}
-          window.setTimeout(() => kgMarkDragCard(xe, "dragging"), 0);
-        }
-        function kgDragOver(V, xe) {
-          if (!kgDragId.current) return;
-          V.preventDefault();
-          try {
-            V.dataTransfer.dropEffect = "move";
-          } catch {}
-          kgClearDragOver();
-          Number(kgDragId.current) !== Number(xe) && kgMarkDragCard(xe, "drag-over");
-        }
-        async function kgDrop(V, xe) {
-          if (!kgDragId.current) return;
-          V.preventDefault();
-          const ke = kgBuildPlannerOrder(xe);
-          kgApplyPlannerOrder(ke);
-          kgClearDragMarks();
-          await kgSavePlannerOrder(ke);
-          kgDragId.current = null;
-        }
-        async function kgEndDrag() {
-          kgClearDragMarks();
-          await kgSavePlannerOrder();
-          kgDragId.current = null;
-        }
-        function kgGetCardIdFromPoint(V, xe) {
-          const ke = document.elementFromPoint(V, xe),
-            Le = ke && ke.closest ? ke.closest(".assignment-card[data-assignment-id]") : null;
-          return Le ? Number(Le.getAttribute("data-assignment-id")) : 0;
-        }
-        function kgPointerStart(V, xe) {
-          if (!r) return;
-          if (V.pointerType === "mouse" && V.button !== 0) return;
-          V.preventDefault();
-          V.stopPropagation();
-          try {
-            V.currentTarget.setPointerCapture && V.currentTarget.setPointerCapture(V.pointerId);
-          } catch {}
-          kgDragId.current = Number(xe);
-          kgPendingOrder.current = null;
-          kgLastTouchTargetId.current = null;
-          kgClearDragMarks();
-          kgMarkDragCard(xe, "dragging");
-          document.body.classList.add("kg-planner-dragging");
-          const ke = (Qe) => {
-              if (!kgDragId.current) return;
-              Qe.preventDefault();
-              const Ve = kgGetCardIdFromPoint(Qe.clientX, Qe.clientY);
-              if (!Ve || Ve === Number(kgDragId.current) || Ve === Number(kgLastTouchTargetId.current)) return;
-              kgLastTouchTargetId.current = Ve;
-              kgClearDragOver();
-              kgMarkDragCard(Ve, "drag-over");
-              const Re = kgBuildPlannerOrder(Ve);
-              kgApplyPlannerOrder(Re);
-            },
-            Le = async (Qe) => {
-              Qe && Qe.preventDefault && Qe.preventDefault();
-              window.removeEventListener("pointermove", ke);
-              window.removeEventListener("pointerup", Le);
-              window.removeEventListener("pointercancel", Le);
-              document.body.classList.remove("kg-planner-dragging");
-              kgClearDragMarks();
-              await kgSavePlannerOrder();
-              kgDragId.current = null;
-              kgLastTouchTargetId.current = null;
-            };
-          window.addEventListener("pointermove", ke, { passive: !1 });
-          window.addEventListener("pointerup", Le, { passive: !1 });
-          window.addEventListener("pointercancel", Le, { passive: !1 });
-        }
-        function kgTouchStart(V, xe) {
-          kgDragId.current = Number(xe);
-          kgPendingOrder.current = null;
-          kgLastTouchTargetId.current = null;
-          kgMarkDragCard(xe, "dragging");
-        }
-        function kgTouchMove(V) {
-          if (!kgDragId.current) return;
-          const xe = V.touches && V.touches[0];
-          if (!xe) return;
-          V.preventDefault();
-          const ke = kgGetCardIdFromPoint(xe.clientX, xe.clientY);
-          if (!ke || ke === Number(kgDragId.current) || ke === Number(kgLastTouchTargetId.current)) return;
-          kgLastTouchTargetId.current = ke;
-          kgClearDragOver();
-          kgMarkDragCard(ke, "drag-over");
-          const Le = kgBuildPlannerOrder(ke);
-          kgApplyPlannerOrder(Le);
-        }
-        async function kgTouchEnd() {
-          kgClearDragMarks();
-          await kgSavePlannerOrder();
-          kgDragId.current = null;
-          kgLastTouchTargetId.current = null;
+        function kgDropPlannerRow(V) {
+          const xe = Number(kgPlannerDragId.current),
+            ke = Number(V);
+          kgSetDragOverId(null);
+          kgPlannerDragId.current = null;
+          if (!r || !xe || !ke || xe === ke) return;
+          const Le = kgRows.findIndex((At) => Number(At.id) === xe),
+            Qe = kgRows.findIndex((At) => Number(At.id) === ke);
+          if (Le < 0 || Qe < 0) return;
+          const Ve = [...kgRows],
+            [Re] = Ve.splice(Le, 1);
+          Ve.splice(Qe, 0, Re);
+          kgSavePlannerOrder(Ve);
         }
         function P(V = "") {
           const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
@@ -36288,8 +36135,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             pic: w.pic || null,
             is_confirmed: !!w.is_confirmed,
             notes: w.notes || null,
-            sort_order: S === "new" ? s.length + 1 : void 0,
           };
+          if (S === "new")
+            ke.sort_order = s.reduce((Qe, Ve) => Math.max(Qe, Number(Ve.sort_order) || 0), 0) + 10;
           let Le = S;
           if (S === "new") {
             const { data: Qe, error: Ve } = await qe.from("site_assignments").insert(ke).select("id").single();
@@ -36755,26 +36603,50 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               return d.jsxs(
                                 "article",
                                 {
-                                  className: `assignment-card ${V.is_confirmed ? "site-confirmed" : ""}`,
-                                  "data-assignment-id": V.id,
-                                  draggable: !1,
-                                  onDragStart: (Re) => Re.preventDefault(),
+                                  className: `assignment-card ${V.is_confirmed ? "site-confirmed" : ""} ${kgDragOverId === V.id ? "kg-drag-over" : ""}`,
+                                  draggable: r,
+                                  onDragStart: (At) => {
+                                    if (!r) return At.preventDefault();
+                                    const kn = At.target && At.target.closest ? At.target.closest(".kg-desktop-drag-button") : null;
+                                    if (!kn) return At.preventDefault();
+                                    kgPlannerDragId.current = V.id;
+                                    if (At.dataTransfer) {
+                                      At.dataTransfer.effectAllowed = "move";
+                                      try {
+                                        At.dataTransfer.setData("text/plain", String(V.id));
+                                      } catch {}
+                                    }
+                                  },
+                                  onDragOver: (At) => {
+                                    if (!r || !kgPlannerDragId.current) return;
+                                    At.preventDefault();
+                                    if (At.dataTransfer) At.dataTransfer.dropEffect = "move";
+                                    kgSetDragOverId(V.id);
+                                  },
+                                  onDragLeave: () => {
+                                    kgDragOverId === V.id && kgSetDragOverId(null);
+                                  },
+                                  onDrop: (At) => {
+                                    At.preventDefault();
+                                    kgDropPlannerRow(V.id);
+                                  },
+                                  onDragEnd: () => {
+                                    kgPlannerDragId.current = null;
+                                    kgSetDragOverId(null);
+                                  },
                                   children: [
+                                    r && d.jsx("button", {
+                                      type: "button",
+                                      className: "kg-desktop-drag-button",
+                                      title: "Computer only: drag to arrange this site",
+                                      children: "☰ DRAG",
+                                    }),
                                     d.jsxs("div", {
                                       className: "assignment-main",
                                       children: [
                                         d.jsxs("div", {
                                           className: "assignment-title",
                                           children: [
-                                            r &&
-                                              d.jsx("span", {
-                                                className: "drag-handle",
-                                                draggable: !1,
-                                                title: "Hold ☰ DRAG and pull site up or down",
-                                                onDragStart: (Re) => Re.preventDefault(),
-                                                onPointerDown: (Re) => kgPointerStart(Re, V.id),
-                                                children: "☰ DRAG",
-                                              }),
                                             d.jsx(al, { size: 18 }),
                                             d.jsx("strong", {
                                               children:
@@ -38206,11 +38078,16 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           kgQ =
             r.table === "workers" || r.table === "foremen"
               ? kgQ.order("nickname", { nullsFirst: !1 }).order("name")
-              : r.table === "delivery_catalog"
-                ? kgQ.order("category").order("item_name")
-                : kgQ.order(r.orderBy);
+              : kgQ.order(r.orderBy);
           const { data: J, error: j } = await kgQ;
-          (j ? _(j.message) : f(kgSortMasterRows(J || [], r.table, r.orderBy)), E(!1));
+          (j
+            ? _(j.message)
+            : f(
+                r.table === "workers" || r.table === "foremen"
+                  ? kgSortNick(J || [])
+                  : J || [],
+              ),
+            E(!1));
         }
         q.useEffect(() => {
           T();
@@ -40241,41 +40118,25 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         border-color: #b9d2ce;
         box-shadow: 0 5px 16px #143a340f;
       }
-      .assignment-card {
-        touch-action: pan-y;
-      }
-      .assignment-card.dragging {
-        opacity: 0.55;
-        border-color: var(--brand);
-        pointer-events: none;
-      }
-      .assignment-card.drag-over {
-        border-color: var(--brand);
-        background: #ecfdf5;
-        transform: translateY(2px);
-      }
-      .drag-handle {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 76px;
-        height: 34px;
-        padding: 0 10px;
-        border-radius: 10px;
-        border: 1px solid #bddbd6;
-        background: #f0fdfa;
-        color: #0f766e;
-        cursor: grab;
-        font-size: 13px;
+      .kg-desktop-drag-button {
+        align-self: stretch;
+        min-width: 82px;
+        border: 0;
+        border-radius: 12px;
+        background: #0f766e;
+        color: #fff;
         font-weight: 900;
-        line-height: 1;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.03em;
+        cursor: grab;
         touch-action: none;
-        user-select: none;
-        flex: 0 0 auto;
       }
-      .drag-handle:active {
+      .kg-desktop-drag-button:active {
         cursor: grabbing;
+      }
+      .assignment-card.kg-drag-over {
+        outline: 3px dashed #0f766e;
+        outline-offset: 4px;
+        background: #f0fdfa;
       }
       .assignment-main {
         min-width: 0;
@@ -40696,6 +40557,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }
         .assignment-card {
           padding: 13px;
+        }
+        .kg-desktop-drag-button {
+          display: none;
         }
         .assignment-details {
           display: grid;
