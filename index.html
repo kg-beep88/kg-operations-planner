@@ -36657,7 +36657,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             }),
                                             d.jsxs("span", { children: ["Status: ", V.job_status || "CONTINUE JOB"] }),
                                             d.jsxs("span", { children: ["P.I.C.: ", V.pic || ((V.site || {}).pic) || "-"] }),
-                                            d.jsxs("span", { children: ["Foreman in charge: ", ((V.site || {}).foreman_in_charge) || "-"] }),
+                                            d.jsxs("span", { children: ["ID Firm: ", ((V.site || {}).foreman_in_charge) || "-"] }),
                                             d.jsxs("span", {
                                               children: [
                                                 d.jsx(ei, { size: 15 }),
@@ -36842,8 +36842,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         className: "site-history-box site-history-sticky",
                         children: [
                           d.jsx("strong", { children: "Site detail" }),
-                          d.jsxs("div", { className: "site-history-line", children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
-                          d.jsxs("div", { className: "site-history-line", children: ["Foreman: ", kgSiteForemanText(kgSelectedSite)] }),
+                          d.jsxs("div", { className: "site-history-line", children: ["ID Firm: ", kgSelectedSite.foreman_in_charge || "-"] }),
+                          d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSiteForemanText(kgSelectedSite)] }),
                           d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
                           d.jsx("strong", { children: "Previous manpower / foreman went before" }),
                           d.jsx("small", { className: "site-history-note", children: "Latest 10 past records for this site" }),
@@ -39292,15 +39292,15 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             "Maintain addresses and whether each site is active, paused or closed.",
           columns: [
             { key: "address", label: "Address" },
-            { key: "foreman_in_charge", label: "Foreman in charge" },
-            { key: "foreman_detail", label: "Foreman detail" },
+            { key: "foreman_in_charge", label: "ID Firm" },
+            { key: "foreman_detail", label: "ID Firm detail" },
             { key: "pic", label: "P.I.C." },
             { key: "notes", label: "Notes" },
           ],
           fields: [
             { name: "address", label: "Address", required: !0, wide: !0 },
-            { name: "foreman_in_charge", label: "Foreman in charge" },
-            { name: "foreman_detail", label: "Foreman detail", type: "textarea", wide: !0 },
+            { name: "foreman_in_charge", label: "ID Firm" },
+            { name: "foreman_detail", label: "ID Firm detail", type: "textarea", wide: !0 },
             { name: "pic", label: "P.I.C." },
             { name: "notes", label: "Notes", type: "textarea", wide: !0 },
           ],
