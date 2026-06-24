@@ -33844,7 +33844,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       function uC(t) {
         return t.map((r) =>
-          Object.fromEntries(Object.entries(r).map(([n, l]) => [n, sC(l)])),
+          Object.fromEntries(
+            Object.entries(r)
+              .filter(([n]) => !String(n).startsWith("__kg"))
+              .map(([n, l]) => [n, sC(l)]),
+          ),
         );
       }
       function fC(t) {
@@ -33873,6 +33877,23 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             f["!cols"] = fC(s);
             const c = f["!ref"];
             c && (f["!autofilter"] = { ref: c });
+            const m = l.rows || [], v = c ? _0.decode_range(c) : null;
+            if (v && m.some((x) => x && x.__kgDateSeparator)) {
+              f["!rows"] = f["!rows"] || [];
+              m.forEach((x, p) => {
+                if (!x || !x.__kgDateSeparator) return;
+                const g = p + 1;
+                f["!rows"][g] = { hpt: 8 };
+                for (let S = v.s.c; S <= v.e.c; S++) {
+                  const E = _0.encode_cell({ r: g, c: S });
+                  f[E] = f[E] || { t: "s", v: "" };
+                  f[E].s = {
+                    fill: { patternType: "solid", fgColor: { rgb: "000000" }, bgColor: { rgb: "000000" } },
+                    font: { color: { rgb: "000000" } },
+                  };
+                }
+              });
+            }
           }
           _0.book_append_sheet(n, f, cC(l.name));
         }
@@ -34289,7 +34310,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               }),
                 (me = `KG-Site-Summary-${c}.xlsx`));
             }
-            (B.push({ name: "Assignments", rows: wv(oe) }),
+            (B.push({ name: "Assignments", rows: kgDailyExcelRows(oe, []) }),
               B.push({ name: "Delivery Orders", rows: Av(ge) }),
               B.push({ name: "Delivery Items", rows: Cv(ge) }),
               Tv(me, B));
@@ -35750,33 +35771,79 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           .filter(Boolean)
           .join(", ");
       }
+      function kgSortAssignmentsForExcel(t) {
+        return [...(t || [])].sort((r, n) => {
+          const l = String(r.plan_date || "").localeCompare(String(n.plan_date || ""));
+          if (l) return l;
+          const s = kgAssignmentLorryKey(r).localeCompare(kgAssignmentLorryKey(n), void 0, {
+            numeric: !0,
+            sensitivity: "base",
+          });
+          if (s) return s;
+          const f = kgFirstLorrySortOrder(r) - kgFirstLorrySortOrder(n);
+          if (f) return f;
+          return Ca(r.site && r.site.address, "ZZZ").localeCompare(
+            Ca(n.site && n.site.address, "ZZZ"),
+            void 0,
+            { numeric: !0, sensitivity: "base" },
+          );
+        });
+      }
+      function kgExcelDate(t) {
+        return t ? cp(t).replaceAll(".", "/") : "";
+      }
+      function kgBlackSeparatorRow() {
+        const t = "████████████████";
+        return {
+          Lorry: t,
+          Workers: t,
+          Foreman: t,
+          Date: t,
+          "Job status": t,
+          "P.I.C.": t,
+          Address: t,
+          __kgDateSeparator: !0,
+        };
+      }
       const kgDailyExcelRows = (t, r = []) => {
-        const n = kgSortAssignmentsByLorry(t || []).map((l) => {
+        const n = [];
+        for (const l of kgSortAssignmentsForExcel(t || [])) {
           var s;
-          return {
+          n.push({
             Lorry: kgLorryExcelList(l),
             Workers: kgWorkerNames(l),
-            Foremen: kgForemanNames(l),
-            Date: l.plan_date ? cp(l.plan_date).replaceAll(".", "/") : "",
+            Foreman: kgForemanNames(l),
+            Date: kgExcelDate(l.plan_date),
             "Job status": l.job_status || l.jobStatus || "",
-            PIC: l.pic || l.pic_name || l.picName || "",
+            "P.I.C.": l.pic || l.pic_name || l.picName || "",
             Address: Ca((s = l.site) == null ? void 0 : s.address, ""),
-          };
-        });
+          });
+        }
         for (const l of r || []) {
           const s = String(l.body || "").split(`
 `).map(kgCleanExtraLine).filter(Boolean);
           n.push({
             Lorry: "",
             Workers: s.join(" + "),
-            Foremen: "",
-            Date: l.plan_date ? cp(l.plan_date).replaceAll(".", "/") : "",
+            Foreman: "",
+            Date: kgExcelDate(l.plan_date),
             "Job status": "EXTRA",
-            PIC: "",
+            "P.I.C.": "",
             Address: Ca(l.title, ""),
           });
         }
-        return n;
+        const f = [], c = new Map();
+        for (const l of n) {
+          const s = l.Date || "";
+          c.has(s) || c.set(s, []);
+          c.get(s).push(l);
+        }
+        const m = [...c.keys()].sort((l, s) => l.localeCompare(s));
+        m.forEach((l, s) => {
+          f.push(...c.get(l));
+          s < m.length - 1 && f.push(kgBlackSeparatorRow());
+        });
+        return f;
       };
       const kgSortNick = (t) =>
         [...(t || [])].sort((r, n) =>
