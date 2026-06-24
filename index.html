@@ -35618,13 +35618,24 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const [r, n, l] = String(t).split("-");
         return `${l}.${n}.${r} (${kgDayShort(t)})`;
       }
-      function kgAssignmentLorries(t) {
+      function kgAssignmentLorryRows(t) {
         const r = (t.assignment_lorries || [])
           .filter((n) => n && n.lorry && n.lorry.id)
-          .sort((n, l) => Number(n.sort_order || 0) - Number(l.sort_order || 0))
-          .map((n) => n.lorry);
+          .sort((n, l) => {
+            const s = Number(n.sort_order || 0) - Number(l.sort_order || 0);
+            if (s) return s;
+            return kgLorryText(n.lorry).localeCompare(kgLorryText(l.lorry), void 0, {
+              numeric: !0,
+              sensitivity: "base",
+            });
+          });
         if (r.length) return r;
-        return t && t.lorry && t.lorry.id ? [t.lorry] : [];
+        return t && t.lorry && t.lorry.id
+          ? [{ lorry_id: t.lorry.id, lorry: t.lorry, sort_order: t.sort_order || 0 }]
+          : [];
+      }
+      function kgAssignmentLorries(t) {
+        return kgAssignmentLorryRows(t).map((n) => n.lorry);
       }
       function kgLorryText(t, r = "copy") {
         if (!t) return r === "excel" ? "" : "No lorry";
@@ -35644,6 +35655,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgFirstLorry(t) {
         return kgAssignmentLorries(t)[0] || null;
       }
+      function kgFirstLorrySortOrder(t) {
+        const r = kgAssignmentLorryRows(t)[0];
+        return Number((r && r.sort_order) || (t && t.sort_order) || 0);
+      }
       function kgAssignmentLorryKey(t) {
         const r = kgFirstLorry(t);
         return r
@@ -35657,7 +35672,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             sensitivity: "base",
           });
           if (l) return l;
-          const s = Number(r.sort_order || 0) - Number(n.sort_order || 0);
+          const s = kgFirstLorrySortOrder(r) - kgFirstLorrySortOrder(n);
           if (s) return s;
           return Ca(r.site && r.site.address, "ZZZ").localeCompare(
             Ca(n.site && n.site.address, "ZZZ"),
@@ -35835,24 +35850,40 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
           const v = (m.assignment_workers || []).map((p) => kgCopyPersonName(p.worker)).filter(Boolean),
-            x = kgAssignmentLorries(m);
+            x = kgAssignmentLorryRows(m);
           if (!v.length && !x.length) continue;
-          const p = x.length ? x : [null];
+          const p = x.length ? x : [{ lorry: null, sort_order: m.sort_order || 0 }];
           for (const g of p) {
-            const S = g && g.id ? `lorry-${g.id}` : "unassigned";
-            (l.has(S) || l.set(S, { lorry: g, items: [] }), l.get(S).items.push({ assignment: m, workers: v }));
+            const S = g.lorry || null,
+              E = S && S.id ? `lorry-${S.id}` : "unassigned";
+            (l.has(E) || l.set(E, { lorry: S, items: [] }),
+              l.get(E).items.push({
+                assignment: m,
+                workers: v,
+                order: Number(g.sort_order || m.sort_order || 0),
+              }));
           }
         }
         const s = [...l.values()]
             .sort((m, v) => kgAssignmentLorryKey({ assignment_lorries: m.lorry ? [{ lorry: m.lorry }] : [] }).localeCompare(kgAssignmentLorryKey({ assignment_lorries: v.lorry ? [{ lorry: v.lorry }] : [] }), void 0, { numeric: !0 }))
             .map(({ lorry: m, items: v }) => {
               const x = m ? `*${kgLorryText(m)}*` : "*No lorry*",
-                p = v.map(({ assignment: g, workers: S }) => {
-                  var E;
-                  const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "",
-                    _ = Ca((E = g.site) == null ? void 0 : E.address);
-                  return S.length ? `- ${_}${w} - ${S.join(" + ")}` : `- ${_}${w}`;
-                });
+                p = [...v]
+                  .sort((g, S) => {
+                    const E = Number(g.order || 0) - Number(S.order || 0);
+                    if (E) return E;
+                    return Ca(g.assignment.site && g.assignment.site.address, "ZZZ").localeCompare(
+                      Ca(S.assignment.site && S.assignment.site.address, "ZZZ"),
+                      void 0,
+                      { numeric: !0, sensitivity: "base" },
+                    );
+                  })
+                  .map(({ assignment: g, workers: S }) => {
+                    var E;
+                    const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "",
+                      _ = Ca((E = g.site) == null ? void 0 : E.address);
+                    return S.length ? `- ${_}${w} - ${S.join(" + ")}` : `- ${_}${w}`;
+                  });
               return [x, ...p].join(`
 `);
             }),
@@ -37509,17 +37540,31 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               })),
               Qe = { id: null, title: "No lorry yet", rows: [] };
             for (const At of s) {
-              const lt = kgAssignmentLorries(At)[0] || null,
-                qn = lt && lt.id ? Number(lt.id) : null;
-              let In = qn == null ? Qe : Le.find((Pn) => Number(Pn.id) === qn);
-              if (!In && lt) {
-                In = { id: qn, title: kgLorryCopy(lt), rows: [] };
-                Le.push(In);
+              const lt = kgAssignmentLorryRows(At);
+              if (lt.length) {
+                for (const qn of lt) {
+                  const In = qn && qn.lorry && qn.lorry.id ? Number(qn.lorry.id) : null;
+                  let Pn = In == null ? Qe : Le.find((Nn) => Number(Nn.id) === In);
+                  if (!Pn && qn.lorry) {
+                    Pn = { id: In, title: kgLorryCopy(qn.lorry), rows: [] };
+                    Le.push(Pn);
+                  }
+                  (Pn || Qe).rows.push({
+                    ...At,
+                    kg_lorry_id: In,
+                    kg_lorry_sort_order: Number(qn.sort_order || At.sort_order || 0),
+                  });
+                }
+              } else {
+                Qe.rows.push({
+                  ...At,
+                  kg_lorry_id: null,
+                  kg_lorry_sort_order: Number(At.sort_order || 0),
+                });
               }
-              (In || Qe).rows.push(At);
             }
             const Ve = (At, lt) => {
-              const qn = Number(At.sort_order || 0) - Number(lt.sort_order || 0);
+              const qn = Number(At.kg_lorry_sort_order || 0) - Number(lt.kg_lorry_sort_order || 0);
               if (qn) return qn;
               return Ca(At.site && At.site.address, "ZZZ").localeCompare(
                 Ca(lt.site && lt.site.address, "ZZZ"),
@@ -37545,12 +37590,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           const Ve = s.find((At) => Number(At.id) === Number(Le));
           if (!Ve) return;
           const Re = Qe == null ? null : Number(Qe);
-          if (he(Ve) === Re) return;
+          if (he(Ve) === Re && kgAssignmentLorries(Ve).length <= 1) return;
           (g(""), W("Updating lorry plan…"));
           const At =
-              s
-                .filter((lt) => Number(lt.id) !== Number(Le) && he(lt) === Re)
-                .reduce((lt, qn) => Math.max(lt, Number(qn.sort_order || 0)), 0) + 10,
+              Re == null
+                ? s
+                    .filter((lt) => Number(lt.id) !== Number(Le) && he(lt) == null)
+                    .reduce((lt, qn) => Math.max(lt, Number(qn.sort_order || 0)), 0) + 10
+                : s
+                    .flatMap((lt) => kgAssignmentLorryRows(lt))
+                    .filter((lt) => Number(lt.lorry_id || (lt.lorry && lt.lorry.id)) === Re)
+                    .reduce((lt, qn) => Math.max(lt, Number(qn.sort_order || 0)), 0) + 10,
             { error: lt } = await qe
               .from("site_assignments")
               .update({ lorry_id: Re, sort_order: At })
@@ -37567,16 +37617,50 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               .insert({
                 assignment_id: Number(Le),
                 lorry_id: Re,
-                sort_order: 0,
+                sort_order: At,
               });
             if (In) return (g(In.message), W(""));
           }
-          (_(null), D(null), await L(), W("Lorry plan updated. Planner will follow this lorry order."));
+          (_(null), D(null), await L(), W("Lorry plan updated. Use Up / Down to set the route order."));
         }
-        function de(Le, Qe) {
-          Le.preventDefault();
-          const Ve = Le.dataTransfer.getData("text/plain") || T;
-          Ve && G(Ve, Qe);
+        async function de(Le, Qe, Ve) {
+          if (!r) return;
+          const Re = j.find((qn) => (Qe == null ? qn.id == null : Number(qn.id) === Number(Qe)));
+          if (!Re) return;
+          const At = Re.rows.findIndex((qn) => Number(qn.id) === Number(Le)),
+            lt = At + Ve;
+          if (At < 0 || lt < 0 || lt >= Re.rows.length) return;
+          const qn = [...Re.rows];
+          [qn[At], qn[lt]] = [qn[lt], qn[At]];
+          (g(""), W("Saving lorry route sequence…"));
+          for (let In = 0; In < qn.length; In++) {
+            const Pn = qn[In],
+              Nn = (In + 1) * 10;
+            if (Qe == null) {
+              const { error: Pe } = await qe
+                .from("site_assignments")
+                .update({ sort_order: Nn })
+                .eq("id", Number(Pn.id));
+              if (Pe) return (g(Pe.message), W(""));
+            } else {
+              const { error: Pe } = await qe
+                .from("assignment_lorries")
+                .update({ sort_order: Nn })
+                .eq("assignment_id", Number(Pn.id))
+                .eq("lorry_id", Number(Qe));
+              if (Pe) return (g(Pe.message), W(""));
+              const yl = kgAssignmentLorryRows(Pn)[0],
+                Qs = yl && Number(yl.lorry_id || (yl.lorry && yl.lorry.id)) === Number(Qe);
+              if (Qs) {
+                const { error: Zs } = await qe
+                  .from("site_assignments")
+                  .update({ lorry_id: Number(Qe), sort_order: Nn })
+                  .eq("id", Number(Pn.id));
+                if (Zs) return (g(Zs.message), W(""));
+              }
+            }
+          }
+          (await L(), W("Route sequence saved. Planner and Copy 1 will follow this order."));
         }
         return d.jsxs("div", {
           className: "page logistics-page",
@@ -37591,7 +37675,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Logistics" }),
                     d.jsx("p", {
                       children:
-                        "Drag each site card into the lorry box. This updates Planner and Planner will sort Site assignments by lorry.",
+                        "Tap a site, choose Move selected here, then use Up / Down to set the lorry route sequence. Planner and Copy 1 follow this order.",
                     }),
                   ],
                 }),
@@ -37627,7 +37711,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               className: "date-banner",
               children: [
                 d.jsx("strong", { children: D0(n) }),
-                d.jsx("span", { children: r ? "Drag on computer, or tap a site then press Move here." : "View only" }),
+                d.jsx("span", { children: r ? "No drag/drop needed. Use Up / Down for address sequence." : "View only" }),
               ],
             }),
             d.jsxs("div", {
@@ -37663,8 +37747,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         "section",
                         {
                           className: `logistics-lorry ${Le.id == null ? "no-lorry" : ""}`,
-                          onDragOver: (Qe) => Qe.preventDefault(),
-                          onDrop: (Qe) => de(Qe, Le.id),
                           children: [
                             d.jsxs("div", {
                               className: "logistics-lorry-head",
@@ -37697,27 +37779,26 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 Le.rows.length === 0
                                   ? d.jsx("div", {
                                       className: "logistics-empty",
-                                      children: "Drop site here",
+                                      children: "No site here",
                                     })
-                                  : Le.rows.map((Qe) => {
-                                      var Ve;
-                                      const Re = Number(w) === Number(Qe.id);
+                                  : Le.rows.map((Qe, Ve) => {
+                                      var Re;
+                                      const At = Number(w) === Number(Qe.id),
+                                        lt = Ve === 0,
+                                        qn = Ve === Le.rows.length - 1;
                                       return d.jsxs(
                                         "article",
                                         {
-                                          className: `logistics-site ${Re ? "selected" : ""}`,
-                                          draggable: r,
-                                          onDragStart: (At) => {
-                                            (D(Qe.id),
-                                              At.dataTransfer.setData("text/plain", String(Qe.id)),
-                                              (At.dataTransfer.effectAllowed = "move"));
-                                          },
-                                          onDragEnd: () => D(null),
+                                          className: `logistics-site ${At ? "selected" : ""}`,
                                           onClick: () => r && _(Qe.id),
                                           children: [
-                                            d.jsx("strong", {
+                                            d.jsxs("strong", {
                                               className: "logistics-address",
-                                              children: ((Ve = Qe.site) == null ? void 0 : Ve.address) || "No address",
+                                              children: [
+                                                Ve + 1,
+                                                ". ",
+                                                ((Re = Qe.site) == null ? void 0 : Re.address) || "No address",
+                                              ],
                                             }),
                                             d.jsxs("span", {
                                               className: "logistics-workers",
@@ -37727,9 +37808,31 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                 J(Qe) === 1 ? "" : "s",
                                               ],
                                             }),
+                                            r &&
+                                              d.jsxs("div", {
+                                                className: "logistics-order-buttons",
+                                                children: [
+                                                  d.jsx("button", {
+                                                    type: "button",
+                                                    disabled: lt,
+                                                    onClick: (In) => {
+                                                      (In.stopPropagation(), de(Qe.id, Le.id, -1));
+                                                    },
+                                                    children: "↑ Up",
+                                                  }),
+                                                  d.jsx("button", {
+                                                    type: "button",
+                                                    disabled: qn,
+                                                    onClick: (In) => {
+                                                      (In.stopPropagation(), de(Qe.id, Le.id, 1));
+                                                    },
+                                                    children: "↓ Down",
+                                                  }),
+                                                ],
+                                              }),
                                           ],
                                         },
-                                        Qe.id,
+                                        `${Le.id == null ? "no" : Le.id}-${Qe.id}`,
                                       );
                                     }),
                             }),
@@ -42236,11 +42339,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         border: 1px solid #dbeafe;
         border-radius: 13px;
         background: #ffffff;
-        cursor: grab;
+        cursor: pointer;
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
       }
       .logistics-site:active {
-        cursor: grabbing;
+        transform: translateY(1px);
       }
       .logistics-site.selected {
         border-color: #0f766e;
@@ -42261,6 +42364,25 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #155e75;
         font-size: 11px;
         font-weight: 900;
+      }
+      .logistics-order-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .logistics-order-buttons button {
+        min-height: 30px;
+        border: 1px solid #99f6e4;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #0f766e;
+        font-size: 11px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      .logistics-order-buttons button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
       }
       .logistics-empty {
         min-height: 42px;
