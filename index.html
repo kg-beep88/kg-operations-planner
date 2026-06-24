@@ -37610,7 +37610,54 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             workers: s.reduce((Ve, Re) => Ve + J(Re), 0),
           };
         }, [routeGroups, s]);
-        function markScreenChanged() {
+        function lorryForGroupId(Le) {
+          const Qe = normalizeLorryId(Le);
+          return Qe == null ? null : (c.lorries || []).find((Ve) => Number(Ve.id) === Qe) || null;
+        }
+        function cloneRouteGroups(Le = routeGroups) {
+          return (Le || []).map((Qe) => ({
+            ...Qe,
+            rows: (Qe.rows || []).map((Ve) => ({ ...Ve })),
+          }));
+        }
+        function syncAssignmentsFromScreen(Le, Qe) {
+          const Ve = new Map(),
+            Re = new Map();
+          for (const At of Qe || []) {
+            const lt = normalizeLorryId(At.id),
+              qn = lorryForGroupId(lt);
+            (At.rows || []).forEach((In, Pn) => {
+              const Nn = Number(In.id),
+                Pe = (Pn + 1) * 10;
+              if (!Nn) return;
+              Re.set(Nn, { sort_order: Pe, lorry_id: lt });
+              if (lt != null) {
+                const Qs = {
+                  lorry_id: lt,
+                  sort_order: Pe,
+                  lorry: qn,
+                };
+                Ve.has(Nn) ? Ve.get(Nn).push(Qs) : Ve.set(Nn, [Qs]);
+              }
+            });
+          }
+          return (Le || []).map((At) => {
+            const lt = Number(At.id),
+              qn = Ve.get(lt) || [],
+              In = qn[0] || null,
+              Pn = Re.get(lt) || null;
+            return {
+              ...At,
+              assignment_lorries: qn,
+              lorry_id: In ? In.lorry_id : null,
+              sort_order: In ? In.sort_order : Pn ? Pn.sort_order : Number(At.sort_order || 0),
+            };
+          });
+        }
+        function applyScreenGroups(Le) {
+          const Qe = resequenceGroups(Le);
+          setRouteGroups(Qe);
+          f((Ve) => syncAssignmentsFromScreen(Ve, Qe));
           (setDirty(!0), W("Screen changed. Press Save Update to sync Planner and Copy 1."));
         }
         function G(Le, Qe, Ve) {
@@ -37618,38 +37665,33 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           const Re = normalizeLorryId(Qe),
             At = normalizeLorryId(Ve);
           if (Re === At) return;
-          setRouteGroups((lt) => {
-            const qn = lt.map((yl) => ({ ...yl, rows: [...(yl.rows || [])] })),
-              In = qn.find((yl) => normalizeLorryId(yl.id) === Re),
-              Pn = qn.find((yl) => normalizeLorryId(yl.id) === At);
-            if (!In || !Pn) return lt;
-            const Nn = In.rows.findIndex((yl) => Number(yl.id) === Number(Le));
-            if (Nn < 0) return lt;
-            const [Pe] = In.rows.splice(Nn, 1),
-              existingTarget = Pn.rows.some((yl) => Number(yl.id) === Number(Le)),
-              stillHasOtherLorry = qn.some(
-                (yl) => normalizeLorryId(yl.id) != null && normalizeLorryId(yl.id) !== Re && yl.rows.some((Qs) => Number(Qs.id) === Number(Le)),
-              );
-            if (!existingTarget && !(At == null && stillHasOtherLorry)) Pn.rows.push({ ...Pe, kg_lorry_id: At });
-            return resequenceGroups(qn);
-          });
-          markScreenChanged();
+          const lt = cloneRouteGroups(),
+            qn = lt.find((Nn) => normalizeLorryId(Nn.id) === Re),
+            In = lt.find((Nn) => normalizeLorryId(Nn.id) === At);
+          if (!qn || !In) return;
+          const Pn = qn.rows.findIndex((Nn) => Number(Nn.id) === Number(Le));
+          if (Pn < 0) return;
+          const [Nn] = qn.rows.splice(Pn, 1),
+            Pe = In.rows.some((Nn) => Number(Nn.id) === Number(Le)),
+            Qs = lt.some(
+              (Nn) => normalizeLorryId(Nn.id) != null && normalizeLorryId(Nn.id) !== Re && Nn.rows.some((tl) => Number(tl.id) === Number(Le)),
+            );
+          if (!Pe && !(At == null && Qs)) In.rows.push({ ...Nn, kg_lorry_id: At });
+          applyScreenGroups(lt);
         }
         function de(Le, Qe, Ve) {
           if (!r || saving) return;
-          const Re = normalizeLorryId(Qe);
-          setRouteGroups((At) => {
-            const lt = At.map((Qs) => ({ ...Qs, rows: [...(Qs.rows || [])] })),
-              qn = lt.find((Qs) => normalizeLorryId(Qs.id) === Re);
-            if (!qn) return At;
-            const In = qn.rows.findIndex((Qs) => Number(Qs.id) === Number(Le)),
-              Pn = In + Ve;
-            if (In < 0 || Pn < 0 || Pn >= qn.rows.length) return At;
-            [qn.rows[In], qn.rows[Pn]] = [qn.rows[Pn], qn.rows[In]];
-            return resequenceGroups(lt);
-          });
-          markScreenChanged();
+          const Re = normalizeLorryId(Qe),
+            At = cloneRouteGroups(),
+            lt = At.find((qn) => normalizeLorryId(qn.id) === Re);
+          if (!lt) return;
+          const qn = lt.rows.findIndex((In) => Number(In.id) === Number(Le)),
+            In = qn + Ve;
+          if (qn < 0 || In < 0 || In >= lt.rows.length) return;
+          [lt.rows[qn], lt.rows[In]] = [lt.rows[In], lt.rows[qn]];
+          applyScreenGroups(At);
         }
+
         async function saveRouteUpdate() {
           if (!r || saving || !dirty) return;
           (setSaving(!0), g(""), W("Saving Logistics update…"));
