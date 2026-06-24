@@ -37795,10 +37795,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   children: [
                     d.jsx("p", { className: "eyebrow", children: "Daily lorry planning" }),
                     d.jsx("h1", { children: "Logistics" }),
-                    d.jsx("p", { className: "muted", children: "Logistics simple edit v5 — choose lorry and route no., then Save Update." }),
+                    d.jsx("p", { className: "muted", children: "Logistics compact edit v6 — one-page view, choose lorry + route no., then Save Update." }),
                     d.jsx("p", {
                       children:
-                        "Simple table: choose the lorry and type the route order number. Press Save Update once when correct, then Planner and Copy 1 will follow.",
+                        "Compact one-page table. Choose lorry, type route no., press Save Update once.",
                     }),
                   ],
                 }),
@@ -37880,10 +37880,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       d.jsxs("div", {
                         className: "helper-card logistics-v5-help",
                         children: [
-                          d.jsx("strong", { children: "Simple Logistics Route Editor" }),
+                          d.jsx("strong", { children: "Compact Logistics Route Editor" }),
                           d.jsx("p", {
                             children:
-                              "Do not drag. For each address, choose lorry and type route no. Example: same lorry 291 uses order 1, 2, 3, 4. Then press Save Update.",
+                              "No drag. Choose lorry and route no. Save Update when correct.",
                           }),
                         ],
                       }),
@@ -42641,6 +42641,190 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #075985;
         font-size: 12px;
         font-weight: 800;
+      }
+
+
+      /* Logistics compact one-page view v6 */
+      .logistics-page {
+        display: grid;
+        gap: 6px;
+      }
+      .logistics-page .page-header {
+        margin-bottom: 6px;
+        gap: 10px;
+        align-items: center;
+      }
+      .logistics-page .page-header h1 {
+        font-size: clamp(22px, 2.2vw, 30px);
+        margin: 0 0 2px;
+        line-height: 1.05;
+      }
+      .logistics-page .page-header .eyebrow,
+      .logistics-page .page-header p:not(.eyebrow):not(.muted) {
+        display: none;
+      }
+      .logistics-page .page-header .muted {
+        font-size: 11px;
+        line-height: 1.2;
+      }
+      .logistics-page .date-controls {
+        gap: 5px;
+      }
+      .logistics-page .date-picker {
+        min-height: 34px;
+        padding: 0 8px;
+      }
+      .logistics-page .icon-button {
+        width: 34px;
+        height: 34px;
+        min-height: 34px;
+      }
+      .logistics-page .date-banner {
+        margin-bottom: 4px;
+        padding: 7px 10px;
+        border-radius: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+      }
+      .logistics-page .date-banner strong,
+      .logistics-page .date-banner span {
+        font-size: 12px;
+      }
+      .logistics-page .date-banner .primary-button {
+        min-height: 32px;
+        padding: 0 10px;
+        border-radius: 8px;
+      }
+      .logistics-page .summary-grid,
+      .logistics-page .logistics-v5-help {
+        display: none !important;
+      }
+      .logistics-page .logistics-simple-editor {
+        gap: 4px;
+      }
+      .logistics-page .table-wrap {
+        overflow: visible;
+      }
+      .logistics-page .logistics-route-table {
+        table-layout: fixed;
+        font-size: 11px;
+        border: 1px solid #dbe7e4;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .logistics-page .logistics-route-table th,
+      .logistics-page .logistics-route-table td {
+        padding: 4px 6px;
+        line-height: 1.15;
+      }
+      .logistics-page .logistics-route-table th:nth-child(1),
+      .logistics-page .logistics-route-table td:nth-child(1) {
+        width: 64px;
+      }
+      .logistics-page .logistics-route-table th:nth-child(2),
+      .logistics-page .logistics-route-table td:nth-child(2) {
+        width: auto;
+      }
+      .logistics-page .logistics-route-table th:nth-child(3),
+      .logistics-page .logistics-route-table td:nth-child(3) {
+        width: 120px;
+      }
+      .logistics-page .logistics-route-table th:nth-child(4),
+      .logistics-page .logistics-route-table td:nth-child(4) {
+        width: 145px;
+      }
+      .logistics-page .logistics-route-table select,
+      .logistics-page .logistics-route-table input {
+        min-height: 26px;
+        height: 26px;
+        border-radius: 7px;
+        padding: 2px 5px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .logistics-page .logistics-route-no-input {
+        max-width: 48px;
+      }
+      .logistics-page .logistics-route-address-cell {
+        min-width: 0;
+      }
+      .logistics-page .logistics-route-address-cell strong {
+        display: block;
+        font-size: 11px;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .logistics-page .logistics-route-address-cell span {
+        display: none;
+      }
+      @media (max-width: 900px) {
+        .logistics-page .page-header {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+        .logistics-page .date-controls {
+          justify-content: stretch;
+        }
+        .logistics-page .logistics-route-table,
+        .logistics-page .logistics-route-table thead,
+        .logistics-page .logistics-route-table tbody,
+        .logistics-page .logistics-route-table th,
+        .logistics-page .logistics-route-table td,
+        .logistics-page .logistics-route-table tr {
+          display: revert;
+        }
+        .logistics-page .logistics-route-table thead {
+          display: table-header-group;
+        }
+        .logistics-page .logistics-route-table tr {
+          display: table-row;
+          padding: 0;
+          border-bottom: 0;
+        }
+        .logistics-page .logistics-route-table th,
+        .logistics-page .logistics-route-table td {
+          display: table-cell;
+          border-bottom: 1px solid #edf1f0;
+          padding: 3px 4px;
+        }
+        .logistics-page .logistics-route-table td[data-label]:before {
+          content: none;
+        }
+        .logistics-page .logistics-route-table th:nth-child(1),
+        .logistics-page .logistics-route-table td:nth-child(1) {
+          width: 46px;
+        }
+        .logistics-page .logistics-route-table th:nth-child(3),
+        .logistics-page .logistics-route-table td:nth-child(3) {
+          width: 72px;
+        }
+        .logistics-page .logistics-route-table th:nth-child(4),
+        .logistics-page .logistics-route-table td:nth-child(4) {
+          width: 94px;
+        }
+        .logistics-page .logistics-route-table th {
+          font-size: 8px;
+          letter-spacing: 0.02em;
+        }
+        .logistics-page .logistics-route-table select,
+        .logistics-page .logistics-route-table input {
+          min-height: 24px;
+          height: 24px;
+          font-size: 10px;
+          padding: 1px 3px;
+        }
+        .logistics-page .logistics-route-no-input {
+          max-width: 38px;
+        }
+        .logistics-page .logistics-route-address-cell strong {
+          font-size: 9.5px;
+          max-width: 100%;
+        }
       }
       </style>
   </head>
