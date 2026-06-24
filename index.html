@@ -16491,14 +16491,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       const _s = `
   id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed, lorry_id,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge),
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,is_boss_site,is_project_site),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status))
 `,
         w0 = `
   id, delivery_date, sent_on, notes, created_at, updated_at,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge),
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,is_boss_site,is_project_site),
   delivery_order_items(
     id, catalog_item_id, category, item_name, size,
     quantity_delivered, quantity_returned, unit_cost, sort_order
@@ -34379,6 +34379,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   rows: V.map((Pe) => ({
                     ID: Pe.id,
                     Address: Pe.address,
+                    "Boss site": Pe.is_boss_site ? "Yes" : "No",
+                    "Project site": Pe.is_project_site ? "Yes" : "No",
                     Status: Pe.status,
                     Notes: Pe.notes || "",
                     Created: Pe.created_at,
@@ -35313,7 +35315,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [l, s] = q.useState([]),
           [f, c] = q.useState([]),
           [m, v] = q.useState(!0),
-          [x, p] = q.useState("");
+          [x, p] = q.useState(""),
+          [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 });
         async function g() {
           (v(!0), p(""));
           const { start: T, endExclusive: D } = lh(r),
@@ -35326,7 +35329,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .order("plan_date"),
               qe
                 .from("delivery_orders")
-                .select("id,delivery_date,sent_on,site:sites(id,address)")
+                .select("id,delivery_date,sent_on,site:sites(id,address,is_boss_site,is_project_site)")
                 .gte("delivery_date", T)
                 .lt("delivery_date", D)
                 .order("delivery_date"),
@@ -35337,10 +35340,18 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         q.useEffect(() => {
           g();
         }, [r]);
-        const S = q.useMemo(() => {
+        const kgVisibleAssignments = q.useMemo(
+            () => l.filter((T) => kgSiteTypeMatches(T.site, kgSiteTypeFilter)),
+            [l, kgSiteTypeFilter],
+          ),
+          kgVisibleOrders = q.useMemo(
+            () => f.filter((T) => kgSiteTypeMatches(T.site, kgSiteTypeFilter)),
+            [f, kgSiteTypeFilter],
+          ),
+          S = q.useMemo(() => {
             var D, I;
             const T = new Map();
-            for (const L of l) {
+            for (const L of kgVisibleAssignments) {
               const W = L.plan_date;
               T.has(W) ||
                 T.set(W, {
@@ -35355,7 +35366,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               for (const J of L.assignment_workers || [])
                 he.workers.add(Number(J.worker_id));
             }
-            for (const L of f) {
+            for (const L of kgVisibleOrders) {
               const W = L.delivery_date;
               (T.has(W) ||
                 T.set(W, {
@@ -35370,7 +35381,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   T.get(W).sentSites.add(Number(L.site.id)));
             }
             return T;
-          }, [l, f]),
+          }, [kgVisibleAssignments, kgVisibleOrders]),
           E = pE(r),
           w = ri(0);
         function _(T) {
@@ -35424,6 +35435,34 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               ],
             }),
             d.jsx("div", { className: "month-title", children: fp(r) }),
+            d.jsxs("div", {
+              className: "site-type-filter calendar-type-filter",
+              children: [
+                d.jsx("strong", { children: "Show site type:" }),
+                d.jsxs("label", {
+                  children: [
+                    d.jsx("input", {
+                      type: "checkbox",
+                      checked: kgSiteTypeFilter.boss,
+                      onChange: (T) =>
+                        kgSetSiteTypeFilter({ ...kgSiteTypeFilter, boss: T.target.checked }),
+                    }),
+                    " Boss site",
+                  ],
+                }),
+                d.jsxs("label", {
+                  children: [
+                    d.jsx("input", {
+                      type: "checkbox",
+                      checked: kgSiteTypeFilter.project,
+                      onChange: (T) =>
+                        kgSetSiteTypeFilter({ ...kgSiteTypeFilter, project: T.target.checked }),
+                    }),
+                    " Project site",
+                  ],
+                }),
+              ],
+            }),
             x && d.jsx("div", { className: "error-box", children: x }),
             d.jsxs("section", {
               className: "month-calendar panel",
@@ -35550,6 +35589,15 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         String((t == null ? void 0 : t.foreman_type) || "project").toLowerCase() === "boss"
           ? "boss"
           : "project";
+      const kgIsBossSite = (t) => !t || t.is_boss_site !== !1;
+      const kgIsProjectSite = (t) => !t || t.is_project_site !== !1;
+      const kgSiteTypeMatches = (t, r) =>
+        !!((r == null ? void 0 : r.boss) && kgIsBossSite(t)) ||
+        !!((r == null ? void 0 : r.project) && kgIsProjectSite(t));
+      const kgSiteTypeText = (t) => {
+        const r = kgIsBossSite(t), n = kgIsProjectSite(t);
+        return r && n ? "Boss + Project" : r ? "Boss site" : n ? "Project site" : "No Boss/Project";
+      };
       const kgJoinNames = (t) =>
         (t || []).map((r) => kgNameNick(r)).filter(Boolean).join(" + ");
       const kgWorkerNames = (t) =>
@@ -35930,6 +35978,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [W, he] = q.useState(""),
           [J, j] = q.useState(""),
           [fe, G] = q.useState(!0),
+          [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 }),
           [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
           [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1);
         async function de() {
@@ -35953,7 +36002,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .order("sort_order"),
               qe
                 .from("delivery_orders")
-                .select("id,delivery_date,sent_on,site:sites(id,address)")
+                .select("id,delivery_date,sent_on,site:sites(id,address,is_boss_site,is_project_site)")
                 .eq("delivery_date", n),
             ]),
             Le =
@@ -35997,21 +36046,25 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               V = !0;
             };
           }, [S, w.site_id, n]));
-        const ge = q.useMemo(() => Go(s), [s]),
-          Ne = q.useMemo(() => op(s), [s]),
+        const kgVisibleAssignments = q.useMemo(
+            () => s.filter((V) => kgSiteTypeMatches(V.site, kgSiteTypeFilter)),
+            [s, kgSiteTypeFilter],
+          ),
+          ge = q.useMemo(() => Go(kgVisibleAssignments), [kgVisibleAssignments]),
+          Ne = q.useMemo(() => op(kgVisibleAssignments), [kgVisibleAssignments]),
           Ye = q.useMemo(
             () =>
               new Set(
-                s
+                kgVisibleAssignments
                   .map((V) => {
                     var xe;
                     return Number((xe = V.site) == null ? void 0 : xe.id);
                   })
                   .filter(Boolean),
               ),
-            [s],
+            [kgVisibleAssignments],
           ),
-          je = p.sites.filter((V) => !Ye.has(Number(V.id))),
+          je = p.sites.filter((V) => kgSiteTypeMatches(V, kgSiteTypeFilter) && !Ye.has(Number(V.id))),
           re = p.workers.filter((V) => !ge.has(Number(V.id))),
           X = p.foremen.filter((V) => !Ne.has(Number(V.id))),
           kgProjectForemenWithoutSite = X.filter((V) => kgForemanType(V) === "project"),
@@ -36027,7 +36080,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           _e = q.useMemo(
             () => ({
               sites: new Set(
-                s
+                kgVisibleAssignments
                   .map((V) => {
                     var xe;
                     return (xe = V.site) == null ? void 0 : xe.id;
@@ -36035,20 +36088,20 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   .filter(Boolean),
               ).size,
               workers: ge.size,
-              workerShifts: s.reduce(
+              workerShifts: kgVisibleAssignments.reduce(
                 (V, xe) => V + (xe.assignment_workers || []).length,
                 0,
               ),
-              foremanShifts: s.reduce((V, xe) => V + ar(xe).length, 0),
+              foremanShifts: kgVisibleAssignments.reduce((V, xe) => V + ar(xe).length, 0),
               lorries: new Set(
-                s
+                kgVisibleAssignments
                   .flatMap((V) => kgAssignmentLorries(V).map((xe) => xe.id))
                   .filter(Boolean),
               ).size,
             }),
-            [s, ge],
+            [kgVisibleAssignments, ge],
           ),
-          kgRows = q.useMemo(() => kgSortPlannerRowsSafe(s), [s]),
+          kgRows = q.useMemo(() => kgSortPlannerRowsSafe(kgVisibleAssignments), [kgVisibleAssignments]),
           kgRankMap = q.useMemo(() => kgBuildRankMap(kgRows), [kgRows]),
           kgSelectedSite = q.useMemo(
             () => p.sites.find((V) => Number(V.id) === Number(w.site_id)) || null,
@@ -36284,6 +36337,34 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 d.jsx("strong", { children: D0(n) }),
                 d.jsx("span", {
                   children: n === ri(1) ? "Tomorrow" : "Selected day",
+                }),
+              ],
+            }),
+            d.jsxs("div", {
+              className: "site-type-filter planner-type-filter",
+              children: [
+                d.jsx("strong", { children: "Show site type:" }),
+                d.jsxs("label", {
+                  children: [
+                    d.jsx("input", {
+                      type: "checkbox",
+                      checked: kgSiteTypeFilter.boss,
+                      onChange: (V) =>
+                        kgSetSiteTypeFilter({ ...kgSiteTypeFilter, boss: V.target.checked }),
+                    }),
+                    " Boss site",
+                  ],
+                }),
+                d.jsxs("label", {
+                  children: [
+                    d.jsx("input", {
+                      type: "checkbox",
+                      checked: kgSiteTypeFilter.project,
+                      onChange: (V) =>
+                        kgSetSiteTypeFilter({ ...kgSiteTypeFilter, project: V.target.checked }),
+                    }),
+                    " Project site",
+                  ],
                 }),
               ],
             }),
@@ -36587,9 +36668,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             d.jsx("h2", { children: "Site assignments" }),
                             d.jsxs("span", {
                               children: [
-                                s.length,
+                                kgVisibleAssignments.length,
                                 " shift record",
-                                s.length === 1 ? "" : "s",
+                                kgVisibleAssignments.length === 1 ? "" : "s",
                               ],
                             }),
                           ],
@@ -36609,7 +36690,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             className: "empty-state",
                             children: "Loading…",
                           })
-                        : s.length === 0
+                        : kgVisibleAssignments.length === 0
                           ? d.jsx("div", {
                               className: "empty-state",
                               children: "No assignments for this day.",
@@ -36640,6 +36721,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                 (Ve = V.site) == null
                                                   ? void 0
                                                   : Ve.address,
+                                            }),
+                                            d.jsx("span", {
+                                              className: "site-type-pill",
+                                              children: kgSiteTypeText(V.site),
                                             }),
                                             d.jsx("span", {
                                               className: "shift-pill",
@@ -36837,6 +36922,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               children: "Choose active site",
                             }),
                             p.sites
+                              .filter((V) => kgSiteTypeMatches(V, kgSiteTypeFilter))
                               .filter((V) => S !== "new" || !Ye.has(Number(V.id)) || Number(w.site_id) === Number(V.id))
                               .map((V) =>
                                 d.jsx(
@@ -38526,7 +38612,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [v, x] = q.useState(null),
           [p, g] = q.useState(l),
           [S, E] = q.useState(!0),
-          [w, _] = q.useState("");
+          [w, _] = q.useState(""),
+          [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 });
         async function T() {
           (E(!0), _(""));
           let kgQ = qe.from(r.table).select("*");
@@ -38551,6 +38638,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           const J = c.trim().toLowerCase(),
             j = r.table === "workers" || r.table === "foremen";
           return s.filter((fe) => {
+            if (r.table === "sites" && !kgSiteTypeMatches(fe, kgSiteTypeFilter)) return !1;
             if (!J) return !0;
             if (j && (J === "pass" || J === "have pass" || J === "with pass"))
               return !!String(fe.pass || "").trim();
@@ -38577,7 +38665,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               );
             return JSON.stringify(fe).toLowerCase().includes(J);
           });
-        }, [s, c, r.table]);
+        }, [s, c, r.table, kgSiteTypeFilter]);
         function I() {
           (x("new"), g({ ...l }));
         }
@@ -38589,6 +38677,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               ...(r.table === "foremen"
                 ? { foreman_type: J.foreman_type || "project" }
                 : {}),
+              ...(r.table === "sites"
+                ? { is_boss_site: J.is_boss_site !== !1, is_project_site: J.is_project_site !== !1 }
+                : {}),
             }));
         }
         async function W(J) {
@@ -38596,10 +38687,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           const j = {};
           for (const de of r.fields) {
             const oe = p[de.name];
-            de.type === "number"
-              ? (j[de.name] = oe === "" || oe == null ? 0 : Number(oe))
-              : (j[de.name] =
-                  oe === "" ? (de.name === "size" ? "" : null) : oe);
+            de.type === "checkbox"
+              ? (j[de.name] = !!oe)
+              : de.type === "number"
+                ? (j[de.name] = oe === "" || oe == null ? 0 : Number(oe))
+                : (j[de.name] =
+                    oe === "" ? (de.name === "size" ? "" : null) : oe);
           }
           j.status = p.status || "active";
           const fe =
@@ -38652,11 +38745,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             ? kgForemanType(J) === "boss"
               ? "Boss foreman"
               : "Project foreman"
-            : j.format === "money"
-              ? rr(J[j.key])
-              : J[j.key] === 0
-                ? "0"
-                : J[j.key] || "—";
+            : j.format === "boolean"
+              ? J[j.key] ? "Yes" : "No"
+              : j.format === "money"
+                ? rr(J[j.key])
+                : J[j.key] === 0
+                  ? "0"
+                  : J[j.key] || "—";
         }
         return d.jsxs("div", {
           className: "page",
@@ -38701,6 +38796,35 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
+                    r.table === "sites" &&
+                      d.jsxs("div", {
+                        className: "site-type-filter",
+                        children: [
+                          d.jsx("strong", { children: "Show:" }),
+                          d.jsxs("label", {
+                            children: [
+                              d.jsx("input", {
+                                type: "checkbox",
+                                checked: kgSiteTypeFilter.boss,
+                                onChange: (J) =>
+                                  kgSetSiteTypeFilter({ ...kgSiteTypeFilter, boss: J.target.checked }),
+                              }),
+                              " Boss site",
+                            ],
+                          }),
+                          d.jsxs("label", {
+                            children: [
+                              d.jsx("input", {
+                                type: "checkbox",
+                                checked: kgSiteTypeFilter.project,
+                                onChange: (J) =>
+                                  kgSetSiteTypeFilter({ ...kgSiteTypeFilter, project: J.target.checked }),
+                              }),
+                              " Project site",
+                            ],
+                          }),
+                        ],
+                      }),
                     d.jsxs("span", {
                       className: "muted",
                       children: [
@@ -38843,6 +38967,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     g({ ...p, [J.name]: j.target.value }),
                                   rows: "3",
                                 })
+                              : J.type === "checkbox"
+                                ? d.jsx("input", {
+                                    type: "checkbox",
+                                    checked: !!p[J.name],
+                                    onChange: (j) =>
+                                      g({ ...p, [J.name]: j.target.checked }),
+                                  })
                               : J.type === "select"
                                 ? d.jsx("select", {
                                     value: p[J.name] || "",
@@ -39481,6 +39612,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             "Maintain addresses and whether each site is active, paused or closed.",
           columns: [
             { key: "address", label: "Address" },
+            { key: "is_boss_site", label: "Boss site", format: "boolean" },
+            { key: "is_project_site", label: "Project site", format: "boolean" },
             { key: "foreman_in_charge", label: "ID Firm" },
             { key: "foreman_detail", label: "ID Firm detail" },
             { key: "pic", label: "P.I.C." },
@@ -39488,11 +39621,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           ],
           fields: [
             { name: "address", label: "Address", required: !0, wide: !0 },
+            { name: "is_boss_site", label: "Boss site", type: "checkbox" },
+            { name: "is_project_site", label: "Project site", type: "checkbox" },
             { name: "foreman_in_charge", label: "ID Firm" },
             { name: "foreman_detail", label: "ID Firm detail", type: "textarea", wide: !0 },
             { name: "pic", label: "P.I.C." },
             { name: "notes", label: "Notes", type: "textarea", wide: !0 },
           ],
+          defaults: { is_boss_site: !0, is_project_site: !0 },
         },
         workers: {
           title: "Workers",
@@ -42155,7 +42291,47 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .backlog-item strong { color: var(--ink); line-height: 1.35; }
       .backlog-item span { color: var(--muted); font-size: 13px; }
       .backlog-item small { color: #64748b; font-weight: 700; }
-    </style>
+    
+      .site-type-filter {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #f8fbfa;
+        color: var(--ink);
+        font-size: 13px;
+      }
+      .site-type-filter label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 800;
+        color: var(--ink);
+        text-transform: none;
+        letter-spacing: 0;
+      }
+      .site-type-filter input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+      }
+      .planner-type-filter,
+      .calendar-type-filter {
+        margin: 0 0 16px;
+      }
+      .site-type-pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 3px 9px;
+        background: #e0f2fe;
+        color: #075985;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      </style>
   </head>
   <body>
     <div id="root"></div>
