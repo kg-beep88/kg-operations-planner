@@ -37497,8 +37497,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [v, x] = q.useState(!0),
           [p, g] = q.useState(""),
           [S, E] = q.useState(""),
-          [w, _] = q.useState(null),
-          [T, D] = q.useState(null);
+          [routeGroups, setRouteGroups] = q.useState([]),
+          [dirty, setDirty] = q.useState(!1),
+          [saving, setSaving] = q.useState(!1);
         function I(Le) {
           (l(Le), window.sessionStorage.setItem("kg_selected_date", Le));
         }
@@ -37517,13 +37518,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           (Ve && g(Ve.message),
             f(kgSortAssignmentsByLorry(Le.data || [])),
             Qe.data && m(Qe.data),
+            setDirty(!1),
             x(!1));
         }
         q.useEffect(() => {
           L();
         }, [n]);
         function W(Le) {
-          (E(Le), window.setTimeout(() => E(""), 2400));
+          (E(Le), window.setTimeout(() => E(""), 2600));
         }
         function he(Le) {
           const Qe = kgAssignmentLorries(Le)[0];
@@ -37532,186 +37534,202 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         function J(Le) {
           return (Le.assignment_workers || []).length;
         }
-        const j = q.useMemo(() => {
-            const Le = (c.lorries || []).map((At) => ({
-                id: Number(At.id),
-                title: kgLorryCopy(At),
-                rows: [],
-              })),
-              Qe = { id: null, title: "No lorry yet", rows: [] };
-            for (const At of s) {
-              const lt = kgAssignmentLorryRows(At);
-              if (lt.length) {
-                for (const qn of lt) {
-                  const In = qn && qn.lorry && qn.lorry.id ? Number(qn.lorry.id) : null;
-                  let Pn = In == null ? Qe : Le.find((Nn) => Number(Nn.id) === In);
-                  if (!Pn && qn.lorry) {
-                    Pn = { id: In, title: kgLorryCopy(qn.lorry), rows: [] };
-                    Le.push(Pn);
-                  }
-                  (Pn || Qe).rows.push({
-                    ...At,
-                    kg_lorry_id: In,
-                    kg_lorry_sort_order: Number(qn.sort_order || At.sort_order || 0),
-                  });
+        function normalizeLorryId(Le) {
+          return Le === "" || Le == null ? null : Number(Le);
+        }
+        function routeSort(Le, Qe) {
+          const Ve = Number(Le.kg_lorry_sort_order || 0) - Number(Qe.kg_lorry_sort_order || 0);
+          if (Ve) return Ve;
+          return Ca(Le.site && Le.site.address, "ZZZ").localeCompare(
+            Ca(Qe.site && Qe.site.address, "ZZZ"),
+            void 0,
+            { numeric: !0, sensitivity: "base" },
+          );
+        }
+        function resequenceGroups(Le) {
+          return Le.map((Qe) => ({
+            ...Qe,
+            rows: (Qe.rows || []).map((Ve, Re) => ({
+              ...Ve,
+              kg_lorry_id: normalizeLorryId(Qe.id),
+              kg_lorry_sort_order: (Re + 1) * 10,
+            })),
+          }));
+        }
+        function buildGroups(Le, Qe) {
+          const Ve = (Qe || []).map((At) => ({
+              id: Number(At.id),
+              title: kgLorryCopy(At),
+              rows: [],
+            })),
+            Re = { id: null, title: "No lorry yet", rows: [] };
+          for (const At of Le || []) {
+            const lt = kgAssignmentLorryRows(At);
+            if (lt.length) {
+              for (const qn of lt) {
+                const In = qn && qn.lorry && qn.lorry.id ? Number(qn.lorry.id) : null;
+                let Pn = In == null ? Re : Ve.find((Nn) => Number(Nn.id) === In);
+                if (!Pn && qn.lorry) {
+                  Pn = { id: In, title: kgLorryCopy(qn.lorry), rows: [] };
+                  Ve.push(Pn);
                 }
-              } else {
-                Qe.rows.push({
+                (Pn || Re).rows.push({
                   ...At,
-                  kg_lorry_id: null,
-                  kg_lorry_sort_order: Number(At.sort_order || 0),
+                  kg_lorry_id: In,
+                  kg_lorry_sort_order: Number(qn.sort_order || At.sort_order || 0),
                 });
               }
-            }
-            const Ve = (At, lt) => {
-              const qn = Number(At.kg_lorry_sort_order || 0) - Number(lt.kg_lorry_sort_order || 0);
-              if (qn) return qn;
-              return Ca(At.site && At.site.address, "ZZZ").localeCompare(
-                Ca(lt.site && lt.site.address, "ZZZ"),
-                void 0,
-                { numeric: !0, sensitivity: "base" },
-              );
-            };
-            for (const At of Le) At.rows.sort(Ve);
-            Qe.rows.sort(Ve);
-            return [...Le, Qe];
-          }, [c.lorries, s]),
-          fe = q.useMemo(
-            () => ({
-              sites: s.length,
-              assigned: s.filter((Le) => he(Le) != null).length,
-              unassigned: s.filter((Le) => he(Le) == null).length,
-              workers: s.reduce((Le, Qe) => Le + J(Qe), 0),
-            }),
-            [s],
-          );
-        async function G(Le, Qe, Ve) {
-          if (!r) return;
-          const Re = s.find((yl) => Number(yl.id) === Number(Le));
-          if (!Re) return;
-          const At = Qe === "" || Qe == null ? null : Number(Qe),
-            lt = Ve === "" || Ve == null ? null : Number(Ve);
-          if ((At == null && lt == null) || (At != null && lt != null && At === lt)) return;
-          (g(""), W("Moving address to lorry…"));
-          const qn = j.find((yl) => (lt == null ? yl.id == null : Number(yl.id) === lt)),
-            In = ((qn && qn.rows) || [])
-              .filter((yl) => Number(yl.id) !== Number(Le))
-              .reduce((yl, Qs) => Math.max(yl, Number(Qs.kg_lorry_sort_order || Qs.sort_order || 0)), 0) + 10,
-            Pn = kgAssignmentLorryRows(Re),
-            Nn = Pn.some((yl) => yl && yl.lorry && Number(yl.lorry.id) === lt);
-          async function Pe(yl) {
-            const { error: Qs } = await qe
-              .from("site_assignments")
-              .update(yl)
-              .eq("id", Number(Le));
-            if (Qs) throw Qs;
-          }
-          try {
-            if (At == null) {
-              if (lt != null) {
-                const { error: yl } = await qe
-                  .from("assignment_lorries")
-                  .insert({ assignment_id: Number(Le), lorry_id: lt, sort_order: In });
-                if (yl) {
-                  const { error: Qs } = await qe
-                    .from("assignment_lorries")
-                    .update({ sort_order: In })
-                    .eq("assignment_id", Number(Le))
-                    .eq("lorry_id", lt);
-                  if (Qs) throw yl;
-                }
-                await Pe({ lorry_id: lt, sort_order: In });
-              } else await Pe({ lorry_id: null, sort_order: In });
-            } else if (lt == null) {
-              const { error: yl } = await qe
-                .from("assignment_lorries")
-                .delete()
-                .eq("assignment_id", Number(Le))
-                .eq("lorry_id", At);
-              if (yl) throw yl;
-              const Qs = Pn.filter((Rn) => Rn && Rn.lorry && Number(Rn.lorry.id) !== At);
-              if (Qs.length) await Pe({ lorry_id: Number(Qs[0].lorry.id), sort_order: Number(Qs[0].sort_order || 0) });
-              else await Pe({ lorry_id: null, sort_order: In });
             } else {
-              if (Nn) {
-                const { error: yl } = await qe
+              Re.rows.push({
+                ...At,
+                kg_lorry_id: null,
+                kg_lorry_sort_order: Number(At.sort_order || 0),
+              });
+            }
+          }
+          for (const At of Ve) At.rows.sort(routeSort);
+          Re.rows.sort(routeSort);
+          return resequenceGroups([...Ve, Re]);
+        }
+        q.useEffect(() => {
+          setRouteGroups(buildGroups(s, c.lorries));
+        }, [s, c.lorries]);
+        const fe = q.useMemo(() => {
+          const Le = new Set(), Qe = new Set();
+          for (const Ve of routeGroups) {
+            if (Ve.id == null) {
+              for (const Re of Ve.rows || []) Qe.add(Number(Re.id));
+            } else {
+              for (const Re of Ve.rows || []) Le.add(Number(Re.id));
+            }
+          }
+          return {
+            sites: s.length,
+            assigned: Le.size,
+            unassigned: Qe.size,
+            workers: s.reduce((Ve, Re) => Ve + J(Re), 0),
+          };
+        }, [routeGroups, s]);
+        function markScreenChanged() {
+          (setDirty(!0), W("Screen changed. Press Save Update to sync Planner and Copy 1."));
+        }
+        function G(Le, Qe, Ve) {
+          if (!r || saving) return;
+          const Re = normalizeLorryId(Qe),
+            At = normalizeLorryId(Ve);
+          if (Re === At) return;
+          setRouteGroups((lt) => {
+            const qn = lt.map((yl) => ({ ...yl, rows: [...(yl.rows || [])] })),
+              In = qn.find((yl) => normalizeLorryId(yl.id) === Re),
+              Pn = qn.find((yl) => normalizeLorryId(yl.id) === At);
+            if (!In || !Pn) return lt;
+            const Nn = In.rows.findIndex((yl) => Number(yl.id) === Number(Le));
+            if (Nn < 0) return lt;
+            const [Pe] = In.rows.splice(Nn, 1),
+              existingTarget = Pn.rows.some((yl) => Number(yl.id) === Number(Le)),
+              stillHasOtherLorry = qn.some(
+                (yl) => normalizeLorryId(yl.id) != null && normalizeLorryId(yl.id) !== Re && yl.rows.some((Qs) => Number(Qs.id) === Number(Le)),
+              );
+            if (!existingTarget && !(At == null && stillHasOtherLorry)) Pn.rows.push({ ...Pe, kg_lorry_id: At });
+            return resequenceGroups(qn);
+          });
+          markScreenChanged();
+        }
+        function de(Le, Qe, Ve) {
+          if (!r || saving) return;
+          const Re = normalizeLorryId(Qe);
+          setRouteGroups((At) => {
+            const lt = At.map((Qs) => ({ ...Qs, rows: [...(Qs.rows || [])] })),
+              qn = lt.find((Qs) => normalizeLorryId(Qs.id) === Re);
+            if (!qn) return At;
+            const In = qn.rows.findIndex((Qs) => Number(Qs.id) === Number(Le)),
+              Pn = In + Ve;
+            if (In < 0 || Pn < 0 || Pn >= qn.rows.length) return At;
+            [qn.rows[In], qn.rows[Pn]] = [qn.rows[Pn], qn.rows[In]];
+            return resequenceGroups(lt);
+          });
+          markScreenChanged();
+        }
+        async function saveRouteUpdate() {
+          if (!r || saving || !dirty) return;
+          (setSaving(!0), g(""), W("Saving Logistics update…"));
+          try {
+            const Le = s.map((Rn) => Number(Rn.id)).filter(Boolean),
+              Qe = [],
+              Ve = new Map(),
+              Re = new Map(),
+              At = new Map();
+            routeGroups.forEach((Rn, Xs) => {
+              const Ws = normalizeLorryId(Rn.id);
+              (Rn.rows || []).forEach((ea, sn) => {
+                const on = Number(ea.id),
+                  uf = (sn + 1) * 10;
+                if (!on) return;
+                At.set(on, uf);
+                if (Ws == null) {
+                  if (!Re.has(on)) Re.set(on, uf);
+                } else {
+                  Qe.push({ assignment_id: on, lorry_id: Ws, sort_order: uf });
+                  if (!Ve.has(on)) Ve.set(on, { lorry_id: Ws, sort_order: uf, group_index: Xs });
+                }
+              });
+            });
+            const currentLinks = [];
+            for (const Rn of s || []) {
+              for (const Xs of kgAssignmentLorryRows(Rn)) {
+                const Ws = Xs && Xs.lorry && Xs.lorry.id ? Number(Xs.lorry.id) : null;
+                Ws != null && currentLinks.push({ assignment_id: Number(Rn.id), lorry_id: Ws });
+              }
+            }
+            const keyOf = (Rn) => `${Number(Rn.assignment_id)}:${Number(Rn.lorry_id)}`,
+              desiredKeys = new Set(Qe.map(keyOf)),
+              currentKeys = new Set(currentLinks.map(keyOf));
+            for (const Rn of Qe) {
+              if (currentKeys.has(keyOf(Rn))) {
+                const { error: Xs } = await qe
+                  .from("assignment_lorries")
+                  .update({ sort_order: Rn.sort_order })
+                  .eq("assignment_id", Rn.assignment_id)
+                  .eq("lorry_id", Rn.lorry_id);
+                if (Xs) throw Xs;
+              } else {
+                const { error: Xs } = await qe.from("assignment_lorries").insert(Rn);
+                if (Xs) {
+                  const { error: Ws } = await qe
+                    .from("assignment_lorries")
+                    .update({ sort_order: Rn.sort_order })
+                    .eq("assignment_id", Rn.assignment_id)
+                    .eq("lorry_id", Rn.lorry_id);
+                  if (Ws) throw Xs;
+                }
+              }
+            }
+            for (const Rn of currentLinks) {
+              if (!desiredKeys.has(keyOf(Rn))) {
+                const { error: Xs } = await qe
                   .from("assignment_lorries")
                   .delete()
-                  .eq("assignment_id", Number(Le))
-                  .eq("lorry_id", At);
-                if (yl) throw yl;
-                const { error: Qs } = await qe
-                  .from("assignment_lorries")
-                  .update({ sort_order: In })
-                  .eq("assignment_id", Number(Le))
-                  .eq("lorry_id", lt);
-                if (Qs) throw Qs;
-              } else {
-                const { error: yl } = await qe
-                  .from("assignment_lorries")
-                  .update({ lorry_id: lt, sort_order: In })
-                  .eq("assignment_id", Number(Le))
-                  .eq("lorry_id", At);
-                if (yl) {
-                  const { error: Qs } = await qe
-                    .from("assignment_lorries")
-                    .delete()
-                    .eq("assignment_id", Number(Le))
-                    .eq("lorry_id", At);
-                  if (Qs) throw Qs;
-                  const { error: Rn } = await qe
-                    .from("assignment_lorries")
-                    .insert({ assignment_id: Number(Le), lorry_id: lt, sort_order: In });
-                  if (Rn) throw Rn;
-                }
-              }
-              await Pe({ lorry_id: lt, sort_order: In });
-            }
-            (_(null), D(null), await L(), W("Address moved. Planner and Copy 1 now follow Logistics."));
-          } catch (yl) {
-            (g((yl && yl.message) || String(yl)), W(""));
-          }
-        }
-        async function de(Le, Qe, Ve) {
-          if (!r) return;
-          const Re = j.find((Nn) => (Qe == null ? Nn.id == null : Number(Nn.id) === Number(Qe)));
-          if (!Re) return;
-          const At = Re.rows.findIndex((Nn) => Number(Nn.id) === Number(Le)),
-            lt = At + Ve;
-          if (At < 0 || lt < 0 || lt >= Re.rows.length) return;
-          const qn = [...Re.rows];
-          [qn[At], qn[lt]] = [qn[lt], qn[At]];
-          (g(""), W("Saving address sequence…"));
-          try {
-            for (let In = 0; In < qn.length; In++) {
-              const Pn = qn[In],
-                Nn = (In + 1) * 10;
-              if (Qe == null) {
-                const { error: Pe } = await qe
-                  .from("site_assignments")
-                  .update({ lorry_id: null, sort_order: Nn })
-                  .eq("id", Number(Pn.id));
-                if (Pe) throw Pe;
-              } else {
-                const { error: Pe } = await qe
-                  .from("assignment_lorries")
-                  .update({ sort_order: Nn })
-                  .eq("assignment_id", Number(Pn.id))
-                  .eq("lorry_id", Number(Qe));
-                if (Pe) throw Pe;
-                const Qs = kgAssignmentLorryRows(Pn)[0];
-                if (Qs && Qs.lorry && Number(Qs.lorry.id) === Number(Qe)) {
-                  const { error: Rn } = await qe
-                    .from("site_assignments")
-                    .update({ lorry_id: Number(Qe), sort_order: Nn })
-                    .eq("id", Number(Pn.id));
-                  if (Rn) throw Rn;
-                }
+                  .eq("assignment_id", Rn.assignment_id)
+                  .eq("lorry_id", Rn.lorry_id);
+                if (Xs) throw Xs;
               }
             }
-            (await L(), W("Sequence saved. Planner and Copy 1 follow this order."));
-          } catch (In) {
-            (g((In && In.message) || String(In)), W(""));
+            for (const Rn of Le) {
+              const Xs = Ve.get(Rn),
+                Ws = Xs
+                  ? { lorry_id: Xs.lorry_id, sort_order: Xs.sort_order }
+                  : { lorry_id: null, sort_order: Re.get(Rn) || At.get(Rn) || 0 };
+              const { error: ea } = await qe
+                .from("site_assignments")
+                .update(Ws)
+                .eq("id", Rn);
+              if (ea) throw ea;
+            }
+            (await L(), setDirty(!1), W("Saved. Planner and Copy 1 now follow this Logistics order."));
+          } catch (Rn) {
+            (g((Rn && Rn.message) || String(Rn)), W("Save failed. Your screen order is still here; try Save Update again."));
+          } finally {
+            setSaving(!1);
           }
         }
         return d.jsxs("div", {
@@ -37727,7 +37745,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Logistics" }),
                     d.jsx("p", {
                       children:
-                        "Each address has a Move to lorry dropdown and Up / Down buttons. Planner and Copy 1 follow this sequence.",
+                        "Arrange the lorry route on screen first. Press Save Update once when correct, then Planner and Copy 1 will follow.",
                     }),
                   ],
                 }),
@@ -37737,6 +37755,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("button", {
                       className: "icon-button",
                       onClick: () => I(wr(n, -1)),
+                      disabled: saving,
                       children: d.jsx(bs, {}),
                     }),
                     d.jsxs("label", {
@@ -37746,6 +37765,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         d.jsx("input", {
                           type: "date",
                           value: n,
+                          disabled: saving,
                           onChange: (Le) => I(Le.target.value),
                         }),
                       ],
@@ -37753,6 +37773,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("button", {
                       className: "icon-button",
                       onClick: () => I(wr(n, 1)),
+                      disabled: saving,
                       children: d.jsx(Os, {}),
                     }),
                   ],
@@ -37763,7 +37784,15 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               className: "date-banner",
               children: [
                 d.jsx("strong", { children: D0(n) }),
-                d.jsx("span", { children: r ? "No drag/drop needed. Use dropdown to move address and Up / Down for sequence." : "View only" }),
+                d.jsx("span", { children: r ? dirty ? "Unsaved Logistics changes" : "Saved Logistics order" : "View only" }),
+                r &&
+                  d.jsx("button", {
+                    type: "button",
+                    className: "primary-button",
+                    disabled: saving || !dirty,
+                    onClick: saveRouteUpdate,
+                    children: saving ? "Saving…" : dirty ? "Save Update" : "Saved",
+                  }),
               ],
             }),
             d.jsxs("div", {
@@ -37794,7 +37823,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 ? d.jsx("div", { className: "empty-state", children: "No sites added for this day." })
                 : d.jsx("div", {
                     className: "logistics-board",
-                    children: j.map((Le) =>
+                    children: routeGroups.map((Le) =>
                       d.jsxs(
                         "section",
                         {
@@ -37818,7 +37847,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 }),
                               ],
                             }),
-
                             d.jsx("div", {
                               className: "logistics-site-list",
                               children:
@@ -37829,14 +37857,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     })
                                   : Le.rows.map((Qe, Ve) => {
                                       var Re;
-                                      const At = Number(w) === Number(Qe.id),
-                                        lt = Ve === 0,
-                                        qn = Ve === Le.rows.length - 1;
+                                      const At = Ve === 0,
+                                        lt = Ve === Le.rows.length - 1;
                                       return d.jsxs(
                                         "article",
                                         {
-                                          className: `logistics-site ${At ? "selected" : ""}`,
-                                          onClick: () => r && _(Qe.id),
+                                          className: "logistics-site",
                                           children: [
                                             d.jsxs("strong", {
                                               className: "logistics-address",
@@ -37857,14 +37883,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             r &&
                                               d.jsxs("label", {
                                                 className: "logistics-move-select",
-                                                onClick: (In) => In.stopPropagation(),
                                                 children: [
                                                   "Move to lorry",
                                                   d.jsxs("select", {
                                                     value: Le.id == null ? "" : String(Le.id),
-                                                    onChange: (In) => {
-                                                      (In.stopPropagation(), G(Qe.id, Le.id, In.target.value));
-                                                    },
+                                                    disabled: saving,
+                                                    onChange: (In) => G(Qe.id, Le.id, In.target.value),
                                                     children: [
                                                       d.jsx("option", { value: "", children: "No lorry" }),
                                                       (c.lorries || []).map((In) =>
@@ -37880,25 +37904,21 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                 children: [
                                                   d.jsx("button", {
                                                     type: "button",
-                                                    disabled: lt,
-                                                    onClick: (In) => {
-                                                      (In.stopPropagation(), de(Qe.id, Le.id, -1));
-                                                    },
+                                                    disabled: saving || At,
+                                                    onClick: () => de(Qe.id, Le.id, -1),
                                                     children: "↑ Up",
                                                   }),
                                                   d.jsx("button", {
                                                     type: "button",
-                                                    disabled: qn,
-                                                    onClick: (In) => {
-                                                      (In.stopPropagation(), de(Qe.id, Le.id, 1));
-                                                    },
+                                                    disabled: saving || lt,
+                                                    onClick: () => de(Qe.id, Le.id, 1),
                                                     children: "↓ Down",
                                                   }),
                                                 ],
                                               }),
                                           ],
                                         },
-                                        `${Le.id == null ? "no" : Le.id}-${Qe.id}`,
+                                        `${Le.id == null ? "no" : Le.id}-${Qe.id}-${Ve}`,
                                       );
                                     }),
                             }),
