@@ -38848,16 +38848,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           let kgQ = qe.from(r.table).select("*");
           kgQ =
             r.table === "workers" || r.table === "foremen"
-              ? kgQ.order("nickname", { nullsFirst: !1 }).order("name")
+              ? kgQ.order("sort_order", { nullsFirst: !1 }).order("nickname", { nullsFirst: !1 }).order("name")
               : kgQ.order(r.orderBy);
           const { data: J, error: j } = await kgQ;
           (j
             ? _(j.message)
-            : f(
-                r.table === "workers" || r.table === "foremen"
-                  ? kgSortNick(J || [])
-                  : J || [],
-              ),
+            : f(kgSortMasterRows(J || [], r.table, r.orderBy)),
             E(!1));
         }
         q.useEffect(() => {
@@ -39884,10 +39880,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Add nickname, pass and license details. Lists are arranged by nickname.",
+            "Maintain workers available for deployment. Add manual No., nickname, pass and license details. Lists are arranged by manual No., then nickname.",
           searchPlaceholder:
             "Search name, nickname, phone, pass, license — type pass or license to show only those records…",
           columns: [
+            { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "phone", label: "Phone" },
@@ -39895,12 +39892,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "license", label: "License" },
           ],
           fields: [
+            { name: "sort_order", label: "Manual No.", type: "number", min: "0", step: "1" },
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Worker full name", required: !0 },
             { name: "phone", label: "Phone" },
             { name: "pass", label: "Pass" },
             { name: "license", label: "License" },
           ],
+          defaults: { sort_order: 0 },
         },
         lorries: {
           title: "Lorries",
@@ -39924,10 +39923,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "foremen",
           orderBy: "nickname",
           description:
-            "Maintain foremen available for site assignment. Add nickname, pass, license and choose Boss foreman or Project foreman. Lists are arranged by nickname.",
+            "Maintain foremen available for site assignment. Add manual No., nickname, pass, license and choose Boss foreman or Project foreman. Lists are arranged by manual No., then nickname.",
           searchPlaceholder:
             "Search name, nickname, phone, pass, license, boss or project — type pass or license to show only those records…",
           columns: [
+            { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
             { key: "foreman_type", label: "Foreman type" },
@@ -39936,6 +39936,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "license", label: "License" },
           ],
           fields: [
+            { name: "sort_order", label: "Manual No.", type: "number", min: "0", step: "1" },
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Foreman full name", required: !0 },
             {
@@ -39952,7 +39953,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "pass", label: "Pass" },
             { name: "license", label: "License" },
           ],
-          defaults: { foreman_type: "project" },
+          defaults: { foreman_type: "project", sort_order: 0 },
         },
         catalog: {
           title: "Delivery Items",
