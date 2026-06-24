@@ -37585,39 +37585,92 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             }),
             [s],
           );
-        async function G(Le, Qe) {
+        async function G(Le, Qe, Ve) {
           if (!r) return;
-          const Ve = s.find((Nn) => Number(Nn.id) === Number(Le));
-          if (!Ve) return;
-          const Re = Qe === "" || Qe == null ? null : Number(Qe),
-            At = kgAssignmentLorries(Ve).map((Nn) => Number(Nn.id)).filter(Boolean);
-          if (At.length === 1 && At[0] === Re) return;
+          const Re = s.find((yl) => Number(yl.id) === Number(Le));
+          if (!Re) return;
+          const At = Qe === "" || Qe == null ? null : Number(Qe),
+            lt = Ve === "" || Ve == null ? null : Number(Ve);
+          if ((At == null && lt == null) || (At != null && lt != null && At === lt)) return;
           (g(""), W("Moving address to lorry…"));
-          const lt = j.find((Nn) => (Re == null ? Nn.id == null : Number(Nn.id) === Re)),
-            qn = ((lt && lt.rows) || [])
-              .filter((Nn) => Number(Nn.id) !== Number(Le))
-              .reduce((Nn, Pe) => Math.max(Nn, Number(Pe.kg_lorry_sort_order || Pe.sort_order || 0)), 0) + 10,
-            { error: In } = await qe
+          const qn = j.find((yl) => (lt == null ? yl.id == null : Number(yl.id) === lt)),
+            In = ((qn && qn.rows) || [])
+              .filter((yl) => Number(yl.id) !== Number(Le))
+              .reduce((yl, Qs) => Math.max(yl, Number(Qs.kg_lorry_sort_order || Qs.sort_order || 0)), 0) + 10,
+            Pn = kgAssignmentLorryRows(Re),
+            Nn = Pn.some((yl) => yl && yl.lorry && Number(yl.lorry.id) === lt);
+          async function Pe(yl) {
+            const { error: Qs } = await qe
               .from("site_assignments")
-              .update({ lorry_id: Re, sort_order: qn })
+              .update(yl)
               .eq("id", Number(Le));
-          if (In) return (g(In.message), W(""));
-          const { error: Pn } = await qe
-            .from("assignment_lorries")
-            .delete()
-            .eq("assignment_id", Number(Le));
-          if (Pn) return (g(Pn.message), W(""));
-          if (Re != null) {
-            const { error: Nn } = await qe
-              .from("assignment_lorries")
-              .insert({
-                assignment_id: Number(Le),
-                lorry_id: Re,
-                sort_order: qn,
-              });
-            if (Nn) return (g(Nn.message), W(""));
+            if (Qs) throw Qs;
           }
-          (_(null), D(null), await L(), W("Address moved. Planner and Copy 1 now follow Logistics."));
+          try {
+            if (At == null) {
+              if (lt != null) {
+                const { error: yl } = await qe
+                  .from("assignment_lorries")
+                  .insert({ assignment_id: Number(Le), lorry_id: lt, sort_order: In });
+                if (yl) {
+                  const { error: Qs } = await qe
+                    .from("assignment_lorries")
+                    .update({ sort_order: In })
+                    .eq("assignment_id", Number(Le))
+                    .eq("lorry_id", lt);
+                  if (Qs) throw yl;
+                }
+                await Pe({ lorry_id: lt, sort_order: In });
+              } else await Pe({ lorry_id: null, sort_order: In });
+            } else if (lt == null) {
+              const { error: yl } = await qe
+                .from("assignment_lorries")
+                .delete()
+                .eq("assignment_id", Number(Le))
+                .eq("lorry_id", At);
+              if (yl) throw yl;
+              const Qs = Pn.filter((Rn) => Rn && Rn.lorry && Number(Rn.lorry.id) !== At);
+              if (Qs.length) await Pe({ lorry_id: Number(Qs[0].lorry.id), sort_order: Number(Qs[0].sort_order || 0) });
+              else await Pe({ lorry_id: null, sort_order: In });
+            } else {
+              if (Nn) {
+                const { error: yl } = await qe
+                  .from("assignment_lorries")
+                  .delete()
+                  .eq("assignment_id", Number(Le))
+                  .eq("lorry_id", At);
+                if (yl) throw yl;
+                const { error: Qs } = await qe
+                  .from("assignment_lorries")
+                  .update({ sort_order: In })
+                  .eq("assignment_id", Number(Le))
+                  .eq("lorry_id", lt);
+                if (Qs) throw Qs;
+              } else {
+                const { error: yl } = await qe
+                  .from("assignment_lorries")
+                  .update({ lorry_id: lt, sort_order: In })
+                  .eq("assignment_id", Number(Le))
+                  .eq("lorry_id", At);
+                if (yl) {
+                  const { error: Qs } = await qe
+                    .from("assignment_lorries")
+                    .delete()
+                    .eq("assignment_id", Number(Le))
+                    .eq("lorry_id", At);
+                  if (Qs) throw Qs;
+                  const { error: Rn } = await qe
+                    .from("assignment_lorries")
+                    .insert({ assignment_id: Number(Le), lorry_id: lt, sort_order: In });
+                  if (Rn) throw Rn;
+                }
+              }
+              await Pe({ lorry_id: lt, sort_order: In });
+            }
+            (_(null), D(null), await L(), W("Address moved. Planner and Copy 1 now follow Logistics."));
+          } catch (yl) {
+            (g((yl && yl.message) || String(yl)), W(""));
+          }
         }
         async function de(Le, Qe, Ve) {
           if (!r) return;
@@ -37629,40 +37682,37 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           const qn = [...Re.rows];
           [qn[At], qn[lt]] = [qn[lt], qn[At]];
           (g(""), W("Saving address sequence…"));
-          if (Qe == null) {
+          try {
             for (let In = 0; In < qn.length; In++) {
               const Pn = qn[In],
-                Nn = (In + 1) * 10,
-                { error: Pe } = await qe
+                Nn = (In + 1) * 10;
+              if (Qe == null) {
+                const { error: Pe } = await qe
                   .from("site_assignments")
                   .update({ lorry_id: null, sort_order: Nn })
                   .eq("id", Number(Pn.id));
-              if (Pe) return (g(Pe.message), W(""));
+                if (Pe) throw Pe;
+              } else {
+                const { error: Pe } = await qe
+                  .from("assignment_lorries")
+                  .update({ sort_order: Nn })
+                  .eq("assignment_id", Number(Pn.id))
+                  .eq("lorry_id", Number(Qe));
+                if (Pe) throw Pe;
+                const Qs = kgAssignmentLorryRows(Pn)[0];
+                if (Qs && Qs.lorry && Number(Qs.lorry.id) === Number(Qe)) {
+                  const { error: Rn } = await qe
+                    .from("site_assignments")
+                    .update({ lorry_id: Number(Qe), sort_order: Nn })
+                    .eq("id", Number(Pn.id));
+                  if (Rn) throw Rn;
+                }
+              }
             }
-          } else {
-            const In = qn.map((Pn) => Number(Pn.id)),
-              Pn = qn.map((Nn, Pe) => ({
-                assignment_id: Number(Nn.id),
-                lorry_id: Number(Qe),
-                sort_order: (Pe + 1) * 10,
-              }));
-            const { error: Nn } = await qe
-              .from("assignment_lorries")
-              .delete()
-              .eq("lorry_id", Number(Qe))
-              .in("assignment_id", In);
-            if (Nn) return (g(Nn.message), W(""));
-            const { error: Pe } = await qe.from("assignment_lorries").insert(Pn);
-            if (Pe) return (g(Pe.message), W(""));
-            for (const yl of Pn) {
-              const { error: Qs } = await qe
-                .from("site_assignments")
-                .update({ lorry_id: Number(Qe), sort_order: yl.sort_order })
-                .eq("id", yl.assignment_id);
-              if (Qs) return (g(Qs.message), W(""));
-            }
+            (await L(), W("Sequence saved. Planner and Copy 1 follow this order."));
+          } catch (In) {
+            (g((In && In.message) || String(In)), W(""));
           }
-          (await L(), W("Sequence saved. Planner and Copy 1 follow this order."));
         }
         return d.jsxs("div", {
           className: "page logistics-page",
@@ -37768,13 +37818,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 }),
                               ],
                             }),
-                            r &&
-                              w &&
-                              d.jsx("button", {
-                                className: "logistics-move-button",
-                                onClick: () => G(w, Le.id),
-                                children: "Move selected here",
-                              }),
+
                             d.jsx("div", {
                               className: "logistics-site-list",
                               children:
@@ -37819,7 +37863,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                   d.jsxs("select", {
                                                     value: Le.id == null ? "" : String(Le.id),
                                                     onChange: (In) => {
-                                                      (In.stopPropagation(), G(Qe.id, In.target.value));
+                                                      (In.stopPropagation(), G(Qe.id, Le.id, In.target.value));
                                                     },
                                                     children: [
                                                       d.jsx("option", { value: "", children: "No lorry" }),
