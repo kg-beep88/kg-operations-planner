@@ -37587,80 +37587,82 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           );
         async function G(Le, Qe) {
           if (!r) return;
-          const Ve = s.find((At) => Number(At.id) === Number(Le));
+          const Ve = s.find((Nn) => Number(Nn.id) === Number(Le));
           if (!Ve) return;
-          const Re = Qe == null ? null : Number(Qe);
-          if (he(Ve) === Re && kgAssignmentLorries(Ve).length <= 1) return;
-          (g(""), W("Updating lorry plan…"));
-          const At =
-              Re == null
-                ? s
-                    .filter((lt) => Number(lt.id) !== Number(Le) && he(lt) == null)
-                    .reduce((lt, qn) => Math.max(lt, Number(qn.sort_order || 0)), 0) + 10
-                : s
-                    .flatMap((lt) => kgAssignmentLorryRows(lt))
-                    .filter((lt) => Number(lt.lorry_id || (lt.lorry && lt.lorry.id)) === Re)
-                    .reduce((lt, qn) => Math.max(lt, Number(qn.sort_order || 0)), 0) + 10,
-            { error: lt } = await qe
+          const Re = Qe === "" || Qe == null ? null : Number(Qe),
+            At = kgAssignmentLorries(Ve).map((Nn) => Number(Nn.id)).filter(Boolean);
+          if (At.length === 1 && At[0] === Re) return;
+          (g(""), W("Moving address to lorry…"));
+          const lt = j.find((Nn) => (Re == null ? Nn.id == null : Number(Nn.id) === Re)),
+            qn = ((lt && lt.rows) || [])
+              .filter((Nn) => Number(Nn.id) !== Number(Le))
+              .reduce((Nn, Pe) => Math.max(Nn, Number(Pe.kg_lorry_sort_order || Pe.sort_order || 0)), 0) + 10,
+            { error: In } = await qe
               .from("site_assignments")
-              .update({ lorry_id: Re, sort_order: At })
+              .update({ lorry_id: Re, sort_order: qn })
               .eq("id", Number(Le));
-          if (lt) return (g(lt.message), W(""));
-          const { error: qn } = await qe
+          if (In) return (g(In.message), W(""));
+          const { error: Pn } = await qe
             .from("assignment_lorries")
             .delete()
             .eq("assignment_id", Number(Le));
-          if (qn) return (g(qn.message), W(""));
+          if (Pn) return (g(Pn.message), W(""));
           if (Re != null) {
-            const { error: In } = await qe
+            const { error: Nn } = await qe
               .from("assignment_lorries")
               .insert({
                 assignment_id: Number(Le),
                 lorry_id: Re,
-                sort_order: At,
+                sort_order: qn,
               });
-            if (In) return (g(In.message), W(""));
+            if (Nn) return (g(Nn.message), W(""));
           }
-          (_(null), D(null), await L(), W("Lorry plan updated. Use Up / Down to set the route order."));
+          (_(null), D(null), await L(), W("Address moved. Planner and Copy 1 now follow Logistics."));
         }
         async function de(Le, Qe, Ve) {
           if (!r) return;
-          const Re = j.find((qn) => (Qe == null ? qn.id == null : Number(qn.id) === Number(Qe)));
+          const Re = j.find((Nn) => (Qe == null ? Nn.id == null : Number(Nn.id) === Number(Qe)));
           if (!Re) return;
-          const At = Re.rows.findIndex((qn) => Number(qn.id) === Number(Le)),
+          const At = Re.rows.findIndex((Nn) => Number(Nn.id) === Number(Le)),
             lt = At + Ve;
           if (At < 0 || lt < 0 || lt >= Re.rows.length) return;
           const qn = [...Re.rows];
           [qn[At], qn[lt]] = [qn[lt], qn[At]];
-          (g(""), W("Saving lorry route sequence…"));
-          for (let In = 0; In < qn.length; In++) {
-            const Pn = qn[In],
-              Nn = (In + 1) * 10;
-            if (Qe == null) {
-              const { error: Pe } = await qe
-                .from("site_assignments")
-                .update({ sort_order: Nn })
-                .eq("id", Number(Pn.id));
-              if (Pe) return (g(Pe.message), W(""));
-            } else {
-              const { error: Pe } = await qe
-                .from("assignment_lorries")
-                .update({ sort_order: Nn })
-                .eq("assignment_id", Number(Pn.id))
-                .eq("lorry_id", Number(Qe));
-              if (Pe) return (g(Pe.message), W(""));
-              const yl = kgAssignmentLorryRows(Pn)[0],
-                Qs = yl && Number(yl.lorry_id || (yl.lorry && yl.lorry.id)) === Number(Qe);
-              if (Qs) {
-                const { error: Zs } = await qe
+          (g(""), W("Saving address sequence…"));
+          if (Qe == null) {
+            for (let In = 0; In < qn.length; In++) {
+              const Pn = qn[In],
+                Nn = (In + 1) * 10,
+                { error: Pe } = await qe
                   .from("site_assignments")
-                  .update({ lorry_id: Number(Qe), sort_order: Nn })
+                  .update({ lorry_id: null, sort_order: Nn })
                   .eq("id", Number(Pn.id));
-                if (Zs) return (g(Zs.message), W(""));
-              }
+              if (Pe) return (g(Pe.message), W(""));
+            }
+          } else {
+            const In = qn.map((Pn) => Number(Pn.id)),
+              Pn = qn.map((Nn, Pe) => ({
+                assignment_id: Number(Nn.id),
+                lorry_id: Number(Qe),
+                sort_order: (Pe + 1) * 10,
+              }));
+            const { error: Nn } = await qe
+              .from("assignment_lorries")
+              .delete()
+              .eq("lorry_id", Number(Qe))
+              .in("assignment_id", In);
+            if (Nn) return (g(Nn.message), W(""));
+            const { error: Pe } = await qe.from("assignment_lorries").insert(Pn);
+            if (Pe) return (g(Pe.message), W(""));
+            for (const yl of Pn) {
+              const { error: Qs } = await qe
+                .from("site_assignments")
+                .update({ lorry_id: Number(Qe), sort_order: yl.sort_order })
+                .eq("id", yl.assignment_id);
+              if (Qs) return (g(Qs.message), W(""));
             }
           }
-          (await L(), W("Route sequence saved. Planner and Copy 1 will follow this order."));
+          (await L(), W("Sequence saved. Planner and Copy 1 follow this order."));
         }
         return d.jsxs("div", {
           className: "page logistics-page",
@@ -37675,7 +37677,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Logistics" }),
                     d.jsx("p", {
                       children:
-                        "Tap a site, choose Move selected here, then use Up / Down to set the lorry route sequence. Planner and Copy 1 follow this order.",
+                        "Each address has a Move to lorry dropdown and Up / Down buttons. Planner and Copy 1 follow this sequence.",
                     }),
                   ],
                 }),
@@ -37711,7 +37713,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               className: "date-banner",
               children: [
                 d.jsx("strong", { children: D0(n) }),
-                d.jsx("span", { children: r ? "No drag/drop needed. Use Up / Down for address sequence." : "View only" }),
+                d.jsx("span", { children: r ? "No drag/drop needed. Use dropdown to move address and Up / Down for sequence." : "View only" }),
               ],
             }),
             d.jsxs("div", {
@@ -37808,6 +37810,26 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                 J(Qe) === 1 ? "" : "s",
                                               ],
                                             }),
+                                            r &&
+                                              d.jsxs("label", {
+                                                className: "logistics-move-select",
+                                                onClick: (In) => In.stopPropagation(),
+                                                children: [
+                                                  "Move to lorry",
+                                                  d.jsxs("select", {
+                                                    value: Le.id == null ? "" : String(Le.id),
+                                                    onChange: (In) => {
+                                                      (In.stopPropagation(), G(Qe.id, In.target.value));
+                                                    },
+                                                    children: [
+                                                      d.jsx("option", { value: "", children: "No lorry" }),
+                                                      (c.lorries || []).map((In) =>
+                                                        d.jsx("option", { value: In.id, children: kgLorryCopy(In) }, In.id),
+                                                      ),
+                                                    ],
+                                                  }),
+                                                ],
+                                              }),
                                             r &&
                                               d.jsxs("div", {
                                                 className: "logistics-order-buttons",
@@ -42364,6 +42386,23 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #155e75;
         font-size: 11px;
         font-weight: 900;
+      }
+      .logistics-move-select {
+        display: grid;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 900;
+        color: #0f766e;
+      }
+      .logistics-move-select select {
+        width: 100%;
+        min-height: 34px;
+        border: 1px solid #99f6e4;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #0f172a;
+        font-size: 12px;
+        font-weight: 800;
       }
       .logistics-order-buttons {
         display: grid;
