@@ -41209,12 +41209,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .modal-body {
         padding: 20px;
         overflow-y: auto;
+        overflow-x: hidden;
         max-height: calc(90vh - 74px);
       }
       .form-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 17px;
+        min-width: 0;
       }
       .wide {
         grid-column: 1 / -1;
@@ -41232,11 +41234,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
       .check-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 8px;
         max-height: 240px;
         overflow-y: auto;
+        overflow-x: hidden;
         padding: 2px;
+        width: 100%;
+        box-sizing: border-box;
       }
       .check-card {
         display: flex !important;
@@ -41247,6 +41252,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         border-radius: 8px;
         padding: 9px;
         font-weight: 600 !important;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
       }
       .check-card input {
         width: auto;
@@ -41416,7 +41424,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           grid-column: auto;
         }
         .check-grid {
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          overflow-x: hidden;
         }
         .toolbar {
           align-items: stretch;
@@ -41745,6 +41754,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .check-card span {
         display: grid;
         gap: 3px;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
       }
       .check-card small {
         color: #9a6212;
@@ -41758,6 +41771,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
       .foreman-list-box {
         align-content: start;
+        min-width: 0;
+        overflow-x: hidden;
+      }
+      .foreman-split .check-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        overflow-y: auto;
+        overflow-x: hidden;
       }
       .summary-table-panel {
         margin-bottom: 16px;
