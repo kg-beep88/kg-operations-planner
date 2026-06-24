@@ -16201,6 +16201,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           { to: "/calendar", label: "Calendar", icon: fl },
           { to: "/planner", label: "Planner", icon: eE },
           { to: "/logistics", label: "Logistics", icon: b0 },
+          { to: "/manpower-search", label: "Name Search", icon: fE },
           { to: "/deliveries", label: "Delivery", icon: Q0 },
           { to: "/sites", label: "Sites", icon: $S },
           { to: "/workers", label: "Workers", icon: Rs },
@@ -37175,6 +37176,183 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           ],
         });
       }
+      function kgManpowerSearchPage({ profile: t }) {
+        const [r, n] = q.useState(""),
+          [l, s] = q.useState([]),
+          [f, c] = q.useState(!1),
+          [m, v] = q.useState(""),
+          [x, p] = q.useState("");
+        function g(I) {
+          return String(I || "").toLowerCase().trim();
+        }
+        function S(I, L) {
+          const W = g(L),
+            he = [I == null ? void 0 : I.name, I == null ? void 0 : I.nickname, kgNameNick(I)].map(g).join(" ");
+          return W && he.includes(W);
+        }
+        function E(I, L) {
+          const W = [];
+          for (const he of I || []) {
+            for (const J of he.assignment_workers || []) {
+              const j = J.worker || {};
+              S(j, L) && W.push({
+                key: `worker-${j.id || J.worker_id}-${he.id}`,
+                date: he.plan_date,
+                person: kgNameNick(j),
+                role: "Worker",
+                site: Ca(he.site && he.site.address, "No address"),
+                lorry: kgLorryCopyList(he),
+                workers: (he.assignment_workers || []).length,
+                foremen: kgForemanNames(he),
+                assignment: he,
+              });
+            }
+            for (const J of ar(he)) {
+              S(J, L) && W.push({
+                key: `foreman-${J.id}-${he.id}`,
+                date: he.plan_date,
+                person: kgNameNick(J),
+                role: `${kgForemanType(J) === "boss" ? "Boss" : "Project"} Foreman`,
+                site: Ca(he.site && he.site.address, "No address"),
+                lorry: kgLorryCopyList(he),
+                workers: (he.assignment_workers || []).length,
+                foremen: kgForemanNames(he),
+                assignment: he,
+              });
+            }
+          }
+          return W.sort((he, J) => String(J.date || "").localeCompare(String(he.date || "")) || he.site.localeCompare(J.site, void 0, { numeric: !0, sensitivity: "base" }));
+        }
+        async function w(I) {
+          I && I.preventDefault();
+          const L = r.trim();
+          (p(L), v(""));
+          if (!L) return s([]);
+          (c(!0), s([]));
+          const { data: W, error: he } = await qe
+            .from("site_assignments")
+            .select(_s)
+            .order("plan_date", { ascending: !1 })
+            .order("shift")
+            .limit(5000);
+          if (he) (v(he.message), s([]));
+          else s(E(W || [], L));
+          c(!1);
+        }
+        const _ = q.useMemo(() => {
+          const I = new Map();
+          for (const L of l) {
+            const W = L.person || "Unknown";
+            I.set(W, (I.get(W) || 0) + 1);
+          }
+          return [...I.entries()].map(([L, W]) => `${L}: ${W}`).join(" · ");
+        }, [l]);
+        return d.jsxs("div", {
+          className: "page manpower-search-page",
+          children: [
+            d.jsxs("header", {
+              className: "page-header",
+              children: [
+                d.jsxs("div", {
+                  children: [
+                    d.jsx("p", { className: "eyebrow", children: "Worker / Foreman history" }),
+                    d.jsx("h1", { children: "Name Search" }),
+                    d.jsx("p", { children: "Search name or nickname to see which sites the worker or foreman has been to." }),
+                  ],
+                }),
+              ],
+            }),
+            d.jsx("section", {
+              className: "panel",
+              children: d.jsxs("form", {
+                className: "form-grid",
+                onSubmit: w,
+                children: [
+                  d.jsxs("label", {
+                    className: "wide",
+                    children: [
+                      "Name or nickname",
+                      d.jsx("input", {
+                        value: r,
+                        onChange: (I) => n(I.target.value),
+                        placeholder: "Example: Panjang, Suresh, Ah Bao",
+                      }),
+                    ],
+                  }),
+                  d.jsx("div", {
+                    className: "form-actions wide",
+                    children: d.jsx("button", {
+                      className: "primary-button",
+                      disabled: f,
+                      children: f ? "Searching…" : "Search history",
+                    }),
+                  }),
+                ],
+              }),
+            }),
+            m && d.jsx("div", { className: "error-box", children: m }),
+            f
+              ? d.jsx("div", { className: "empty-state", children: "Searching planner history…" })
+              : !x
+                ? d.jsx("div", { className: "empty-state", children: "Type a worker or foreman name, then press Search history." })
+                : l.length === 0
+                  ? d.jsx("div", { className: "empty-state", children: `No planner history found for ${x}.` })
+                  : d.jsxs("section", {
+                      className: "panel",
+                      children: [
+                        d.jsxs("div", {
+                          className: "panel-title-row",
+                          children: [
+                            d.jsxs("div", {
+                              children: [
+                                d.jsx("h2", { children: `Found ${l.length} record${l.length === 1 ? "" : "s"}` }),
+                                _ && d.jsx("p", { className: "muted", children: _ }),
+                              ],
+                            }),
+                            d.jsx("button", { className: "secondary-button", onClick: w, children: "Refresh" }),
+                          ],
+                        }),
+                        d.jsx("div", {
+                          className: "table-wrap",
+                          children: d.jsxs("table", {
+                            className: "data-table",
+                            children: [
+                              d.jsx("thead", {
+                                children: d.jsxs("tr", {
+                                  children: [
+                                    d.jsx("th", { children: "Date" }),
+                                    d.jsx("th", { children: "Name" }),
+                                    d.jsx("th", { children: "Type" }),
+                                    d.jsx("th", { children: "Site" }),
+                                    d.jsx("th", { children: "Lorry" }),
+                                    d.jsx("th", { children: "Worker count" }),
+                                  ],
+                                }),
+                              }),
+                              d.jsx("tbody", {
+                                children: l.map((I) =>
+                                  d.jsxs("tr", {
+                                    children: [
+                                      d.jsx("td", { children: kgMiniDate(I.date) }),
+                                      d.jsx("td", { children: I.person }),
+                                      d.jsx("td", { children: I.role }),
+                                      d.jsx("td", { children: I.site }),
+                                      d.jsx("td", { children: I.lorry }),
+                                      d.jsx("td", { children: I.workers }),
+                                    ],
+                                  }, I.key),
+                                ),
+                              }),
+                            ],
+                          }),
+                        }),
+                        d.jsx("p", { className: "muted", children: "Showing latest planner records first. Search checks both name and nickname." }),
+                      ],
+                    }),
+          ],
+        });
+      }
+
       function kgLogisticsPage({ profile: t }) {
         const r = t.role === "admin" || t.role === "operation",
           [n, l] = q.useState(window.sessionStorage.getItem("kg_selected_date") || ri(1)),
@@ -39533,6 +39711,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       d.jsx(jn, {
                         path: "/logistics",
                         element: d.jsx(kgLogisticsPage, { profile: t }),
+                      }),
+                      d.jsx(jn, {
+                        path: "/manpower-search",
+                        element: d.jsx(kgManpowerSearchPage, { profile: t }),
                       }),
                       d.jsx(jn, {
                         path: "/deliveries",
