@@ -37695,83 +37695,91 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }
 
         async function saveRouteUpdate() {
-          if (!r || saving || !dirty) return;
+          if (!r || saving) return;
           (setSaving(!0), g(""), W("Saving Logistics update…"));
           try {
-            const Le = s.map((Rn) => Number(Rn.id)).filter(Boolean),
-              Qe = [],
+            const Le = Array.from(document.querySelectorAll('[data-logistics-route-row="1"]'));
+            if (!Le.length) throw new Error("No Logistics rows found on screen. Refresh and try again.");
+            const Qe = s.map((tl) => Number(tl.id)).filter(Boolean),
               Ve = new Map(),
               Re = new Map(),
               At = new Map();
-            routeGroups.forEach((Rn, Xs) => {
-              const Ws = normalizeLorryId(Rn.id);
-              (Rn.rows || []).forEach((ea, sn) => {
-                const on = Number(ea.id),
-                  uf = (sn + 1) * 10;
-                if (!on) return;
-                At.set(on, uf);
-                if (Ws == null) {
-                  if (!Re.has(on)) Re.set(on, uf);
-                } else {
-                  Qe.push({ assignment_id: on, lorry_id: Ws, sort_order: uf });
-                  if (!Ve.has(on)) Ve.set(on, { lorry_id: Ws, sort_order: uf, group_index: Xs });
-                }
-              });
+            Le.forEach((tl, hl) => {
+              const dl = Number(tl.getAttribute("data-assignment-id"));
+              if (!dl) return;
+              const Kl = tl.querySelector('[data-logistics-lorry-select="1"]'),
+                pl = tl.querySelector('[data-logistics-sort-input="1"]'),
+                El = normalizeLorryId(Kl ? Kl.value : ""),
+                Sl = Number(pl && pl.value ? pl.value : 0),
+                Tl = Number.isFinite(Sl) && Sl > 0 ? Math.round(Sl * 10) : (hl + 1) * 10;
+              At.set(dl, Math.min(At.get(dl) || 999999, Tl));
+              if (El == null) Re.set(dl, Math.min(Re.get(dl) || 999999, Tl));
+              else {
+                const Ml = `${dl}:${El}`,
+                  Ll = { assignment_id: dl, lorry_id: El, sort_order: Tl };
+                (!Ve.has(Ml) || Tl < Ve.get(Ml).sort_order) && Ve.set(Ml, Ll);
+              }
             });
-            const currentLinks = [];
-            for (const Rn of s || []) {
-              for (const Xs of kgAssignmentLorryRows(Rn)) {
-                const Ws = Xs && Xs.lorry && Xs.lorry.id ? Number(Xs.lorry.id) : null;
-                Ws != null && currentLinks.push({ assignment_id: Number(Rn.id), lorry_id: Ws });
+            const lt = Array.from(Ve.values()).sort((tl, hl) => Number(tl.lorry_id) - Number(hl.lorry_id) || Number(tl.sort_order) - Number(hl.sort_order)),
+              qn = new Map();
+            for (const tl of lt) {
+              const hl = qn.get(tl.assignment_id);
+              (!hl || Number(tl.sort_order) < Number(hl.sort_order)) && qn.set(tl.assignment_id, tl);
+            }
+            const In = [];
+            for (const tl of s || []) {
+              for (const hl of kgAssignmentLorryRows(tl)) {
+                const dl = hl && hl.lorry && hl.lorry.id ? Number(hl.lorry.id) : null;
+                dl != null && In.push({ assignment_id: Number(tl.id), lorry_id: dl });
               }
             }
-            const keyOf = (Rn) => `${Number(Rn.assignment_id)}:${Number(Rn.lorry_id)}`,
-              desiredKeys = new Set(Qe.map(keyOf)),
-              currentKeys = new Set(currentLinks.map(keyOf));
-            for (const Rn of Qe) {
-              if (currentKeys.has(keyOf(Rn))) {
-                const { error: Xs } = await qe
+            const Pn = (tl) => `${Number(tl.assignment_id)}:${Number(tl.lorry_id)}`,
+              Nn = new Set(lt.map(Pn)),
+              Pe = new Set(In.map(Pn));
+            for (const tl of lt) {
+              if (Pe.has(Pn(tl))) {
+                const { error: hl } = await qe
                   .from("assignment_lorries")
-                  .update({ sort_order: Rn.sort_order })
-                  .eq("assignment_id", Rn.assignment_id)
-                  .eq("lorry_id", Rn.lorry_id);
-                if (Xs) throw Xs;
+                  .update({ sort_order: tl.sort_order })
+                  .eq("assignment_id", tl.assignment_id)
+                  .eq("lorry_id", tl.lorry_id);
+                if (hl) throw hl;
               } else {
-                const { error: Xs } = await qe.from("assignment_lorries").insert(Rn);
-                if (Xs) {
-                  const { error: Ws } = await qe
+                const { error: hl } = await qe.from("assignment_lorries").insert(tl);
+                if (hl) {
+                  const { error: dl } = await qe
                     .from("assignment_lorries")
-                    .update({ sort_order: Rn.sort_order })
-                    .eq("assignment_id", Rn.assignment_id)
-                    .eq("lorry_id", Rn.lorry_id);
-                  if (Ws) throw Xs;
+                    .update({ sort_order: tl.sort_order })
+                    .eq("assignment_id", tl.assignment_id)
+                    .eq("lorry_id", tl.lorry_id);
+                  if (dl) throw hl;
                 }
               }
             }
-            for (const Rn of currentLinks) {
-              if (!desiredKeys.has(keyOf(Rn))) {
-                const { error: Xs } = await qe
+            for (const tl of In) {
+              if (!Nn.has(Pn(tl))) {
+                const { error: hl } = await qe
                   .from("assignment_lorries")
                   .delete()
-                  .eq("assignment_id", Rn.assignment_id)
-                  .eq("lorry_id", Rn.lorry_id);
-                if (Xs) throw Xs;
+                  .eq("assignment_id", tl.assignment_id)
+                  .eq("lorry_id", tl.lorry_id);
+                if (hl) throw hl;
               }
             }
-            for (const Rn of Le) {
-              const Xs = Ve.get(Rn),
-                Ws = Xs
-                  ? { lorry_id: Xs.lorry_id, sort_order: Xs.sort_order }
-                  : { lorry_id: null, sort_order: Re.get(Rn) || At.get(Rn) || 0 };
-              const { error: ea } = await qe
+            for (const tl of Qe) {
+              const hl = qn.get(tl),
+                dl = hl
+                  ? { lorry_id: hl.lorry_id, sort_order: hl.sort_order }
+                  : { lorry_id: null, sort_order: Re.get(tl) || At.get(tl) || 0 };
+              const { error: Kl } = await qe
                 .from("site_assignments")
-                .update(Ws)
-                .eq("id", Rn);
-              if (ea) throw ea;
+                .update(dl)
+                .eq("id", tl);
+              if (Kl) throw Kl;
             }
             (await L(), setDirty(!1), W("Saved. Planner and Copy 1 now follow this Logistics order."));
-          } catch (Rn) {
-            (g((Rn && Rn.message) || String(Rn)), W("Save failed. Your screen order is still here; try Save Update again."));
+          } catch (Le) {
+            (g((Le && Le.message) || String(Le)), W("Save failed. Your screen edits are still visible; try Save Update again."));
           } finally {
             setSaving(!1);
           }
@@ -37787,10 +37795,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   children: [
                     d.jsx("p", { className: "eyebrow", children: "Daily lorry planning" }),
                     d.jsx("h1", { children: "Logistics" }),
-                    d.jsx("p", { className: "muted", children: "Logistics screen edit v4 — changes should show immediately before save." }),
+                    d.jsx("p", { className: "muted", children: "Logistics simple edit v5 — choose lorry and route no., then Save Update." }),
                     d.jsx("p", {
                       children:
-                        "Arrange the lorry route on screen first. Press Save Update once when correct, then Planner and Copy 1 will follow.",
+                        "Simple table: choose the lorry and type the route order number. Press Save Update once when correct, then Planner and Copy 1 will follow.",
                     }),
                   ],
                 }),
@@ -37834,9 +37842,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   d.jsx("button", {
                     type: "button",
                     className: "primary-button",
-                    disabled: saving || !dirty,
+                    disabled: saving,
                     onClick: saveRouteUpdate,
-                    children: saving ? "Saving…" : dirty ? "Save Update" : "Saved",
+                    children: saving ? "Saving…" : "Save Update",
                   }),
               ],
             }),
@@ -37866,124 +37874,96 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               ? d.jsx("div", { className: "empty-state", children: "Loading logistics…" })
               : s.length === 0
                 ? d.jsx("div", { className: "empty-state", children: "No sites added for this day." })
-                : d.jsx("div", {
-                    className: "logistics-board",
-                    children: routeGroups.map((Le) =>
-                      d.jsxs(
-                        "section",
-                        {
-                          className: `logistics-lorry ${Le.id == null ? "no-lorry" : ""}`,
+                : d.jsxs("div", {
+                    className: "logistics-simple-editor",
+                    children: [
+                      d.jsxs("div", {
+                        className: "helper-card logistics-v5-help",
+                        children: [
+                          d.jsx("strong", { children: "Simple Logistics Route Editor" }),
+                          d.jsx("p", {
+                            children:
+                              "Do not drag. For each address, choose lorry and type route no. Example: same lorry 291 uses order 1, 2, 3, 4. Then press Save Update.",
+                          }),
+                        ],
+                      }),
+                      d.jsx("div", {
+                        className: "table-wrap",
+                        children: d.jsxs("table", {
+                          className: "data-table logistics-route-table",
                           children: [
-                            d.jsxs("div", {
-                              className: "logistics-lorry-head",
-                              children: [
-                                d.jsxs("strong", {
-                                  children: [
-                                    d.jsx(b0, { size: 15 }),
-                                    Le.title,
-                                  ],
-                                }),
-                                d.jsxs("span", {
-                                  children: [
-                                    Le.rows.length,
-                                    " site",
-                                    Le.rows.length === 1 ? "" : "s",
-                                  ],
-                                }),
-                              ],
+                            d.jsx("thead", {
+                              children: d.jsxs("tr", {
+                                children: [
+                                  d.jsx("th", { children: "Route No." }),
+                                  d.jsx("th", { children: "Address" }),
+                                  d.jsx("th", { children: "Workers" }),
+                                  d.jsx("th", { children: "Choose lorry" }),
+                                ],
+                              }),
                             }),
-                            d.jsx("div", {
-                              className: "logistics-site-list",
-                              children:
-                                Le.rows.length === 0
-                                  ? d.jsx("div", {
-                                      className: "logistics-empty",
-                                      children: "No site here",
-                                    })
-                                  : Le.rows.map((Qe, Ve) => {
-                                      var Re;
-                                      const At = Ve === 0,
-                                        lt = Ve === Le.rows.length - 1;
-                                      return d.jsxs(
-                                        "article",
-                                        {
-                                          className: "logistics-site",
+                            d.jsx("tbody", {
+                              children: routeGroups.flatMap((Le) =>
+                                (Le.rows || []).map((Qe, Ve) => {
+                                  var Re;
+                                  const At = Le.id == null ? "" : String(Le.id),
+                                    lt = `${At || "no"}-${Qe.id}-${Ve}`;
+                                  return d.jsxs(
+                                    "tr",
+                                    {
+                                      "data-logistics-route-row": "1",
+                                      "data-assignment-id": Qe.id,
+                                      children: [
+                                        d.jsx("td", {
+                                          "data-label": "Route No.",
+                                          children: d.jsx("input", {
+                                            className: "logistics-route-no-input",
+                                            type: "number",
+                                            min: "1",
+                                            step: "1",
+                                            defaultValue: Ve + 1,
+                                            disabled: saving || !r,
+                                            "data-logistics-sort-input": "1",
+                                            onChange: () => setDirty(!0),
+                                          }),
+                                        }),
+                                        d.jsxs("td", {
+                                          "data-label": "Address",
+                                          className: "logistics-route-address-cell",
                                           children: [
-                                            d.jsxs("strong", {
-                                              className: "logistics-address",
-                                              children: [
-                                                Ve + 1,
-                                                ". ",
-                                                ((Re = Qe.site) == null ? void 0 : Re.address) || "No address",
-                                              ],
-                                            }),
-                                            d.jsxs("span", {
-                                              className: "logistics-workers",
-                                              children: [
-                                                J(Qe),
-                                                " worker",
-                                                J(Qe) === 1 ? "" : "s",
-                                              ],
-                                            }),
-                                            r &&
-                                              d.jsxs("label", {
-                                                className: "logistics-move-select",
-                                                children: [
-                                                  "Move to lorry",
-                                                  d.jsxs("select", {
-                                                    value: Le.id == null ? "" : String(Le.id),
-                                                    disabled: saving,
-                                                    onPointerDown: (In) => In.stopPropagation(),
-                                                    onClick: (In) => In.stopPropagation(),
-                                                    onChange: (In) => G(Qe.id, Le.id, In.target.value),
-                                                    children: [
-                                                      d.jsx("option", { value: "", children: "No lorry" }),
-                                                      (c.lorries || []).map((In) =>
-                                                        d.jsx("option", { value: In.id, children: kgLorryCopy(In) }, In.id),
-                                                      ),
-                                                    ],
-                                                  }),
-                                                ],
-                                              }),
-                                            r &&
-                                              d.jsxs("div", {
-                                                className: "logistics-order-buttons",
-                                                children: [
-                                                  d.jsx("button", {
-                                                    type: "button",
-                                                    disabled: saving || At,
-                                                    onPointerDown: (In) => In.stopPropagation(),
-                                                    onClick: (In) => {
-                                                      In.stopPropagation();
-                                                      de(Qe.id, Le.id, -1);
-                                                    },
-                                                    children: "↑ Up",
-                                                  }),
-                                                  d.jsx("button", {
-                                                    type: "button",
-                                                    disabled: saving || lt,
-                                                    onPointerDown: (In) => In.stopPropagation(),
-                                                    onClick: (In) => {
-                                                      In.stopPropagation();
-                                                      de(Qe.id, Le.id, 1);
-                                                    },
-                                                    children: "↓ Down",
-                                                  }),
-                                                ],
-                                              }),
+                                            d.jsx("strong", { children: ((Re = Qe.site) == null ? void 0 : Re.address) || "No address" }),
+                                            d.jsx("span", { className: "muted", children: Le.title }),
                                           ],
-                                        },
-                                        `${draftRev}-${Le.id == null ? "no" : Le.id}-${Qe.id}-${Ve}`,
-                                      );
-                                    }),
+                                        }),
+                                        d.jsx("td", { "data-label": "Workers", children: J(Qe) }),
+                                        d.jsx("td", {
+                                          "data-label": "Choose lorry",
+                                          children: d.jsxs("select", {
+                                            className: "logistics-route-lorry-select",
+                                            defaultValue: At,
+                                            disabled: saving || !r,
+                                            "data-logistics-lorry-select": "1",
+                                            onChange: () => setDirty(!0),
+                                            children: [
+                                              d.jsx("option", { value: "", children: "No lorry" }),
+                                              (c.lorries || []).map((qn) =>
+                                                d.jsx("option", { value: String(qn.id), children: kgLorryCopy(qn) }, qn.id),
+                                              ),
+                                            ],
+                                          }),
+                                        }),
+                                      ],
+                                    },
+                                    lt,
+                                  );
+                                }),
+                              ),
                             }),
                           ],
-                        },
-                        Le.id == null ? "no-lorry" : Le.id,
-                      ),
-                    ),
-                  }),
-          ],
+                        }),
+                      }),
+                    ],
+                  })          ],
         });
       }
 
@@ -42414,6 +42394,36 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         .site-history-sticky { position: relative; max-height: 360px; }
       }
 
+
+      .logistics-simple-editor {
+        display: grid;
+        gap: 12px;
+      }
+      .logistics-v5-help {
+        border-left: 5px solid #0f766e;
+      }
+      .logistics-route-table select,
+      .logistics-route-table input {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid #99f6e4;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #0f172a;
+        font-weight: 900;
+        padding: 6px 8px;
+      }
+      .logistics-route-no-input {
+        max-width: 90px;
+        text-align: center;
+      }
+      .logistics-route-address-cell {
+        min-width: 280px;
+      }
+      .logistics-route-address-cell strong,
+      .logistics-route-address-cell span {
+        display: block;
+      }
       .logistics-page {
         --logistics-card-gap: 8px;
       }
