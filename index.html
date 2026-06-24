@@ -34379,8 +34379,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   rows: V.map((Pe) => ({
                     ID: Pe.id,
                     Address: Pe.address,
-                    "Boss site": Pe.is_boss_site ? "Yes" : "No",
-                    "Project site": Pe.is_project_site ? "Yes" : "No",
+                    "Site type": kgSiteTypeText(Pe),
                     Status: Pe.status,
                     Notes: Pe.notes || "",
                     Created: Pe.created_at,
@@ -35589,15 +35588,18 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         String((t == null ? void 0 : t.foreman_type) || "project").toLowerCase() === "boss"
           ? "boss"
           : "project";
-      const kgIsBossSite = (t) => !t || t.is_boss_site !== !1;
-      const kgIsProjectSite = (t) => !t || t.is_project_site !== !1;
+      const kgSiteTypeValue = (t) =>
+        (t == null ? void 0 : t.is_project_site) === !0 &&
+        (t == null ? void 0 : t.is_boss_site) !== !0
+          ? "project"
+          : "boss";
+      const kgIsBossSite = (t) => kgSiteTypeValue(t) === "boss";
+      const kgIsProjectSite = (t) => kgSiteTypeValue(t) === "project";
       const kgSiteTypeMatches = (t, r) =>
         !!((r == null ? void 0 : r.boss) && kgIsBossSite(t)) ||
         !!((r == null ? void 0 : r.project) && kgIsProjectSite(t));
-      const kgSiteTypeText = (t) => {
-        const r = kgIsBossSite(t), n = kgIsProjectSite(t);
-        return r && n ? "Boss + Project" : r ? "Boss site" : n ? "Project site" : "No Boss/Project";
-      };
+      const kgSiteTypeText = (t) =>
+        kgSiteTypeValue(t) === "project" ? "Project site" : "Boss site";
       const kgJoinNames = (t) =>
         (t || []).map((r) => kgNameNick(r)).filter(Boolean).join(" + ");
       const kgWorkerNames = (t) =>
@@ -36754,7 +36756,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             }),
                                             d.jsxs("span", { children: ["Status: ", V.job_status || "CONTINUE JOB"] }),
                                             d.jsxs("span", { children: ["P.I.C.: ", V.pic || ((V.site || {}).pic) || "-"] }),
-                                            d.jsxs("span", { children: ["ID Firm: ", ((V.site || {}).foreman_in_charge) || "-"] }),
+                                            d.jsxs("span", { children: ["Foreman in charge: ", ((V.site || {}).foreman_in_charge) || "-"] }),
                                             d.jsxs("span", {
                                               children: [
                                                 d.jsx(ei, { size: 15 }),
@@ -36940,7 +36942,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         className: "site-history-box site-history-sticky",
                         children: [
                           d.jsx("strong", { children: "Site detail" }),
-                          d.jsxs("div", { className: "site-history-line", children: ["ID Firm: ", kgSelectedSite.foreman_in_charge || "-"] }),
+                          d.jsxs("div", { className: "site-history-line", children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSiteForemanText(kgSelectedSite)] }),
                           d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
                           d.jsx("strong", { children: "Previous manpower / foreman went before" }),
@@ -38678,7 +38680,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 ? { foreman_type: J.foreman_type || "project" }
                 : {}),
               ...(r.table === "sites"
-                ? { is_boss_site: J.is_boss_site !== !1, is_project_site: J.is_project_site !== !1 }
+                ? {
+                    site_type: kgSiteTypeValue(J),
+                    is_boss_site: kgSiteTypeValue(J) === "boss",
+                    is_project_site: kgSiteTypeValue(J) === "project",
+                  }
                 : {}),
             }));
         }
@@ -38693,6 +38699,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 ? (j[de.name] = oe === "" || oe == null ? 0 : Number(oe))
                 : (j[de.name] =
                     oe === "" ? (de.name === "size" ? "" : null) : oe);
+          }
+          if (r.table === "sites") {
+            const de = p.site_type === "project" ? "project" : "boss";
+            j.is_boss_site = de === "boss";
+            j.is_project_site = de === "project";
+            delete j.site_type;
           }
           j.status = p.status || "active";
           const fe =
@@ -38745,7 +38757,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             ? kgForemanType(J) === "boss"
               ? "Boss foreman"
               : "Project foreman"
-            : j.format === "boolean"
+            : j.key === "site_type"
+              ? kgSiteTypeText(J)
+              : j.format === "boolean"
               ? J[j.key] ? "Yes" : "No"
               : j.format === "money"
                 ? rr(J[j.key])
@@ -39612,23 +39626,30 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             "Maintain addresses and whether each site is active, paused or closed.",
           columns: [
             { key: "address", label: "Address" },
-            { key: "is_boss_site", label: "Boss site", format: "boolean" },
-            { key: "is_project_site", label: "Project site", format: "boolean" },
-            { key: "foreman_in_charge", label: "ID Firm" },
+            { key: "site_type", label: "Site type" },
+            { key: "foreman_in_charge", label: "Foreman in charge" },
             { key: "foreman_detail", label: "ID Firm detail" },
             { key: "pic", label: "P.I.C." },
             { key: "notes", label: "Notes" },
           ],
           fields: [
             { name: "address", label: "Address", required: !0, wide: !0 },
-            { name: "is_boss_site", label: "Boss site", type: "checkbox" },
-            { name: "is_project_site", label: "Project site", type: "checkbox" },
-            { name: "foreman_in_charge", label: "ID Firm" },
+            {
+              name: "site_type",
+              label: "Site type",
+              type: "select",
+              required: !0,
+              options: [
+                ["boss", "Boss site"],
+                ["project", "Project site"],
+              ],
+            },
+            { name: "foreman_in_charge", label: "Foreman in charge" },
             { name: "foreman_detail", label: "ID Firm detail", type: "textarea", wide: !0 },
             { name: "pic", label: "P.I.C." },
             { name: "notes", label: "Notes", type: "textarea", wide: !0 },
           ],
-          defaults: { is_boss_site: !0, is_project_site: !0 },
+          defaults: { site_type: "boss", is_boss_site: !0, is_project_site: !1 },
         },
         workers: {
           title: "Workers",
