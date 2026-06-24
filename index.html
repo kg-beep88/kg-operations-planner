@@ -35535,6 +35535,17 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const Ca = (t, r = "-") => String(t || "").trim() || r;
       const kgNameNick = (t) =>
         Ca((t == null ? void 0 : t.nickname) || (t == null ? void 0 : t.name));
+      const kgRemoveCopySl = (t) =>
+        String(t || "")
+          .replace(/\s*[\(\[（]\s*S\s*\.?\s*\/?\s*L\s*\.?\s*[\)\]）]/gi, "")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+      const kgCopyPersonName = (t) => kgRemoveCopySl(kgNameNick(t));
+      const kgCleanCopyText = (t) =>
+        String(t || "")
+          .split("\n")
+          .map((r) => kgRemoveCopySl(r))
+          .join("\n");
       const kgForemanType = (t) =>
         String((t == null ? void 0 : t.foreman_type) || "project").toLowerCase() === "boss"
           ? "boss"
@@ -35773,7 +35784,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
-          const v = (m.assignment_workers || []).map((p) => kgNameNick(p.worker)).filter(Boolean),
+          const v = (m.assignment_workers || []).map((p) => kgCopyPersonName(p.worker)).filter(Boolean),
             x = kgAssignmentLorries(m);
           if (!v.length && !x.length) continue;
           const p = x.length ? x : [null];
@@ -35797,25 +35808,25 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             }),
           f = (n || []).map(kgFormatExtraCopy1).filter(Boolean),
           c = [...s, ...f].filter(Boolean);
-        return [`*${kgCopyDateTitle(t)} - Job*`, c.join(`
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Job*`, c.join(`
 
 
 `)].filter(Boolean).join(`
 
-`);
+`));
       }
       function xC(t, r) {
         const n = kgSortAssignmentsByLorry(r)
           .filter((l) => ar(l).length > 0)
           .map((l) => {
             var f;
-            const s = ar(l).map((c) => kgNameNick(c)).filter(Boolean).join(" + "),
+            const s = ar(l).map((c) => kgCopyPersonName(c)).filter(Boolean).join(" + "),
               c = (l.assignment_workers || []).length,
               m = `${c} worker${c === 1 ? "" : "s"}`;
             return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s} (${m})`;
           });
-        return [`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
-`);
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
+`));
       }
       async function vC(t) {
         let r = !1;
