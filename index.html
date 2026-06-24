@@ -36282,7 +36282,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await oe();
         }
         async function ee(V, xe = !1) {
-          const ke = V === 1 ? mC(n, s, c, p.lorries) : xC(n, s);
+          const ke = V === 1 ? mC(n, kgVisibleAssignments, c, p.lorries) : xC(n, kgVisibleAssignments);
           (await vC(ke), He(`Copy ${V} ready. Edit box first if needed.`));
         }
         return d.jsxs("div", {
@@ -36629,7 +36629,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1: lorry @ driver, address and workers. Copy 2: only sites with foremen. Edit the copy box before copying if needed.",
+                        "Copy 1 and Copy 2 follow the Boss/Project tick filter above. Edit the copy box, then Copy again will copy your edited text.",
                     }),
                   ],
                 }),
