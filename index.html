@@ -37107,11 +37107,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "check-grid",
                               children: p.foremen
                                 .filter((V) => kgForemanType(V) === "boss")
-                                .map((V) =>
-                                  d.jsxs(
+                                .map((V) => {
+                                  const xe = s.filter((ke) => ke.id !== S && ar(ke).some((Le) => Number(Le.id) === Number(V.id)));
+                                  return d.jsxs(
                                     "label",
                                     {
-                                      className: "check-card",
+                                      className: `check-card ${xe.length ? "duplicate-worker" : ""}`,
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -37120,12 +37121,28 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           ),
                                           onChange: () => z(V.id),
                                         }),
-                                        d.jsx("span", { children: kgNameNick(V) }),
+                                        d.jsxs("span", {
+                                          children: [
+                                            kgNameNick(V),
+                                            xe.length > 0 &&
+                                              d.jsxs("small", {
+                                                children: [
+                                                  "Already: ",
+                                                  xe
+                                                    .map((ke) => {
+                                                      var Le;
+                                                      return (Le = ke.site) == null ? void 0 : Le.address;
+                                                    })
+                                                    .join(", "),
+                                                ],
+                                              }),
+                                          ],
+                                        }),
                                       ],
                                     },
                                     V.id,
-                                  ),
-                                ),
+                                  );
+                                }),
                             }),
                           ],
                         }),
@@ -37141,11 +37158,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               className: "check-grid",
                               children: p.foremen
                                 .filter((V) => kgForemanType(V) === "project")
-                                .map((V) =>
-                                  d.jsxs(
+                                .map((V) => {
+                                  const xe = s.filter((ke) => ke.id !== S && ar(ke).some((Le) => Number(Le.id) === Number(V.id)));
+                                  return d.jsxs(
                                     "label",
                                     {
-                                      className: "check-card",
+                                      className: `check-card ${xe.length ? "duplicate-worker" : ""}`,
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -37154,12 +37172,28 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           ),
                                           onChange: () => z(V.id),
                                         }),
-                                        d.jsx("span", { children: kgNameNick(V) }),
+                                        d.jsxs("span", {
+                                          children: [
+                                            kgNameNick(V),
+                                            xe.length > 0 &&
+                                              d.jsxs("small", {
+                                                children: [
+                                                  "Already: ",
+                                                  xe
+                                                    .map((ke) => {
+                                                      var Le;
+                                                      return (Le = ke.site) == null ? void 0 : Le.address;
+                                                    })
+                                                    .join(", "),
+                                                ],
+                                              }),
+                                          ],
+                                        }),
                                       ],
                                     },
                                     V.id,
-                                  ),
-                                ),
+                                  );
+                                }),
                             }),
                           ],
                         }),
