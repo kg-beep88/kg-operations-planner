@@ -36387,6 +36387,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             return { ...ke, lorry_ids: Qe, lorry_id: Qe.length ? String(Qe[0]) : "" };
           });
         }
+        function kgUseHistoryAssignment(V) {
+          const xe = new Set(p.foremen.map((At) => Number(At.id))),
+            ke = new Set(p.workers.map((At) => Number(At.id))),
+            Le = Array.from(new Set(ar(V).map((At) => Number(At && At.id)).filter((At) => At && xe.has(At)))),
+            Qe = Array.from(new Set((V.assignment_workers || []).map((At) => Number(At.worker_id || (At.worker && At.worker.id))).filter((At) => At && ke.has(At))));
+          (_((At) => ({ ...At, foreman_ids: Le, worker_ids: Qe })),
+            He(`Used ${kgHistoryDate(V.plan_date)} team: ${Le.length} foreman, ${Qe.length} worker${Qe.length === 1 ? "" : "s"}.`));
+        }
         function U() {
           const V = [];
           for (const xe of w.worker_ids) {
@@ -37172,7 +37180,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSiteForemanText(kgSelectedSite)] }),
                           d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
                           d.jsx("strong", { children: "Previous manpower / foreman went before" }),
-                          d.jsx("small", { className: "site-history-note", children: "Latest 10 past records for this site" }),
+                          d.jsx("small", { className: "site-history-note", children: "Latest 10 past records for this site. Click one record to select the same foreman and workers for today." }),
                           kgSiteHistoryLoading
                             ? d.jsx("div", { className: "site-history-empty", children: "Loading site history…" })
                             : kgSiteHistory.length === 0
@@ -37183,11 +37191,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     d.jsxs(
                                       "div",
                                       {
-                                        className: "site-history-item",
+                                        className: "site-history-item site-history-clickable",
+                                        title: "Click to use same foreman and workers",
+                                        role: "button",
+                                        tabIndex: 0,
+                                        onClick: () => kgUseHistoryAssignment(V),
+                                        onKeyDown: (xe) => {
+                                          if (xe.key === "Enter" || xe.key === " ") {
+                                            xe.preventDefault();
+                                            kgUseHistoryAssignment(V);
+                                          }
+                                        },
                                         children: [
                                           d.jsx("b", { children: kgHistoryDate(V.plan_date) }),
                                           d.jsxs("span", { children: ["Foreman: ", kgForemanNames(V) || "-"] }),
                                           d.jsxs("span", { children: ["Worker: ", kgWorkerNames(V) || "-"] }),
+                                          d.jsx("small", { className: "site-history-use", children: "Click to use this team" }),
                                           d.jsxs("span", { children: ["P.I.C.: ", V.pic || kgSitePicText(V.site)] }),
                                         ],
                                       },
@@ -42626,6 +42645,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
       .site-history-item b { color: #0f766e; }
       .site-history-item span { font-size: 13px; font-weight: 750; }
+      .site-history-clickable { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+      .site-history-clickable:hover { border-color: #14b8a6; box-shadow: 0 8px 22px rgba(15, 118, 110, .16); transform: translateY(-1px); }
+      .site-history-clickable:focus { outline: 3px solid rgba(20, 184, 166, .32); outline-offset: 2px; }
+      .site-history-use { color: #0f766e; font-weight: 900; }
       .modal:has(.site-history-sticky) { width: min(1180px, 100%); }
       .site-history-layout { grid-template-columns: minmax(360px, 1fr) minmax(360px, 0.8fr); align-items: start; }
       .site-history-layout > label.wide:first-child { grid-column: 1; }
