@@ -37499,7 +37499,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [S, E] = q.useState(""),
           [routeGroups, setRouteGroups] = q.useState([]),
           [dirty, setDirty] = q.useState(!1),
-          [saving, setSaving] = q.useState(!1);
+          [saving, setSaving] = q.useState(!1),
+          [draftRev, setDraftRev] = q.useState(0);
         function I(Le) {
           (l(Le), window.sessionStorage.setItem("kg_selected_date", Le));
         }
@@ -37657,8 +37658,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         function applyScreenGroups(Le) {
           const Qe = resequenceGroups(Le);
           setRouteGroups(Qe);
-          f((Ve) => syncAssignmentsFromScreen(Ve, Qe));
-          (setDirty(!0), W("Screen changed. Press Save Update to sync Planner and Copy 1."));
+          setDraftRev((Ve) => Ve + 1);
+          setDirty(!0);
+          W("Screen changed. Press Save Update to sync Planner and Copy 1.");
         }
         function G(Le, Qe, Ve) {
           if (!r || saving) return;
@@ -37785,6 +37787,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   children: [
                     d.jsx("p", { className: "eyebrow", children: "Daily lorry planning" }),
                     d.jsx("h1", { children: "Logistics" }),
+                    d.jsx("p", { className: "muted", children: "Logistics screen edit v4 — changes should show immediately before save." }),
                     d.jsx("p", {
                       children:
                         "Arrange the lorry route on screen first. Press Save Update once when correct, then Planner and Copy 1 will follow.",
@@ -37930,6 +37933,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                   d.jsxs("select", {
                                                     value: Le.id == null ? "" : String(Le.id),
                                                     disabled: saving,
+                                                    onPointerDown: (In) => In.stopPropagation(),
+                                                    onClick: (In) => In.stopPropagation(),
                                                     onChange: (In) => G(Qe.id, Le.id, In.target.value),
                                                     children: [
                                                       d.jsx("option", { value: "", children: "No lorry" }),
@@ -37947,20 +37952,28 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                   d.jsx("button", {
                                                     type: "button",
                                                     disabled: saving || At,
-                                                    onClick: () => de(Qe.id, Le.id, -1),
+                                                    onPointerDown: (In) => In.stopPropagation(),
+                                                    onClick: (In) => {
+                                                      In.stopPropagation();
+                                                      de(Qe.id, Le.id, -1);
+                                                    },
                                                     children: "↑ Up",
                                                   }),
                                                   d.jsx("button", {
                                                     type: "button",
                                                     disabled: saving || lt,
-                                                    onClick: () => de(Qe.id, Le.id, 1),
+                                                    onPointerDown: (In) => In.stopPropagation(),
+                                                    onClick: (In) => {
+                                                      In.stopPropagation();
+                                                      de(Qe.id, Le.id, 1);
+                                                    },
                                                     children: "↓ Down",
                                                   }),
                                                 ],
                                               }),
                                           ],
                                         },
-                                        `${Le.id == null ? "no" : Le.id}-${Qe.id}-${Ve}`,
+                                        `${draftRev}-${Le.id == null ? "no" : Le.id}-${Qe.id}-${Ve}`,
                                       );
                                     }),
                             }),
