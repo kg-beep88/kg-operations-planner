@@ -33869,30 +33869,64 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function Tv(t, r) {
         const n = _0.book_new();
         for (const l of r) {
-          const s = uC(l.rows || []),
+          let f;
+          if (l.aoa) {
+            const s = l.aoa || [];
+            f = s.length
+              ? _0.aoa_to_sheet(s)
+              : _0.aoa_to_sheet([[l.emptyMessage || "No records"]]);
+            if (s.length) {
+              f["!cols"] = l.cols || [
+                { wch: 18 },
+                { wch: 45 },
+                { wch: 30 },
+                { wch: 12 },
+                { wch: 16 },
+                { wch: 14 },
+                { wch: 70 },
+              ];
+              const c = f["!ref"], m = c ? _0.decode_range(c) : null;
+              if (m && l.dateSeparatorRows && l.dateSeparatorRows.length) {
+                f["!rows"] = f["!rows"] || [];
+                for (const v of l.dateSeparatorRows) {
+                  f["!rows"][v] = { hpt: 8 };
+                  for (let x = m.s.c; x <= m.e.c; x++) {
+                    const p = _0.encode_cell({ r: v, c: x });
+                    f[p] = f[p] || { t: "s", v: "████████" };
+                    f[p].s = {
+                      fill: { patternType: "solid", fgColor: { rgb: "000000" }, bgColor: { rgb: "000000" } },
+                      font: { color: { rgb: "000000" } },
+                    };
+                  }
+                }
+              }
+            }
+          } else {
+            const s = uC(l.rows || []);
             f = s.length
               ? _0.json_to_sheet(s)
               : _0.aoa_to_sheet([[l.emptyMessage || "No records"]]);
-          if (s.length) {
-            f["!cols"] = fC(s);
-            const c = f["!ref"];
-            c && (f["!autofilter"] = { ref: c });
-            const m = l.rows || [], v = c ? _0.decode_range(c) : null;
-            if (v && m.some((x) => x && x.__kgDateSeparator)) {
-              f["!rows"] = f["!rows"] || [];
-              m.forEach((x, p) => {
-                if (!x || !x.__kgDateSeparator) return;
-                const g = p + 1;
-                f["!rows"][g] = { hpt: 8 };
-                for (let S = v.s.c; S <= v.e.c; S++) {
-                  const E = _0.encode_cell({ r: g, c: S });
-                  f[E] = f[E] || { t: "s", v: "" };
-                  f[E].s = {
-                    fill: { patternType: "solid", fgColor: { rgb: "000000" }, bgColor: { rgb: "000000" } },
-                    font: { color: { rgb: "000000" } },
-                  };
-                }
-              });
+            if (s.length) {
+              f["!cols"] = fC(s);
+              const c = f["!ref"];
+              c && (f["!autofilter"] = { ref: c });
+              const m = l.rows || [], v = c ? _0.decode_range(c) : null;
+              if (v && m.some((x) => x && x.__kgDateSeparator)) {
+                f["!rows"] = f["!rows"] || [];
+                m.forEach((x, p) => {
+                  if (!x || !x.__kgDateSeparator) return;
+                  const g = p + 1;
+                  f["!rows"][g] = { hpt: 8 };
+                  for (let S = v.s.c; S <= v.e.c; S++) {
+                    const E = _0.encode_cell({ r: g, c: S });
+                    f[E] = f[E] || { t: "s", v: "" };
+                    f[E].s = {
+                      fill: { patternType: "solid", fgColor: { rgb: "000000" }, bgColor: { rgb: "000000" } },
+                      font: { color: { rgb: "000000" } },
+                    };
+                  }
+                });
+              }
             }
           }
           _0.book_append_sheet(n, f, cC(l.name));
@@ -34255,12 +34289,26 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .order("id");
               if (ee) throw new Error(ee.message);
               B.push({
-                name: "Daily Export",
-                rows: kgDailyExcelRows(oe, ue || []),
+                name: "Planner Export",
+                ...kgDailyExcelSheet(oe, ue || []),
               });
               me = `KG-Daily-Export-${s}.xlsx`;
             }
-            else if (n === "month")
+            else if (n === "month") {
+              const kgRange = lh(c),
+                { data: kgExtraSections, error: kgExtraError } = await qe
+                  .from("plan_sections")
+                  .select("*")
+                  .gte("plan_date", kgRange.start)
+                  .lt("plan_date", kgRange.endExclusive)
+                  .order("plan_date")
+                  .order("sort_order")
+                  .order("id");
+              if (kgExtraError) throw new Error(kgExtraError.message);
+              B.push({
+                name: "Planner Export",
+                ...kgDailyExcelSheet(oe, kgExtraSections || []),
+              });
               (B.push({
                 name: "Monthly Site Summary",
                 rows: P.map((ue) => {
@@ -34287,8 +34335,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 }),
               }),
                 (me = `KG-Month-Summary-${c}.xlsx`));
-            else {
+            } else {
               const ue = S.find((ee) => Number(ee.id) === de);
+              B.push({
+                name: "Planner Export",
+                ...kgDailyExcelSheet(oe, []),
+              });
               (B.push({
                 name: "Site Monthly Summary",
                 rows: N.map((ee) => {
@@ -34310,8 +34362,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               }),
                 (me = `KG-Site-Summary-${c}.xlsx`));
             }
-            (B.push({ name: "Assignments", rows: kgDailyExcelRows(oe, []) }),
-              B.push({ name: "Delivery Orders", rows: Av(ge) }),
+            (B.push({ name: "Delivery Orders", rows: Av(ge) }),
               B.push({ name: "Delivery Items", rows: Cv(ge) }),
               Tv(me, B));
           } catch (B) {
@@ -35827,8 +35878,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             Workers: s.join(" + "),
             Foreman: "",
             Date: kgExcelDate(l.plan_date),
-            "Job status": "EXTRA",
-            "P.I.C.": "",
+            "Job status": l.job_status || "",
+            "P.I.C.": l.pic || "",
             Address: Ca(l.title, ""),
           });
         }
@@ -35845,6 +35896,45 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         });
         return f;
       };
+      function kgDailyExcelSheet(t, r = []) {
+        const n = [], l = [];
+        for (const s of kgDailyExcelRows(t, r)) {
+          if (s && s.__kgDateSeparator) {
+            l.push(n.length);
+            n.push([
+              "████████████████",
+              "████████████████",
+              "████████████████",
+              "████████████████",
+              "████████████████",
+              "████████████████",
+              "████████████████",
+            ]);
+          } else
+            n.push([
+              s.Lorry || "",
+              s.Workers || "",
+              s.Foreman || "",
+              s.Date || "",
+              s["Job status"] || "",
+              s["P.I.C."] || "",
+              s.Address || "",
+            ]);
+        }
+        return {
+          aoa: n,
+          dateSeparatorRows: l,
+          cols: [
+            { wch: 18 },
+            { wch: 45 },
+            { wch: 30 },
+            { wch: 12 },
+            { wch: 16 },
+            { wch: 14 },
+            { wch: 70 },
+          ],
+        };
+      }
       const kgSortNick = (t) =>
         [...(t || [])].sort((r, n) =>
           kgNameNick(r).localeCompare(kgNameNick(n), void 0, {
