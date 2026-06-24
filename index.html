@@ -33889,16 +33889,20 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               if (m && l.dateSeparatorRows && l.dateSeparatorRows.length) {
                 f["!rows"] = f["!rows"] || [];
                 for (const v of l.dateSeparatorRows) {
-                  f["!rows"][v] = { hpt: 8 };
+                  f["!rows"][v] = { hpt: 14 };
                   for (let x = m.s.c; x <= m.e.c; x++) {
                     const p = _0.encode_cell({ r: v, c: x });
-                    f[p] = f[p] || { t: "s", v: "████████" };
+                    f[p] = f[p] || { t: "s", v: "████████████████████████████████" };
                     f[p].s = {
                       fill: { patternType: "solid", fgColor: { rgb: "000000" }, bgColor: { rgb: "000000" } },
                       font: { color: { rgb: "000000" } },
                     };
                   }
                 }
+              }
+              if (m && l.lorrySpaceRows && l.lorrySpaceRows.length) {
+                f["!rows"] = f["!rows"] || [];
+                for (const v of l.lorrySpaceRows) f["!rows"][v] = { hpt: 18 };
               }
             }
           } else {
@@ -35844,7 +35848,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return t ? cp(t).replaceAll(".", "/") : "";
       }
       function kgBlackSeparatorRow() {
-        const t = "████████████████";
+        const t = "████████████████████████████████████████";
         return {
           Lorry: t,
           Workers: t,
@@ -35856,74 +35860,108 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           __kgDateSeparator: !0,
         };
       }
+      function kgBlankLorrySpaceRow() {
+        return {
+          Lorry: "",
+          Workers: "",
+          Foreman: "",
+          Date: "",
+          "Job status": "",
+          "P.I.C.": "",
+          Address: "",
+          __kgLorrySpace: !0,
+        };
+      }
+      function kgExcelLorryGroupKey(t) {
+        const r = String((t && t.Lorry) || "").trim();
+        return r || "__NO_LORRY__";
+      }
       const kgDailyExcelRows = (t, r = []) => {
         const n = [];
         for (const l of kgSortAssignmentsForExcel(t || [])) {
           var s;
+          const f = kgLorryExcelList(l),
+            c = kgExcelDate(l.plan_date);
           n.push({
-            Lorry: kgLorryExcelList(l),
+            Lorry: f,
             Workers: kgWorkerNames(l),
             Foreman: kgForemanNames(l),
-            Date: kgExcelDate(l.plan_date),
+            Date: c,
             "Job status": l.job_status || l.jobStatus || "",
             "P.I.C.": l.pic || l.pic_name || l.picName || "",
             Address: Ca((s = l.site) == null ? void 0 : s.address, ""),
+            __kgDateKey: c,
+            __kgLorryGroup: f || "__NO_LORRY__",
           });
         }
         for (const l of r || []) {
           const s = String(l.body || "").split(`
-`).map(kgCleanExtraLine).filter(Boolean);
+`).map(kgCleanExtraLine).filter(Boolean),
+            f = kgExcelDate(l.plan_date);
           n.push({
             Lorry: "",
             Workers: s.join(" + "),
             Foreman: "",
-            Date: kgExcelDate(l.plan_date),
+            Date: f,
             "Job status": l.job_status || "",
             "P.I.C.": l.pic || "",
             Address: Ca(l.title, ""),
+            __kgDateKey: f,
+            __kgLorryGroup: "__NO_LORRY__",
           });
         }
         const f = [], c = new Map();
         for (const l of n) {
-          const s = l.Date || "";
+          const s = l.__kgDateKey || l.Date || "";
           c.has(s) || c.set(s, []);
           c.get(s).push(l);
         }
         const m = [...c.keys()].sort((l, s) => l.localeCompare(s));
         m.forEach((l, s) => {
-          f.push(...c.get(l));
+          const v = c.get(l) || [];
+          let x = null;
+          v.forEach((p, g) => {
+            const S = p.__kgLorryGroup || kgExcelLorryGroupKey(p);
+            g > 0 && S !== x && f.push(kgBlankLorrySpaceRow());
+            f.push(p);
+            x = S;
+          });
           s < m.length - 1 && f.push(kgBlackSeparatorRow());
         });
         return f;
       };
       function kgDailyExcelSheet(t, r = []) {
-        const n = [], l = [];
-        for (const s of kgDailyExcelRows(t, r)) {
-          if (s && s.__kgDateSeparator) {
+        const n = [], l = [], s = [];
+        for (const f of kgDailyExcelRows(t, r)) {
+          if (f && f.__kgDateSeparator) {
             l.push(n.length);
             n.push([
-              "████████████████",
-              "████████████████",
-              "████████████████",
-              "████████████████",
-              "████████████████",
-              "████████████████",
-              "████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
             ]);
+          } else if (f && f.__kgLorrySpace) {
+            s.push(n.length);
+            n.push(["", "", "", "", "", "", ""]);
           } else
             n.push([
-              s.Lorry || "",
-              s.Workers || "",
-              s.Foreman || "",
-              s.Date || "",
-              s["Job status"] || "",
-              s["P.I.C."] || "",
-              s.Address || "",
+              f.Lorry || "",
+              f.Workers || "",
+              f.Foreman || "",
+              f.Date || "",
+              f["Job status"] || "",
+              f["P.I.C."] || "",
+              f.Address || "",
             ]);
         }
         return {
           aoa: n,
           dateSeparatorRows: l,
+          lorrySpaceRows: s,
           cols: [
             { wch: 18 },
             { wch: 45 },
