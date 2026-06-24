@@ -35733,6 +35733,42 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           });
         });
       }
+      function kgCopyExtraTitle(t) {
+        return String(t || "").replace(/^[-*•]\s*/, "").replace(/^\*+|\*+$/g, "").trim();
+      }
+      function kgSplitLorryDriverText(t) {
+        const r = String(t || "").replace(/\s+/g, " ").trim();
+        if (!r) return [];
+        const n = [], l = /(\S+)\s*@\s*([^@]+?)(?=\s+\S+\s*@|$)/g;
+        let s;
+        while ((s = l.exec(r))) {
+          const f = `${s[1]} @${String(s[2] || "").trim()}`.trim();
+          f && n.push(f);
+        }
+        return n.length ? n : [r];
+      }
+      function kgFormatExtraCopy1(t) {
+        const r = kgCopyExtraTitle(t == null ? void 0 : t.title),
+          n = String((t == null ? void 0 : t.body) || "").split(`
+`).map(kgCleanExtraLine).filter(Boolean),
+          l = r.toUpperCase();
+        if (!r && !n.length) return "";
+        if (l === "HOUGANG") {
+          const s = n.flatMap(kgSplitLorryDriverText).filter(Boolean);
+          return (s.length ? s : [""]).map((f) => `*HOUGANG${f ? ` ${f}` : ""}*`).join(`
+
+
+`);
+        }
+        if (l === "KG WAREHOUSE") {
+          const s = n.join(" + ");
+          return s ? `*${r}* ${s}` : `*${r}*`;
+        }
+        if (l === "OFF") return n.length ? `*OFF - ${n.join(" + ")}*` : `*${r}*`;
+        if (l.startsWith("OFF -")) return `*${r}*`;
+        if (!n.length) return `*${r}*`;
+        return `*${r}* ${n.join(" + ")}`;
+      }
       function mC(t, r, n = []) {
         const l = new Map();
         for (const m of kgSortAssignmentsByLorry(r)) {
@@ -35753,18 +35789,17 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   var E;
                   const w = g.shift && g.shift !== "day" ? ` (${g.shift})` : "",
                     _ = Ca((E = g.site) == null ? void 0 : E.address);
-                  return S.length ? `* ${_}${w} - ${S.join(" + ")}` : `* ${_}${w}`;
+                  return S.length ? `- ${_}${w} - ${S.join(" + ")}` : `- ${_}${w}`;
                 });
               return [x, ...p].join(`
 `);
             }),
-          f = n.map((m) => {
-            const v = String(m.body || "").split(`
-`).map((x) => x.trim()).filter(Boolean);
-            return [m.title, ...v.map((x) => (x.startsWith("*") || x.startsWith("-") ? x : `* ${x}`))].filter(Boolean).join(`
-`);
-          });
-        return [`*${kgCopyDateTitle(t)} - Job*`, ...s, ...f].filter(Boolean).join(`
+          f = (n || []).map(kgFormatExtraCopy1).filter(Boolean),
+          c = [...s, ...f].filter(Boolean);
+        return [`*${kgCopyDateTitle(t)} - Job*`, c.join(`
+
+
+`)].filter(Boolean).join(`
 
 `);
       }
