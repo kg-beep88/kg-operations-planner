@@ -16493,7 +16493,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
   id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed, lorry_id,
   site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,is_boss_site,is_project_site),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
-  assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type,phone)),
+  assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status))
 `,
         w0 = `
@@ -36091,43 +36091,17 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
 
 `));
       }
-      function kgBuildForemanPhoneMap(t = []) {
-        const r = new Map();
-        for (const n of t || [])
-          n && n.id != null && r.set(String(n.id), String(n.phone || "").trim());
-        return r;
-      }
-      function kgCopy2ForemanPhone(t, r) {
-        if (!t) return "";
-        const n = String((t == null ? void 0 : t.phone) || "").trim(),
-          l = r && (r.get(String(t.id)) || r.get(String(Number(t.id))));
-        return n || String(l || "").trim();
-      }
-      function kgCopy2ForemanText(t, r) {
-        const n = kgCopyPersonName(t), l = kgCopy2ForemanPhone(t, r);
-        if (!n) return "";
-        return l ? `${n} @${l}` : n;
-      }
-      function kgCopy2ShiftText(t) {
-        const r = String(t || "day").trim().toLowerCase();
-        if (!r || r === "day") return "";
-        if (r === "night") return " after 6pm";
-        if (r === "am") return " AM";
-        if (r === "pm") return " PM";
-        return ` ${String(t).trim()}`;
-      }
-      function xC(t, r, n = []) {
-        const l = kgBuildForemanPhoneMap(n),
-          s = kgSortAssignmentsByLorry(r)
-            .filter((f) => ar(f).length > 0)
-            .map((f, c) => {
-              var x;
-              const m = ar(f).map((p) => kgCopy2ForemanText(p, l)).filter(Boolean).join(" + "),
-                v = (f.assignment_workers || []).length,
-                g = `${v} worker${v === 1 ? "" : "s"}`;
-              return `${c + 1}. ${Ca((x = f.site) == null ? void 0 : x.address)} - ${m} (${g})${kgCopy2ShiftText(f.shift)}`;
-            });
-        return kgCleanCopyText([`*${kgCopyDateTitle(t)}*`, ...s].filter(Boolean).join(`
+      function xC(t, r) {
+        const n = kgSortAssignmentsByLorry(r)
+          .filter((l) => ar(l).length > 0)
+          .map((l) => {
+            var f;
+            const s = ar(l).map((c) => kgCopyPersonName(c)).filter(Boolean).join(" + "),
+              c = (l.assignment_workers || []).length,
+              m = `${c} worker${c === 1 ? "" : "s"}`;
+            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s} (${m})`;
+          });
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
 `));
       }
       async function vC(t) {
@@ -36542,7 +36516,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await oe();
         }
         async function ee(V, xe = !1) {
-          const ke = V === 1 ? mC(n, kgVisibleAssignments, c, p.lorries) : xC(n, kgVisibleAssignments, p.foremen);
+          const ke = V === 1 ? mC(n, kgVisibleAssignments, c, p.lorries) : xC(n, kgVisibleAssignments);
           (await vC(ke), He(`Copy ${V} ready. Edit box first if needed.`));
         }
         return d.jsxs("div", {
