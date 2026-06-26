@@ -36091,17 +36091,23 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
 
 `));
       }
+      function kgForemanCopy2Person(t) {
+        const r = kgCopyPersonName(t),
+          n = kgRemoveCopySl((t == null ? void 0 : t.phone) || "");
+        if (!r) return "";
+        return n ? `${r} @${n}` : r;
+      }
       function xC(t, r) {
         const n = kgSortAssignmentsByLorry(r)
           .filter((l) => ar(l).length > 0)
-          .map((l) => {
-            var f;
-            const s = ar(l).map((c) => kgCopyPersonName(c)).filter(Boolean).join(" + "),
+          .map((l, s) => {
+            var m;
+            const f = ar(l).map((v) => kgForemanCopy2Person(v)).filter(Boolean).join(" + "),
               c = (l.assignment_workers || []).length,
-              m = `${c} worker${c === 1 ? "" : "s"}`;
-            return `* ${Ca((f = l.site) == null ? void 0 : f.address)} - ${s} (${m})`;
+              x = `${c} worker${c === 1 ? "" : "s"}`;
+            return `${s + 1}. ${Ca((m = l.site) == null ? void 0 : m.address)} - ${f} (${x})`;
           });
-        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Foreman*`, ...n].filter(Boolean).join(`
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Foreman*`, "", ...n].join(`
 `));
       }
       async function vC(t) {
