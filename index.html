@@ -36345,7 +36345,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           (he(V), window.setTimeout(() => he(""), 2400));
         }
         function kgSortPlannerRowsSafe(V) {
-          return kgSortAssignmentsByLorry(V || []);
+          const xe = kgSortAssignmentsByLorry(V || []);
+          return xe.sort((ke, Le) => {
+            const Qe = ke && ke.is_confirmed ? 1 : 0,
+              Ve = Le && Le.is_confirmed ? 1 : 0;
+            return Qe - Ve;
+          });
         }
         function P(V = "") {
           const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
@@ -37263,23 +37268,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       ],
                     }),
                     d.jsxs("label", {
-                      className: "confirm-check",
-                      children: [
-                        "Site confirm",
-                        d.jsxs("span", {
-                          className: "inline-check",
-                          children: [
-                            d.jsx("input", {
-                              type: "checkbox",
-                              checked: !!w.is_confirmed,
-                              onChange: (V) => _({ ...w, is_confirmed: V.target.checked }),
-                            }),
-                            " Highlight this site as confirmed",
-                          ],
-                        }),
-                      ],
-                    }),
-                    d.jsxs("label", {
                       className: "wide",
                       children: [
                         "Lorries ",
@@ -37482,6 +37470,23 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           rows: "3",
                           value: w.notes,
                           onChange: (V) => _({ ...w, notes: V.target.value }),
+                        }),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      className: "confirm-check",
+                      children: [
+                        "Site confirm",
+                        d.jsxs("span", {
+                          className: "inline-check",
+                          children: [
+                            d.jsx("input", {
+                              type: "checkbox",
+                              checked: !!w.is_confirmed,
+                              onChange: (V) => _({ ...w, is_confirmed: V.target.checked }),
+                            }),
+                            " Highlight this site as confirmed",
+                          ],
                         }),
                       ],
                     }),
