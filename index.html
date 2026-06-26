@@ -36213,6 +36213,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [J, j] = q.useState(""),
           [fe, G] = q.useState(!0),
           [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 }),
+          [kgActiveSitePicFilter, kgSetActiveSitePicFilter] = q.useState(""),
           [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
           [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1);
         async function de() {
@@ -36298,7 +36299,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               ),
             [kgVisibleAssignments],
           ),
-          je = p.sites.filter((V) => kgSiteTypeMatches(V, kgSiteTypeFilter) && !Ye.has(Number(V.id))),
+          kgActiveSiteBase = p.sites.filter((V) => kgSiteTypeMatches(V, kgSiteTypeFilter) && !Ye.has(Number(V.id))),
+          kgActiveSitePicOptions = [...new Set(kgActiveSiteBase.map((V) => String((V == null ? void 0 : V.pic) || (V == null ? void 0 : V.site_pic) || "").trim()).filter(Boolean))].sort((V, xe) => V.localeCompare(xe, void 0, { numeric: !0, sensitivity: "base" })),
+          je = kgActiveSiteBase.filter((V) => !kgActiveSitePicFilter || String((V == null ? void 0 : V.pic) || (V == null ? void 0 : V.site_pic) || "").trim() === kgActiveSitePicFilter),
           re = p.workers.filter((V) => !ge.has(Number(V.id))),
           X = p.foremen.filter((V) => !Ne.has(Number(V.id))),
           kgProjectForemenWithoutSite = X.filter((V) => kgForemanType(V) === "project"),
@@ -36641,13 +36644,29 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
+                    d.jsxs("label", {
+                      className: "pic-filter-inline",
+                      style: { display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", marginBottom: "8px", fontSize: "12px", fontWeight: 700 },
+                      children: [
+                        "Filter P.I.C.",
+                        d.jsxs("select", {
+                          value: kgActiveSitePicFilter,
+                          onChange: (V) => kgSetActiveSitePicFilter(V.target.value),
+                          style: { flex: "1 1 auto", minWidth: 0, padding: "6px 8px", borderRadius: "10px", border: "1px solid #fed7aa" },
+                          children: [
+                            d.jsx("option", { value: "", children: "All P.I.C." }),
+                            ...kgActiveSitePicOptions.map((V) => d.jsx("option", { value: V, children: V }, V)),
+                          ],
+                        }),
+                      ],
+                    }),
                     d.jsx("div", {
                       className: "warning-list",
                       children:
                         je.length === 0
                           ? d.jsx("div", {
                               className: "warning-empty",
-                              children: "All active sites have workers.",
+                              children: kgActiveSitePicFilter ? "No active sites for this P.I.C. filter." : "All active sites have workers.",
                             })
                           : je.map((V) =>
                               d.jsxs(
