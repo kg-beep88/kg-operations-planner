@@ -36386,6 +36386,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               : [...ke.worker_ids, xe],
           }));
         }
+        function kgUsePastManpower(V) {
+          const xe = ar(V).map((ke) => Number(ke.id)).filter(Boolean),
+            ke = (V.assignment_workers || [])
+              .map((Le) => Number(Le.worker_id || (Le.worker && Le.worker.id)))
+              .filter(Boolean);
+          _((Le) => ({ ...Le, foreman_ids: xe, worker_ids: ke }));
+          He(`Copied same foreman + workers from ${kgHistoryDate(V.plan_date)}.`);
+        }
         function kgToggleLorry(V) {
           const xe = Number(V);
           _((ke) => {
@@ -37197,6 +37205,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           d.jsxs("span", { children: ["Foreman: ", kgForemanNames(V) || "-"] }),
                                           d.jsxs("span", { children: ["Worker: ", kgWorkerNames(V) || "-"] }),
                                           d.jsxs("span", { children: ["P.I.C.: ", V.pic || kgSitePicText(V.site)] }),
+                                          d.jsx("button", {
+                                            type: "button",
+                                            className: "secondary-button small-button",
+                                            onClick: () => kgUsePastManpower(V),
+                                            children: "Copy same foreman + workers",
+                                          }),
                                         ],
                                       },
                                       V.id,
