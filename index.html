@@ -16494,7 +16494,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
   site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,is_boss_site,is_project_site),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
-  assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status))
+  assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status,worker_type))
 `,
         w0 = `
   id, delivery_date, sent_on, notes, created_at, updated_at,
@@ -35664,6 +35664,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         String((t == null ? void 0 : t.foreman_type) || "project").toLowerCase() === "boss"
           ? "boss"
           : "project";
+      const kgWorkerType = (t) =>
+        String((t == null ? void 0 : t.worker_type) || "general").toLowerCase() === "skilled"
+          ? "skilled"
+          : "general";
+      const kgWorkerTypeText = (t) =>
+        kgWorkerType(t) === "skilled" ? "Skilled worker" : "General worker";
       const kgSiteTypeValue = (t) =>
         (t == null ? void 0 : t.is_project_site) === !0 &&
         (t == null ? void 0 : t.is_boss_site) !== !0
@@ -36303,6 +36309,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           kgActiveSitePicOptions = [...new Set(kgActiveSiteBase.map((V) => String((V == null ? void 0 : V.pic) || (V == null ? void 0 : V.site_pic) || "").trim()).filter(Boolean))].sort((V, xe) => V.localeCompare(xe, void 0, { numeric: !0, sensitivity: "base" })),
           je = kgActiveSiteBase.filter((V) => !kgActiveSitePicFilter || String((V == null ? void 0 : V.pic) || (V == null ? void 0 : V.site_pic) || "").trim() === kgActiveSitePicFilter),
           re = p.workers.filter((V) => !ge.has(Number(V.id))),
+          kgSkilledWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "skilled"),
+          kgGeneralWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "general"),
           X = p.foremen.filter((V) => !Ne.has(Number(V.id))),
           kgProjectForemenWithoutSite = X.filter((V) => kgForemanType(V) === "project"),
           kgBossForemenWithoutSite = X.filter((V) => kgForemanType(V) === "boss"),
@@ -36438,6 +36446,47 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               );
           }
           return V;
+        }
+        function kgWorkerCheckCard(V) {
+          const xe = s.filter(
+            (ke) =>
+              ke.id !== S &&
+              (ke.assignment_workers || []).some(
+                (Le) => Number(Le.worker_id) === Number(V.id),
+              ),
+          );
+          return d.jsxs(
+            "label",
+            {
+              className: `check-card ${xe.length ? "duplicate-worker" : ""}`,
+              children: [
+                d.jsx("input", {
+                  type: "checkbox",
+                  checked: w.worker_ids.includes(Number(V.id)),
+                  onChange: () => F(V.id),
+                }),
+                d.jsxs("span", {
+                  children: [
+                    kgNameNick(V),
+                    d.jsxs("small", { children: [" ", kgWorkerTypeText(V)] }),
+                    xe.length > 0 &&
+                      d.jsxs("small", {
+                        children: [
+                          "Already: ",
+                          xe
+                            .map((ke) => {
+                              var Le;
+                              return (Le = ke.site) == null ? void 0 : Le.address;
+                            })
+                            .join(", "),
+                        ],
+                      }),
+                  ],
+                }),
+              ],
+            },
+            V.id,
+          );
         }
         async function se(V) {
           (V.preventDefault(), j(""));
@@ -36687,7 +36736,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   ],
                 }),
                 d.jsxs("section", {
-                  className: `warning-panel ${re.length ? "warn" : "ok"}`,
+                  className: `warning-panel ${kgSkilledWorkersWithoutSite.length ? "warn" : "ok"}`,
                   children: [
                     d.jsxs("div", {
                       className: "warning-heading",
@@ -36696,13 +36745,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         d.jsxs("div", {
                           children: [
                             d.jsx("strong", {
-                              children: "Active workers without site",
+                              children: "Skilled workers without site",
                             }),
                             d.jsxs("span", {
                               children: [
-                                re.length,
+                                kgSkilledWorkersWithoutSite.length,
                                 " worker",
-                                re.length === 1 ? "" : "s",
+                                kgSkilledWorkersWithoutSite.length === 1 ? "" : "s",
                               ],
                             }),
                           ],
@@ -36712,12 +36761,56 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("div", {
                       className: "warning-list chips",
                       children:
-                        re.length === 0
+                        kgSkilledWorkersWithoutSite.length === 0
                           ? d.jsx("div", {
                               className: "warning-empty",
-                              children: "All active workers are assigned.",
+                              children: "All skilled workers are assigned.",
                             })
-                          : re.map((V) =>
+                          : kgSkilledWorkersWithoutSite.map((V) =>
+                              d.jsx(
+                                "span",
+                                {
+                                  className: "warning-chip",
+                                  children: kgNameNick(V),
+                                },
+                                V.id,
+                              ),
+                            ),
+                    }),
+                  ],
+                }),
+                d.jsxs("section", {
+                  className: `warning-panel ${kgGeneralWorkersWithoutSite.length ? "warn" : "ok"}`,
+                  children: [
+                    d.jsxs("div", {
+                      className: "warning-heading",
+                      children: [
+                        d.jsx(up, { size: 20 }),
+                        d.jsxs("div", {
+                          children: [
+                            d.jsx("strong", {
+                              children: "General workers without site",
+                            }),
+                            d.jsxs("span", {
+                              children: [
+                                kgGeneralWorkersWithoutSite.length,
+                                " worker",
+                                kgGeneralWorkersWithoutSite.length === 1 ? "" : "s",
+                              ],
+                            }),
+                          ],
+                        }),
+                      ],
+                    }),
+                    d.jsx("div", {
+                      className: "warning-list chips",
+                      children:
+                        kgGeneralWorkersWithoutSite.length === 0
+                          ? d.jsx("div", {
+                              className: "warning-empty",
+                              children: "All general workers are assigned.",
+                            })
+                          : kgGeneralWorkersWithoutSite.map((V) =>
                               d.jsx(
                                 "span",
                                 {
@@ -37423,61 +37516,40 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
-                    d.jsxs("label", {
-                      className: "wide",
+                    d.jsxs("div", {
+                      className: "wide foreman-split",
                       children: [
-                        "Workers ",
-                        d.jsx("span", {
-                          className: "field-help",
-                          children:
-                            "A worker may be selected for another site. A warning will appear before saving.",
+                        d.jsxs("label", {
+                          className: "foreman-list-box",
+                          children: [
+                            "Skilled workers ",
+                            d.jsx("span", {
+                              className: "field-help",
+                              children: "Tick skilled workers. Change skilled/general type in Workers page.",
+                            }),
+                            d.jsx("div", {
+                              className: "check-grid",
+                              children: p.workers
+                                .filter((V) => kgWorkerType(V) === "skilled")
+                                .map((V) => kgWorkerCheckCard(V)),
+                            }),
+                          ],
                         }),
-                        d.jsx("div", {
-                          className: "check-grid",
-                          children: p.workers.map((V) => {
-                            const xe = s.filter(
-                              (ke) =>
-                                ke.id !== S &&
-                                (ke.assignment_workers || []).some(
-                                  (Le) => Number(Le.worker_id) === Number(V.id),
-                                ),
-                            );
-                            return d.jsxs(
-                              "label",
-                              {
-                                className: `check-card ${xe.length ? "duplicate-worker" : ""}`,
-                                children: [
-                                  d.jsx("input", {
-                                    type: "checkbox",
-                                    checked: w.worker_ids.includes(
-                                      Number(V.id),
-                                    ),
-                                    onChange: () => F(V.id),
-                                  }),
-                                  d.jsxs("span", {
-                                    children: [
-                                      kgNameNick(V),
-                                      xe.length > 0 &&
-                                        d.jsxs("small", {
-                                          children: [
-                                            "Already: ",
-                                            xe
-                                              .map((ke) => {
-                                                var Le;
-                                                return (Le = ke.site) == null
-                                                  ? void 0
-                                                  : Le.address;
-                                              })
-                                              .join(", "),
-                                          ],
-                                        }),
-                                    ],
-                                  }),
-                                ],
-                              },
-                              V.id,
-                            );
-                          }),
+                        d.jsxs("label", {
+                          className: "foreman-list-box",
+                          children: [
+                            "General workers ",
+                            d.jsx("span", {
+                              className: "field-help",
+                              children: "Tick general workers. A warning will appear before saving if worker already has another site.",
+                            }),
+                            d.jsx("div", {
+                              className: "check-grid",
+                              children: p.workers
+                                .filter((V) => kgWorkerType(V) === "general")
+                                .map((V) => kgWorkerCheckCard(V)),
+                            }),
+                          ],
                         }),
                       ],
                     }),
@@ -39250,11 +39322,27 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (de) return _(de.message);
           await T();
         }
+        async function kgToggleWorkerType(J) {
+          if (r.table !== "workers" || !n) return;
+          const j = kgWorkerType(J) === "skilled" ? "general" : "skilled",
+            fe = j === "skilled" ? "Skilled worker" : "General worker",
+            G = J.nickname || J.name || "this worker";
+          if (!window.confirm(`Change ${G} to ${fe}?`)) return;
+          _("");
+          const { error: de } = await qe
+            .from("workers")
+            .update({ worker_type: j })
+            .eq("id", J.id);
+          if (de) return _(de.message);
+          await T();
+        }
         function he(J, j) {
           return j.key === "foreman_type"
             ? kgForemanType(J) === "boss"
               ? "Boss foreman"
               : "Project foreman"
+            : j.key === "worker_type"
+              ? kgWorkerTypeText(J)
             : j.key === "site_type"
               ? kgSiteTypeText(J)
               : j.format === "boolean"
@@ -39423,6 +39511,18 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                                     kgForemanType(J) === "boss"
                                                       ? "Make Project"
                                                       : "Make Boss",
+                                                }),
+                                              r.table === "workers" &&
+                                                d.jsx("button", {
+                                                  type: "button",
+                                                  className:
+                                                    "secondary-button small-button",
+                                                  onClick: () =>
+                                                    kgToggleWorkerType(J),
+                                                  children:
+                                                    kgWorkerType(J) === "skilled"
+                                                      ? "Make General"
+                                                      : "Make Skilled",
                                                 }),
                                               d.jsx("button", {
                                                 className: "icon-button",
@@ -40155,13 +40255,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Add manual No., nickname, pass and license details. Lists are arranged by manual No., then nickname.",
+            "Maintain workers available for deployment. Add manual No., choose Skilled or General worker, nickname, pass and license details. Lists are arranged by manual No., then nickname.",
           searchPlaceholder:
-            "Search name, nickname, phone, pass, license — type pass or license to show only those records…",
+            "Search name, nickname, phone, pass, license, skilled or general — type pass or license to show only those records…",
           columns: [
             { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
+            { key: "worker_type", label: "Worker type" },
             { key: "phone", label: "Phone" },
             { key: "pass", label: "Pass" },
             { key: "license", label: "License" },
@@ -40170,11 +40271,21 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "sort_order", label: "Manual No.", type: "number", min: "0", step: "1" },
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Worker full name", required: !0 },
+            {
+              name: "worker_type",
+              label: "Worker type",
+              type: "select",
+              required: !0,
+              options: [
+                ["skilled", "Skilled worker"],
+                ["general", "General worker"],
+              ],
+            },
             { name: "phone", label: "Phone" },
             { name: "pass", label: "Pass" },
             { name: "license", label: "License" },
           ],
-          defaults: { sort_order: 0 },
+          defaults: { sort_order: 0, worker_type: "general" },
         },
         lorries: {
           title: "Lorries",
