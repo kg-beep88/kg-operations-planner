@@ -35853,33 +35853,55 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgExcelDate(t) {
         return t ? cp(t).replaceAll(".", "/") : "";
       }
+      function kgIsSubName(t) {
+        return /^sub\s*[-–—]/i.test(String(t || "").trim());
+      }
+      function kgWorkerPeopleForExcel(t) {
+        return (t.assignment_workers || []).map((r) => r.worker).filter(Boolean);
+      }
+      function kgNormalWorkerCount(t) {
+        return kgWorkerPeopleForExcel(t).filter((r) => !kgIsSubName(kgNameNick(r))).length;
+      }
+      function kgSubWorkerCount(t) {
+        return kgWorkerPeopleForExcel(t).filter((r) => kgIsSubName(kgNameNick(r))).length;
+      }
+      function kgSectionSubCount(t) {
+        return (t || []).filter((r) => kgIsSubName(r)).length;
+      }
+      function kgSectionWorkerCount(t) {
+        return (t || []).filter((r) => !kgIsSubName(r)).length;
+      }
       function kgBlackSeparatorRow() {
         const t = "████████████████████████████████████████";
         return {
-          Lorry: t,
-          Workers: t,
-          Foreman: t,
-          Date: t,
-          "Job status": t,
-          "P.I.C.": t,
-          Address: t,
+          LORRY: t,
+          WORKER: t,
+          FOREMAN: t,
+          DATE: t,
+          PIC: t,
+          ADDRESS: t,
+          WS: t,
+          FS: t,
+          SUB: t,
           __kgDateSeparator: !0,
         };
       }
       function kgBlankLorrySpaceRow() {
         return {
-          Lorry: "",
-          Workers: "",
-          Foreman: "",
-          Date: "",
-          "Job status": "",
-          "P.I.C.": "",
-          Address: "",
+          LORRY: "",
+          WORKER: "",
+          FOREMAN: "",
+          DATE: "",
+          PIC: "",
+          ADDRESS: "",
+          WS: "",
+          FS: "",
+          SUB: "",
           __kgLorrySpace: !0,
         };
       }
       function kgExcelLorryGroupKey(t) {
-        const r = String((t && t.Lorry) || "").trim();
+        const r = String((t && (t.LORRY || t.Lorry)) || "").trim();
         return r || "__NO_LORRY__";
       }
       const kgDailyExcelRows = (t, r = []) => {
@@ -35887,15 +35909,18 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         for (const l of kgSortAssignmentsForExcel(t || [])) {
           var s;
           const f = kgLorryExcelList(l),
-            c = kgExcelDate(l.plan_date);
+            c = kgExcelDate(l.plan_date),
+            m = ar(l).length;
           n.push({
-            Lorry: f,
-            Workers: kgWorkerNames(l),
-            Foreman: kgForemanNames(l),
-            Date: c,
-            "Job status": l.job_status || l.jobStatus || "",
-            "P.I.C.": l.pic || l.pic_name || l.picName || "",
-            Address: Ca((s = l.site) == null ? void 0 : s.address, ""),
+            LORRY: f,
+            WORKER: kgWorkerNames(l),
+            FOREMAN: kgForemanNames(l),
+            DATE: c,
+            PIC: l.pic || l.pic_name || l.picName || "",
+            ADDRESS: Ca((s = l.site) == null ? void 0 : s.address, ""),
+            WS: kgNormalWorkerCount(l),
+            FS: m,
+            SUB: kgSubWorkerCount(l),
             __kgDateKey: c,
             __kgLorryGroup: f || "__NO_LORRY__",
           });
@@ -35905,20 +35930,22 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
 `).map(kgCleanExtraLine).filter(Boolean),
             f = kgExcelDate(l.plan_date);
           n.push({
-            Lorry: "",
-            Workers: s.join(" + "),
-            Foreman: "",
-            Date: f,
-            "Job status": l.job_status || "",
-            "P.I.C.": l.pic || "",
-            Address: Ca(l.title, ""),
+            LORRY: "",
+            WORKER: s.join(" + "),
+            FOREMAN: "",
+            DATE: f,
+            PIC: l.pic || "",
+            ADDRESS: Ca(l.title, ""),
+            WS: kgSectionWorkerCount(s),
+            FS: 0,
+            SUB: kgSectionSubCount(s),
             __kgDateKey: f,
             __kgLorryGroup: "__NO_LORRY__",
           });
         }
         const f = [], c = new Map();
         for (const l of n) {
-          const s = l.__kgDateKey || l.Date || "";
+          const s = l.__kgDateKey || l.DATE || "";
           c.has(s) || c.set(s, []);
           c.get(s).push(l);
         }
@@ -35937,7 +35964,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return f;
       };
       function kgDailyExcelSheet(t, r = []) {
-        const n = [], l = [], s = [];
+        const n = [["LORRY", "WORKER", "FOREMAN", "DATE", "PIC", "ADDRESS", "WS", "FS", "SUB"]], l = [], s = [];
         for (const f of kgDailyExcelRows(t, r)) {
           if (f && f.__kgDateSeparator) {
             l.push(n.length);
@@ -35949,19 +35976,23 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               "████████████████████████████████████████",
               "████████████████████████████████████████",
               "████████████████████████████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
             ]);
           } else if (f && f.__kgLorrySpace) {
             s.push(n.length);
-            n.push(["", "", "", "", "", "", ""]);
+            n.push(["", "", "", "", "", "", "", "", ""]);
           } else
             n.push([
-              f.Lorry || "",
-              f.Workers || "",
-              f.Foreman || "",
-              f.Date || "",
-              f["Job status"] || "",
-              f["P.I.C."] || "",
-              f.Address || "",
+              f.LORRY || "",
+              f.WORKER || "",
+              f.FOREMAN || "",
+              f.DATE || "",
+              f.PIC || "",
+              f.ADDRESS || "",
+              f.WS === 0 || f.WS ? f.WS : "",
+              f.FS === 0 || f.FS ? f.FS : "",
+              f.SUB === 0 || f.SUB ? f.SUB : "",
             ]);
         }
         return {
@@ -35973,9 +36004,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             { wch: 45 },
             { wch: 30 },
             { wch: 12 },
-            { wch: 16 },
             { wch: 14 },
             { wch: 70 },
+            { wch: 8 },
+            { wch: 8 },
+            { wch: 8 },
           ],
         };
       }
