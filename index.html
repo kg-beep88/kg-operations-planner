@@ -36253,6 +36253,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [fe, G] = q.useState(!0),
           [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 }),
           [kgActiveSitePicFilter, kgSetActiveSitePicFilter] = q.useState(""),
+          [kgAssignmentPicFilter, kgSetAssignmentPicFilter] = q.useState(""),
           [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
           [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1);
         async function de() {
@@ -36320,9 +36321,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               V = !0;
             };
           }, [S, w.site_id, n]));
-        const kgVisibleAssignments = q.useMemo(
+        const kgAssignmentBase = q.useMemo(
             () => s.filter((V) => kgSiteTypeMatches(V.site, kgSiteTypeFilter)),
             [s, kgSiteTypeFilter],
+          ),
+          kgAssignmentPicOptions = [...new Set(kgAssignmentBase.map((V) => String((V == null ? void 0 : V.pic) || ((V == null ? void 0 : V.site) || {}).pic || (V == null ? void 0 : V.site_pic) || "").trim()).filter(Boolean))].sort((V, xe) => V.localeCompare(xe, void 0, { numeric: !0, sensitivity: "base" })),
+          kgVisibleAssignments = q.useMemo(
+            () => kgAssignmentBase.filter((V) => !kgAssignmentPicFilter || String((V == null ? void 0 : V.pic) || ((V == null ? void 0 : V.site) || {}).pic || (V == null ? void 0 : V.site_pic) || "").trim() === kgAssignmentPicFilter),
+            [kgAssignmentBase, kgAssignmentPicFilter],
           ),
           ge = q.useMemo(() => Go(kgVisibleAssignments), [kgVisibleAssignments]),
           Ne = q.useMemo(() => op(kgVisibleAssignments), [kgVisibleAssignments]),
@@ -37067,6 +37073,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             }),
                           ],
                         }),
+                        d.jsxs("label", {
+                          className: "pic-filter-inline",
+                          style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: 700, minWidth: "220px" },
+                          children: [
+                            "Filter P.I.C.",
+                            d.jsxs("select", {
+                              value: kgAssignmentPicFilter,
+                              onChange: (V) => kgSetAssignmentPicFilter(V.target.value),
+                              style: { flex: "1 1 auto", minWidth: 0, padding: "6px 8px", borderRadius: "10px", border: "1px solid #99f6e4" },
+                              children: [
+                                d.jsx("option", { value: "", children: "All P.I.C." }),
+                                ...kgAssignmentPicOptions.map((V) => d.jsx("option", { value: V, children: V }, V)),
+                              ],
+                            }),
+                          ],
+                        }),
                         r &&
                           d.jsxs("button", {
                             className: "primary-button",
@@ -37085,7 +37107,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         : kgVisibleAssignments.length === 0
                           ? d.jsx("div", {
                               className: "empty-state",
-                              children: "No assignments for this day.",
+                              children: kgAssignmentPicFilter ? "No assignments for this P.I.C. filter." : "No assignments for this day.",
                             })
                           : kgRows.map((V) => {
                               var Qe, Ve;
