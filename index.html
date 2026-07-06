@@ -36200,10 +36200,22 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         if (r.length) return r;
         return t.foreman && t.foreman.id ? [t.foreman] : [];
       }
+      function kgCopy3HideChinaSubName(t) {
+        const r = Ca(t, "");
+        return /^\s*(china|sub)\s*[-–—]/i.test(r);
+      }
       function kgCopy3PersonParts(t) {
         return {
-          workers: kgCopy3LineList((t.assignment_workers || []).map((r) => kgCopyPersonName(r.worker)).filter(Boolean)),
-          foremen: kgCopy3LineList(kgCopy3AssignedForemen(t).map((r) => kgForemanCopy2Person(r)).filter(Boolean)),
+          workers: kgCopy3LineList(
+            (t.assignment_workers || [])
+              .map((r) => kgCopyPersonName(r.worker))
+              .filter((r) => r && !kgCopy3HideChinaSubName(r)),
+          ),
+          foremen: kgCopy3LineList(
+            kgCopy3AssignedForemen(t)
+              .map((r) => kgForemanCopy2Person(r))
+              .filter((r) => r && !kgCopy3HideChinaSubName(r)),
+          ),
         };
       }
       function kgCopy3PeopleText(t) {
@@ -36251,20 +36263,20 @@ Worker : ${n}`;
         }
         const f = new Set([...s.entries()].filter(([, E]) => E.size > 1).map(([E]) => E)),
           c = new Map(),
-          m = new Map();
+          m = new Map(),
+          v = [];
         for (const E of l) {
-          if (f.has(E.addressKey)) {
+          if (E.nightJob) {
+            v.push(E);
+          } else if (f.has(E.addressKey)) {
             m.has(E.addressKey) ||
               m.set(E.addressKey, {
                 address: E.address,
-                nightJob: !1,
                 rows: [],
                 order: E.order,
               });
             const w = m.get(E.addressKey);
-            ((w.nightJob = w.nightJob || E.nightJob),
-              (w.order = Math.min(Number(w.order || 0), Number(E.order || 0))),
-              w.rows.push(E));
+            ((w.order = Math.min(Number(w.order || 0), Number(E.order || 0))), w.rows.push(E));
           } else {
             c.has(E.lorryKey) ||
               c.set(E.lorryKey, {
@@ -36277,7 +36289,7 @@ Worker : ${n}`;
             ((w.order = Math.min(Number(w.order || 0), Number(E.order || 0))), w.rows.push(E));
           }
         }
-        const v = [...c.values()]
+        const x = [...c.values()]
             .sort((E, w) => {
               const _ = kgAssignmentLorryKey({ assignment_lorries: E.lorry ? [{ lorry: E.lorry }] : [] }).localeCompare(
                 kgAssignmentLorryKey({ assignment_lorries: w.lorry ? [{ lorry: w.lorry }] : [] }),
@@ -36294,31 +36306,43 @@ Worker : ${n}`;
                   if (D) return D;
                   return _.address.localeCompare(T.address, void 0, { numeric: !0, sensitivity: "base" });
                 })
-                .map((_) => `- ${kgCopy3AddressLine(_)} - ${kgCopy3PeopleText(_)}`);
+                .map((_) => `- ${_.address} - ${kgCopy3PeopleText(_)}`);
               return [`*${E.lorryText}*`, ...w].join(`
 `);
             }),
-          x = [...m.values()]
+          p = [...m.values()]
             .sort((E, w) => {
               const _ = Number(E.order || 0) - Number(w.order || 0);
               if (_) return _;
               return E.address.localeCompare(w.address, void 0, { numeric: !0, sensitivity: "base" });
             })
             .map((E) => {
-              const w = [`*${E.address}*`];
-              E.nightJob && w.push("*Night Job*");
-              const _ = E.rows.sort((T, D) => {
-                const I = Number(T.order || 0) - Number(D.order || 0);
-                if (I) return I;
-                return T.lorryText.localeCompare(D.lorryText, void 0, { numeric: !0, sensitivity: "base" });
-              });
+              const w = [`*${E.address}*`],
+                _ = E.rows.sort((T, D) => {
+                  const I = Number(T.order || 0) - Number(D.order || 0);
+                  if (I) return I;
+                  return T.lorryText.localeCompare(D.lorryText, void 0, { numeric: !0, sensitivity: "base" });
+                });
               for (const T of _) w.push(`- *${T.lorryText}* - ${kgCopy3PeopleText(T)}`);
               return w.join(`
 `);
             }),
-          p = (n || []).map(kgFormatExtraCopy1).filter(Boolean),
-          g = [...v, ...x, ...p].filter(Boolean);
-        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Job*`, g.join(`
+          g = v.length
+            ? [
+                "*Night Job*",
+                ...v
+                  .sort((E, w) => {
+                    const _ = Number(E.order || 0) - Number(w.order || 0);
+                    if (_) return _;
+                    return E.address.localeCompare(w.address, void 0, { numeric: !0, sensitivity: "base" });
+                  })
+                  .map((E) => `- ${E.address} - ${kgCopy3PeopleText(E)}`),
+              ].join(`
+`)
+            : "",
+          S = (n || []).map(kgFormatExtraCopy1).filter(Boolean),
+          A = [...x, ...p, g, ...S].filter(Boolean);
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Job*`, A.join(`
 
 
 `)].filter(Boolean).join(`
