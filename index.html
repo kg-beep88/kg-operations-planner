@@ -35856,20 +35856,32 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgIsSubName(t) {
         return /^sub\s*[-–—]/i.test(String(t || "").trim());
       }
+      function kgIsChinaName(t) {
+        return /^china\b/i.test(String(t || "").trim());
+      }
       function kgWorkerPeopleForExcel(t) {
         return (t.assignment_workers || []).map((r) => r.worker).filter(Boolean);
       }
       function kgNormalWorkerCount(t) {
-        return kgWorkerPeopleForExcel(t).filter((r) => !kgIsSubName(kgNameNick(r))).length;
+        return kgWorkerPeopleForExcel(t).filter((r) => {
+          const n = kgNameNick(r);
+          return !kgIsSubName(n) && !kgIsChinaName(n);
+        }).length;
       }
       function kgSubWorkerCount(t) {
         return kgWorkerPeopleForExcel(t).filter((r) => kgIsSubName(kgNameNick(r))).length;
       }
+      function kgChinaWorkerCount(t) {
+        return kgWorkerPeopleForExcel(t).filter((r) => kgIsChinaName(kgNameNick(r))).length;
+      }
       function kgSectionSubCount(t) {
         return (t || []).filter((r) => kgIsSubName(r)).length;
       }
+      function kgSectionChinaCount(t) {
+        return (t || []).filter((r) => kgIsChinaName(r)).length;
+      }
       function kgSectionWorkerCount(t) {
-        return (t || []).filter((r) => !kgIsSubName(r)).length;
+        return (t || []).filter((r) => !kgIsSubName(r) && !kgIsChinaName(r)).length;
       }
       function kgBlackSeparatorRow() {
         const t = "████████████████████████████████████████";
@@ -35883,6 +35895,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           WS: t,
           FS: t,
           SUB: t,
+          CHINA: t,
+          "OT SHIFT": t,
           __kgDateSeparator: !0,
         };
       }
@@ -35897,6 +35911,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           WS: "",
           FS: "",
           SUB: "",
+          CHINA: "",
+          "OT SHIFT": "",
           __kgLorrySpace: !0,
         };
       }
@@ -35921,6 +35937,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             WS: kgNormalWorkerCount(l),
             FS: m,
             SUB: kgSubWorkerCount(l),
+            CHINA: kgChinaWorkerCount(l),
+            "OT SHIFT": "",
             __kgDateKey: c,
             __kgLorryGroup: f || "__NO_LORRY__",
           });
@@ -35939,6 +35957,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             WS: kgSectionWorkerCount(s),
             FS: 0,
             SUB: kgSectionSubCount(s),
+            CHINA: kgSectionChinaCount(s),
+            "OT SHIFT": "",
             __kgDateKey: f,
             __kgLorryGroup: "__NO_LORRY__",
           });
@@ -35964,7 +35984,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return f;
       };
       function kgDailyExcelSheet(t, r = []) {
-        const n = [["LORRY", "WORKER", "FOREMAN", "DATE", "PIC", "ADDRESS", "WS", "FS", "SUB"]], l = [], s = [];
+        const n = [["LORRY", "WORKER", "FOREMAN", "DATE", "PIC", "ADDRESS", "WS", "FS", "SUB", "CHINA", "OT SHIFT"]], l = [], s = [];
         for (const f of kgDailyExcelRows(t, r)) {
           if (f && f.__kgDateSeparator) {
             l.push(n.length);
@@ -35978,10 +35998,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               "████████████████████████████████████████",
               "████████████████████████████████████████",
               "████████████████████████████████████████",
+              "████████████████████████████████████████",
+              "████████████████████████████████████████",
             ]);
           } else if (f && f.__kgLorrySpace) {
             s.push(n.length);
-            n.push(["", "", "", "", "", "", "", "", ""]);
+            n.push(["", "", "", "", "", "", "", "", "", "", ""]);
           } else
             n.push([
               f.LORRY || "",
@@ -35993,6 +36015,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               f.WS === 0 || f.WS ? f.WS : "",
               f.FS === 0 || f.FS ? f.FS : "",
               f.SUB === 0 || f.SUB ? f.SUB : "",
+              f.CHINA === 0 || f.CHINA ? f.CHINA : "",
+              f["OT SHIFT"] || "",
             ]);
         }
         return {
@@ -36009,6 +36033,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             { wch: 8 },
             { wch: 8 },
             { wch: 8 },
+            { wch: 10 },
+            { wch: 14 },
           ],
         };
       }
