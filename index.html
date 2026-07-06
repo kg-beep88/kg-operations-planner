@@ -36189,39 +36189,132 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }
         return r;
       }
+      function kgCopy3PersonParts(t) {
+        return {
+          workers: kgCopy3LineList((t.assignment_workers || []).map((r) => kgCopyPersonName(r.worker)).filter(Boolean)),
+          foremen: kgCopy3LineList(ar(t).map((r) => kgForemanCopy2Person(r)).filter(Boolean)),
+        };
+      }
+      function kgCopy3PeopleText(t) {
+        const r = [];
+        t.workers && t.workers.length && r.push(`Worker: ${t.workers.join(" + ")}`);
+        t.foremen && t.foremen.length && r.push(`Foreman: ${t.foremen.join(" + ")}`);
+        return r.join(" - ");
+      }
+      function kgCopy3AddressLine(t) {
+        return `${t.address}${t.nightJob ? " - *Night Job*" : ""}`;
+      }
       function kgCopy3(t, r, n = []) {
-        const l = new Map();
-        for (const m of kgSortAssignmentsByLorry(r)) {
-          var v;
-          const x = kgCopy3AddressInfo((v = m.site) == null ? void 0 : v.address, m.shift),
-            p = x.address || "No address",
-            g = (m.assignment_workers || []).map((E) => kgCopyPersonName(E.worker)).filter(Boolean),
-            S = kgAssignmentLorryRows(m).map((E) => kgLorryText(E.lorry)).filter(Boolean);
-          if (!g.length && !S.length) continue;
-          const w = p.toLowerCase();
-          l.has(w) || l.set(w, { address: p, nightJob: !1, lorries: [], workers: [], order: kgFirstLorrySortOrder(m) || m.sort_order || 0 });
-          const _ = l.get(w);
-          (_.nightJob = _.nightJob || x.nightJob, _.lorries.push(...(S.length ? S : ["No lorry"])), _.workers.push(...g));
+        const l = [], s = new Map();
+        for (const E of kgSortAssignmentsByLorry(r)) {
+          var w;
+          const _ = kgCopy3AddressInfo((w = E.site) == null ? void 0 : w.address, E.shift),
+            T = _.address || "No address",
+            D = T.toLowerCase(),
+            I = kgCopy3PersonParts(E),
+            L = kgAssignmentLorryRows(E),
+            W = L.length ? L : [{ lorry: null, sort_order: E.sort_order || 0 }];
+          if (!I.workers.length && !I.foremen.length && !L.length) continue;
+          for (const he of W) {
+            const J = he.lorry || null,
+              j = J && J.id ? `lorry-${J.id}` : "unassigned",
+              fe = J ? kgLorryText(J) : "No lorry",
+              G = Number(he.sort_order || E.sort_order || 0);
+            l.push({
+              assignment: E,
+              address: T,
+              addressKey: D,
+              nightJob: _.nightJob,
+              lorry: J,
+              lorryKey: j,
+              lorryText: fe,
+              order: G,
+              workers: I.workers,
+              foremen: I.foremen,
+            });
+            if (J && J.id) {
+              s.has(D) || s.set(D, new Set());
+              s.get(D).add(j);
+            }
+          }
         }
-        const s = [...l.values()]
-            .sort((m, v) => {
-              const x = Number(m.order || 0) - Number(v.order || 0);
-              if (x) return x;
-              return m.address.localeCompare(v.address, void 0, { numeric: !0, sensitivity: "base" });
+        const f = new Set([...s.entries()].filter(([, E]) => E.size > 1).map(([E]) => E)),
+          c = new Map(),
+          m = new Map();
+        for (const E of l) {
+          if (f.has(E.addressKey)) {
+            m.has(E.addressKey) ||
+              m.set(E.addressKey, {
+                address: E.address,
+                nightJob: !1,
+                rows: [],
+                order: E.order,
+              });
+            const w = m.get(E.addressKey);
+            ((w.nightJob = w.nightJob || E.nightJob),
+              (w.order = Math.min(Number(w.order || 0), Number(E.order || 0))),
+              w.rows.push(E));
+          } else {
+            c.has(E.lorryKey) ||
+              c.set(E.lorryKey, {
+                lorry: E.lorry,
+                lorryText: E.lorryText,
+                rows: [],
+                order: E.order,
+              });
+            const w = c.get(E.lorryKey);
+            ((w.order = Math.min(Number(w.order || 0), Number(E.order || 0))), w.rows.push(E));
+          }
+        }
+        const v = [...c.values()]
+            .sort((E, w) => {
+              const _ = kgAssignmentLorryKey({ assignment_lorries: E.lorry ? [{ lorry: E.lorry }] : [] }).localeCompare(
+                kgAssignmentLorryKey({ assignment_lorries: w.lorry ? [{ lorry: w.lorry }] : [] }),
+                void 0,
+                { numeric: !0, sensitivity: "base" },
+              );
+              if (_) return _;
+              return Number(E.order || 0) - Number(w.order || 0);
             })
-            .map((m) => {
-              const v = [`*${m.address}*`];
-              m.nightJob && v.push("*Night Job*");
-              const x = kgCopy3LineList(m.lorries).join(" + "),
-                p = kgCopy3LineList(m.workers).join(" + ");
-              x && v.push(`- ${x}`);
-              p && v.push(`- ${p}`);
-              return v.join(`
+            .map((E) => {
+              const w = E.rows
+                .sort((_, T) => {
+                  const D = Number(_.order || 0) - Number(T.order || 0);
+                  if (D) return D;
+                  return _.address.localeCompare(T.address, void 0, { numeric: !0, sensitivity: "base" });
+                })
+                .map((_) => {
+                  const T = kgCopy3PeopleText(_);
+                  return T ? `- ${kgCopy3AddressLine(_)} - ${T}` : `- ${kgCopy3AddressLine(_)}`;
+                });
+              return [`*${E.lorryText}*`, ...w].join(`
 `);
             }),
-          f = (n || []).map(kgFormatExtraCopy1).filter(Boolean),
-          c = [...s, ...f].filter(Boolean);
-        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Job*`, c.join(`
+          x = [...m.values()]
+            .sort((E, w) => {
+              const _ = Number(E.order || 0) - Number(w.order || 0);
+              if (_) return _;
+              return E.address.localeCompare(w.address, void 0, { numeric: !0, sensitivity: "base" });
+            })
+            .map((E) => {
+              const w = [`*${E.address}*`];
+              E.nightJob && w.push("*Night Job*");
+              const _ = E.rows.sort((T, D) => {
+                const I = Number(T.order || 0) - Number(D.order || 0);
+                if (I) return I;
+                return T.lorryText.localeCompare(D.lorryText, void 0, { numeric: !0, sensitivity: "base" });
+              });
+              for (const T of _) {
+                const D = kgCopy3PeopleText(T);
+                w.push(D ? `- *${T.lorryText}* - ${D}` : `- *${T.lorryText}*`);
+              }
+              return w.join(`
+`);
+            }),
+          p = (n || []).map(kgFormatExtraCopy1).filter(Boolean),
+          g = [...v, ...x, ...p].filter(Boolean);
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Job*`, g.join(`
+
 
 `)].filter(Boolean).join(`
 
