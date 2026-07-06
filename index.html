@@ -36189,17 +36189,28 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }
         return r;
       }
+      function kgCopy3AssignedForemen(t) {
+        const r = (t.assignment_foremen || [])
+          .filter((n) => {
+            var l;
+            return (l = n.foreman) == null ? void 0 : l.id;
+          })
+          .sort((n, l) => Number(n.sort_order || 0) - Number(l.sort_order || 0))
+          .map((n) => n.foreman);
+        if (r.length) return r;
+        return t.foreman && t.foreman.id ? [t.foreman] : [];
+      }
       function kgCopy3PersonParts(t) {
         return {
           workers: kgCopy3LineList((t.assignment_workers || []).map((r) => kgCopyPersonName(r.worker)).filter(Boolean)),
-          foremen: kgCopy3LineList(ar(t).map((r) => kgForemanCopy2Person(r)).filter(Boolean)),
+          foremen: kgCopy3LineList(kgCopy3AssignedForemen(t).map((r) => kgForemanCopy2Person(r)).filter(Boolean)),
         };
       }
       function kgCopy3PeopleText(t) {
-        const r = [];
-        t.workers && t.workers.length && r.push(`Worker: ${t.workers.join(" + ")}`);
-        t.foremen && t.foremen.length && r.push(`Foreman: ${t.foremen.join(" + ")}`);
-        return r.join(" - ");
+        const r = t.foremen && t.foremen.length ? t.foremen.join(" + ") : "-",
+          n = t.workers && t.workers.length ? t.workers.join(" + ") : "-";
+        return `Foreman : ${r}
+Worker : ${n}`;
       }
       function kgCopy3AddressLine(t) {
         return `${t.address}${t.nightJob ? " - *Night Job*" : ""}`;
@@ -36283,10 +36294,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   if (D) return D;
                   return _.address.localeCompare(T.address, void 0, { numeric: !0, sensitivity: "base" });
                 })
-                .map((_) => {
-                  const T = kgCopy3PeopleText(_);
-                  return T ? `- ${kgCopy3AddressLine(_)} - ${T}` : `- ${kgCopy3AddressLine(_)}`;
-                });
+                .map((_) => `- ${kgCopy3AddressLine(_)} - ${kgCopy3PeopleText(_)}`);
               return [`*${E.lorryText}*`, ...w].join(`
 `);
             }),
@@ -36304,10 +36312,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 if (I) return I;
                 return T.lorryText.localeCompare(D.lorryText, void 0, { numeric: !0, sensitivity: "base" });
               });
-              for (const T of _) {
-                const D = kgCopy3PeopleText(T);
-                w.push(D ? `- *${T.lorryText}* - ${D}` : `- *${T.lorryText}*`);
-              }
+              for (const T of _) w.push(`- *${T.lorryText}* - ${kgCopy3PeopleText(T)}`);
               return w.join(`
 `);
             }),
