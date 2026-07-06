@@ -36175,6 +36175,58 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Foreman*`, "", ...n].join(`
 `));
       }
+      function kgCopy3AddressInfo(t, r) {
+        const n = Ca(t, ""),
+          l = /[\(\[（]\s*NJ\s*[\)\]）]/i.test(n) || /night|^nj$/i.test(String(r || "").trim()),
+          s = n.replace(/[\(\[（]\s*NJ\s*[\)\]）]/gi, "").replace(/\s{2,}/g, " ").trim();
+        return { address: s, nightJob: l };
+      }
+      function kgCopy3LineList(t) {
+        const r = [];
+        for (const n of t) {
+          const l = Ca(n, "");
+          l && !r.some((s) => s.toLowerCase() === l.toLowerCase()) && r.push(l);
+        }
+        return r;
+      }
+      function kgCopy3(t, r, n = []) {
+        const l = new Map();
+        for (const m of kgSortAssignmentsByLorry(r)) {
+          var v;
+          const x = kgCopy3AddressInfo((v = m.site) == null ? void 0 : v.address, m.shift),
+            p = x.address || "No address",
+            g = (m.assignment_workers || []).map((E) => kgCopyPersonName(E.worker)).filter(Boolean),
+            S = kgAssignmentLorryRows(m).map((E) => kgLorryText(E.lorry)).filter(Boolean);
+          if (!g.length && !S.length) continue;
+          const w = p.toLowerCase();
+          l.has(w) || l.set(w, { address: p, nightJob: !1, lorries: [], workers: [], order: kgFirstLorrySortOrder(m) || m.sort_order || 0 });
+          const _ = l.get(w);
+          (_.nightJob = _.nightJob || x.nightJob, _.lorries.push(...(S.length ? S : ["No lorry"])), _.workers.push(...g));
+        }
+        const s = [...l.values()]
+            .sort((m, v) => {
+              const x = Number(m.order || 0) - Number(v.order || 0);
+              if (x) return x;
+              return m.address.localeCompare(v.address, void 0, { numeric: !0, sensitivity: "base" });
+            })
+            .map((m) => {
+              const v = [`*${m.address}*`];
+              m.nightJob && v.push("*Night Job*");
+              const x = kgCopy3LineList(m.lorries).join(" + "),
+                p = kgCopy3LineList(m.workers).join(" + ");
+              x && v.push(`- ${x}`);
+              p && v.push(`- ${p}`);
+              return v.join(`
+`);
+            }),
+          f = (n || []).map(kgFormatExtraCopy1).filter(Boolean),
+          c = [...s, ...f].filter(Boolean);
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - Job*`, c.join(`
+
+`)].filter(Boolean).join(`
+
+`));
+      }
       async function vC(t) {
         let r = !1;
         async function n(ke) {
@@ -36644,7 +36696,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await oe();
         }
         async function ee(V, xe = !1) {
-          const ke = V === 1 ? mC(n, kgVisibleAssignments, c, p.lorries) : xC(n, kgVisibleAssignments);
+          const ke = V === 1 ? mC(n, kgVisibleAssignments, c, p.lorries) : V === 2 ? xC(n, kgVisibleAssignments) : kgCopy3(n, kgVisibleAssignments, c);
           (await vC(ke), He(`Copy ${V} ready. Edit box first if needed.`));
         }
         return d.jsxs("div", {
@@ -37051,7 +37103,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1 and Copy 2 follow the Boss/Project tick filter above. Edit the copy box, then Copy again will copy your edited text.",
+                        "Copy 1, Copy 2 and Copy 3 follow the Boss/Project tick filter above. Edit the copy box, then Copy again will copy your edited text.",
                     }),
                   ],
                 }),
@@ -37067,6 +37119,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       className: "copy-button alt",
                       onClick: () => ee(2),
                       children: [d.jsx(jx, { size: 16 }), "Copy 2"],
+                    }),
+                    d.jsxs("button", {
+                      className: "copy-button",
+                      onClick: () => ee(3),
+                      children: [d.jsx(jx, { size: 16 }), "Copy 3"],
                     }),
                     d.jsxs("button", {
                       className: "whatsapp-button",
