@@ -16200,6 +16200,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           { to: "/", label: "Summary", icon: aE },
           { to: "/calendar", label: "Calendar", icon: fl },
           { to: "/planner", label: "Planner", icon: eE },
+          { to: "/phone-view", label: "1 Page View", icon: aE },
           { to: "/logistics", label: "Logistics", icon: b0 },
           { to: "/manpower-search", label: "Name Search", icon: fE },
           { to: "/deliveries", label: "Delivery", icon: Q0 },
@@ -36451,7 +36452,7 @@ Worker : ${n}`;
         notes: "",
         worker_ids: [],
       };
-      function pC({ profile: t }) {
+      function pC({ profile: t, phoneView: kgPhoneOnly = !1 }) {
         const r = t.role === "admin" || t.role === "operation",
           [n, l] = q.useState(ri(1)),
           [s, f] = q.useState([]),
@@ -36610,6 +36611,25 @@ Worker : ${n}`;
           kgSelectedSite = q.useMemo(
             () => p.sites.find((V) => Number(V.id) === Number(w.site_id)) || null,
             [p.sites, w.site_id],
+          ),
+          kgPhoneOnePageRows = q.useMemo(
+            () =>
+              kgRows.map((V, xe) => {
+                var ke;
+                const Le = kgLorryExcelList(V),
+                  Qe = xe > 0 ? kgLorryExcelList(kgRows[xe - 1]) : "";
+                return {
+                  lorry: Le || "No lorry",
+                  worker: kgWorkerNamesForAssignment(V, kgRankMap).join(" + ") || "-",
+                  foreman: kgForemanNamesForAssignment(V, kgRankMap).join(" + ") || "-",
+                  date: kgExcelDate(n),
+                  pic: V.pic || ((V.site || {}).pic) || "",
+                  address: Ca((ke = V.site) == null ? void 0 : ke.address, ""),
+                  groupBreak: xe > 0 && Le !== Qe,
+                  pause: kgSiteIsPause(V.site),
+                };
+              }),
+            [kgRows, kgRankMap, n],
           );
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
@@ -36843,7 +36863,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           (await vC(ke), He(`Copy ${V} ready. Edit box first if needed.`));
         }
         return d.jsxs("div", {
-          className: "page",
+          className: kgPhoneOnly ? "page phone-one-page-mode" : "page",
           children: [
             W && d.jsx("div", { className: "toast", children: W }),
             d.jsxs("header", {
@@ -36855,10 +36875,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       className: "eyebrow",
                       children: "Daily deployment",
                     }),
-                    d.jsx("h1", { children: "Planner" }),
+                    d.jsx("h1", { children: kgPhoneOnly ? "1 Page Phone View" : "Planner" }),
                     d.jsx("p", {
-                      children:
-                        "Same worker may be used at different sites; the website warns before saving.",
+                      children: kgPhoneOnly
+                        ? "Phone-friendly whole-day job sheet. Same Lorry / Worker / Foreman / Date / P.I.C. / Address format."
+                        : "Same worker may be used at different sites; the website warns before saving.",
                     }),
                   ],
                 }),
@@ -36899,6 +36920,63 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 }),
               ],
             }),
+            kgPhoneOnly &&
+              d.jsxs("section", {
+                className: "phone-one-page-panel",
+                children: [
+                  d.jsxs("div", {
+                    className: "phone-one-page-title",
+                    children: [
+                      d.jsxs("div", {
+                        children: [
+                          d.jsx("strong", { children: "1 Page View" }),
+                          d.jsxs("span", {
+                            children: [kgPhoneOnePageRows.length, " job site", kgPhoneOnePageRows.length === 1 ? "" : "s"],
+                          }),
+                        ],
+                      }),
+                      d.jsx("span", { children: "No side scroll" }),
+                    ],
+                  }),
+                  d.jsx("div", {
+                    className: "phone-one-page-sheet",
+                    children: kgPhoneOnePageRows.length === 0
+                      ? d.jsx("div", { className: "empty-state", children: "No job site for this day." })
+                      : d.jsxs("table", {
+                          className: "phone-job-table",
+                          children: [
+                            d.jsx("thead", {
+                              children: d.jsxs("tr", {
+                                children: [
+                                  d.jsx("th", { children: "LORRY" }),
+                                  d.jsx("th", { children: "WORKER" }),
+                                  d.jsx("th", { children: "FOREMAN" }),
+                                  d.jsx("th", { children: "DATE" }),
+                                  d.jsx("th", { children: "PIC" }),
+                                  d.jsx("th", { children: "ADDRESS" }),
+                                ],
+                              }),
+                            }),
+                            d.jsx("tbody", {
+                              children: kgPhoneOnePageRows.map((V, xe) =>
+                                d.jsxs("tr", {
+                                  className: `${V.groupBreak ? "lorry-break " : ""}${V.pause ? "pause-row" : ""}`.trim(),
+                                  children: [
+                                    d.jsx("td", { children: V.lorry }),
+                                    d.jsx("td", { children: V.worker }),
+                                    d.jsx("td", { children: V.foreman }),
+                                    d.jsx("td", { children: V.date }),
+                                    d.jsx("td", { children: V.pic || "-" }),
+                                    d.jsx("td", { children: V.pause ? `${V.address} (PAUSE)` : V.address }),
+                                  ],
+                                }, `${V.address}-${xe}`),
+                              ),
+                            }),
+                          ],
+                        }),
+                  }),
+                ],
+              }),
             d.jsxs("div", {
               className: "site-type-filter planner-type-filter",
               children: [
@@ -40779,6 +40857,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         element: d.jsx(pC, { profile: t }),
                       }),
                       d.jsx(jn, {
+                        path: "/phone-view",
+                        element: d.jsx(pC, { profile: t, phoneView: !0 }),
+                      }),
+                      d.jsx(jn, {
                         path: "/logistics",
                         element: d.jsx(kgLogisticsPage, { profile: t }),
                       }),
@@ -43345,6 +43427,148 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #075985;
         font-size: 12px;
         font-weight: 800;
+      }
+
+
+      /* Planner 1 Page Phone View v26 */
+      .phone-one-page-panel {
+        background: #ffffff;
+        border: 1px solid #cce7df;
+        border-radius: 18px;
+        box-shadow: 0 14px 34px rgba(15, 118, 110, 0.08);
+        padding: 12px;
+        margin: 0 0 16px;
+      }
+      .phone-one-page-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--ink);
+      }
+      .phone-one-page-title strong {
+        display: block;
+        font-size: 15px;
+        line-height: 1.1;
+      }
+      .phone-one-page-title span {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 800;
+      }
+      .phone-one-page-sheet {
+        width: 100%;
+        overflow: visible;
+      }
+      .phone-job-table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        border: 1px solid #d7e8e3;
+        font-size: clamp(5.7px, 1.58vw, 10px);
+        line-height: 1.08;
+        color: #0f172a;
+      }
+      .phone-job-table th,
+      .phone-job-table td {
+        border: 1px solid #dbe7e4;
+        padding: 2px 3px;
+        vertical-align: top;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
+      .phone-job-table th {
+        background: #f0fdfa;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+      }
+      .phone-job-table tr.lorry-break td {
+        border-top: 3px solid #94a3b8;
+      }
+      .phone-job-table tr.pause-row td {
+        background: #fff7ed;
+      }
+      .phone-job-table th:nth-child(1),
+      .phone-job-table td:nth-child(1) { width: 16%; }
+      .phone-job-table th:nth-child(2),
+      .phone-job-table td:nth-child(2) { width: 24%; }
+      .phone-job-table th:nth-child(3),
+      .phone-job-table td:nth-child(3) { width: 20%; }
+      .phone-job-table th:nth-child(4),
+      .phone-job-table td:nth-child(4) { width: 8%; }
+      .phone-job-table th:nth-child(5),
+      .phone-job-table td:nth-child(5) { width: 10%; }
+      .phone-job-table th:nth-child(6),
+      .phone-job-table td:nth-child(6) { width: 22%; }
+      .phone-one-page-mode {
+        max-width: 100vw;
+        padding: 8px;
+      }
+      .phone-one-page-mode .planner-header {
+        margin-bottom: 6px;
+      }
+      .phone-one-page-mode .planner-header .eyebrow,
+      .phone-one-page-mode .planner-header p:not(.eyebrow) {
+        display: none;
+      }
+      .phone-one-page-mode .planner-header h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+      .phone-one-page-mode .date-controls {
+        gap: 4px;
+      }
+      .phone-one-page-mode .date-picker {
+        min-height: 32px;
+        padding: 0 8px;
+      }
+      .phone-one-page-mode .date-picker input {
+        font-size: 12px;
+      }
+      .phone-one-page-mode .icon-button {
+        width: 32px;
+        height: 32px;
+        min-height: 32px;
+      }
+      .phone-one-page-mode .date-banner {
+        margin-bottom: 8px;
+        padding: 7px 9px;
+        border-radius: 10px;
+      }
+      .phone-one-page-mode .site-type-filter,
+      .phone-one-page-mode .warning-grid,
+      .phone-one-page-mode .summary-grid,
+      .phone-one-page-mode .copy-bar,
+      .phone-one-page-mode .planner-grid {
+        display: none !important;
+      }
+      @media (max-width: 600px) {
+        .phone-one-page-panel {
+          border-radius: 10px;
+          padding: 5px;
+          margin: 0;
+          box-shadow: none;
+        }
+        .phone-one-page-title {
+          margin-bottom: 4px;
+        }
+        .phone-one-page-title strong {
+          font-size: 12px;
+        }
+        .phone-one-page-title span {
+          font-size: 8px;
+        }
+        .phone-job-table {
+          font-size: clamp(4.8px, 1.45vw, 7px);
+          line-height: 1.02;
+        }
+        .phone-job-table th,
+        .phone-job-table td {
+          padding: 1px 1.5px;
+        }
       }
 
 
