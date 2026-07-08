@@ -36267,15 +36267,15 @@ Worker : ${c}`;
           f = kgSortAssignmentsByLorry(r || []).map(kgCopyPicLine).filter(Boolean),
           c = kgCopy3LineList(
             (n || [])
-              .filter((m) => kgSiteIsPause(m))
-              .map((m) => kgCopyPicSiteAddress(m.address)),
+              .map((m) => kgCopyPicSiteAddress(m.address))
+              .filter(Boolean),
           ),
           m = [];
         if (f.length) m.push(f.join(`
 
 `));
         if (c.length)
-          m.push(["*Pause Today*", ...c.map((v) => `- ${v} (PAUSE)`) ].join(`
+          m.push(["*Pause Today*", ...c.map((v) => `- ${v}`)].join(`
 `));
         return kgCleanCopyText([`*${kgCopyDateTitle(t)} - ${s}*`, m.join(`
 
