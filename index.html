@@ -16510,7 +16510,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             qe
               .from("sites")
               .select("*")
-              .eq("status", "active")
+              .in("status", ["active", "pause"])
               .order("address"),
             qe
               .from("workers")
@@ -36045,6 +36045,23 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             sensitivity: "base",
           }),
         );
+      function kgSiteStatusRank(t) {
+        const r = String((t == null ? void 0 : t.status) || "active").toLowerCase();
+        return r === "active" ? 0 : r === "pause" ? 1 : r === "closed" ? 2 : 3;
+      }
+      function kgSiteIsPause(t) {
+        return String((t == null ? void 0 : t.status) || "").toLowerCase() === "pause";
+      }
+      function kgSiteOptionLabel(t) {
+        const r = Ca((t == null ? void 0 : t.address) || "");
+        return kgSiteIsPause(t) ? `${r} (PAUSE)` : r;
+      }
+      function kgWarnPauseSite(t) {
+        if (kgSiteIsPause(t)) window.alert(`This site is PAUSE:
+${Ca(t.address)}
+
+Please check before assigning manpower.`);
+      }
       function kgSortMasterRows(t, r, n) {
         const l = [...(t || [])],
           s = l.some((f) => Number(f.sort_order || 0) !== 0);
@@ -36053,6 +36070,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             const m = Number(f.sort_order || 0),
               v = Number(c.sort_order || 0);
             if (m !== v) return m - v;
+          }
+          if (r === "sites") {
+            const m = kgSiteStatusRank(f) - kgSiteStatusRank(c);
+            if (m) return m;
           }
           if (r === "workers" || r === "foremen")
             return kgNameNick(f).localeCompare(kgNameNick(c), void 0, {
@@ -36200,21 +36221,20 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         if (r.length) return r;
         return t.foreman && t.foreman.id ? [t.foreman] : [];
       }
-      function kgCopy3HideChinaSubName(t) {
-        const r = Ca(t, "");
-        return /^\s*(china|sub)\s*[-–—]/i.test(r);
+      function kgCopy3CleanChinaSubName(t) {
+        return Ca(t, "").replace(/^\s*(china|sub)\s*[-–—]\s*/i, "").trim();
       }
       function kgCopy3PersonParts(t) {
         return {
           workers: kgCopy3LineList(
             (t.assignment_workers || [])
-              .map((r) => kgCopyPersonName(r.worker))
-              .filter((r) => r && !kgCopy3HideChinaSubName(r)),
+              .map((r) => kgCopy3CleanChinaSubName(kgCopyPersonName(r.worker)))
+              .filter(Boolean),
           ),
           foremen: kgCopy3LineList(
             kgCopy3AssignedForemen(t)
-              .map((r) => kgForemanCopy2Person(r))
-              .filter((r) => r && !kgCopy3HideChinaSubName(r)),
+              .map((r) => kgCopy3CleanChinaSubName(kgForemanCopy2Person(r)))
+              .filter(Boolean),
           ),
         };
       }
@@ -36604,6 +36624,7 @@ Worker : ${n}`;
         }
         function P(V = "") {
           const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
+          kgWarnPauseSite(xe);
           (E("new"), _({ ...Bo, site_id: V ? String(V) : "", pic: xe && xe.pic ? xe.pic : "" }));
         }
         function N(V) {
@@ -36919,7 +36940,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         d.jsxs("div", {
                           children: [
                             d.jsx("strong", {
-                              children: "Active sites not added today",
+                              children: "Active / Pause sites not added today",
                             }),
                             d.jsxs("span", {
                               children: [
@@ -36954,17 +36975,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         je.length === 0
                           ? d.jsx("div", {
                               className: "warning-empty",
-                              children: kgActiveSitePicFilter ? "No active sites for this P.I.C. filter." : "All active sites have workers.",
+                              children: kgActiveSitePicFilter ? "No active / pause sites for this P.I.C. filter." : "All active / pause sites have workers.",
                             })
                           : je.map((V) =>
                               d.jsxs(
                                 "button",
                                 {
-                                  className: "warning-item",
+                                  className: `warning-item ${kgSiteIsPause(V) ? "pause-site" : ""}`,
                                   onClick: () => r && P(V.id),
                                   children: [
                                     d.jsx(al, { size: 14 }),
-                                    V.address,
+                                    kgSiteOptionLabel(V),
                                     r && d.jsx(ti, { size: 14 }),
                                   ],
                                 },
@@ -37345,6 +37366,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               className: "site-type-pill",
                                               children: kgSiteTypeText(V.site),
                                             }),
+                                            kgSiteIsPause(V.site) && d.jsx("span", {
+                                              className: "confirm-pill not-sent",
+                                              children: "Site is PAUSE",
+                                            }),
                                             d.jsx("span", {
                                               className: "shift-pill",
                                               children: V.shift,
@@ -37533,6 +37558,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           value: w.site_id,
                           onChange: (V) => {
                             const xe = p.sites.find((ke) => Number(ke.id) === Number(V.target.value));
+                            kgWarnPauseSite(xe);
                             _({ ...w, site_id: V.target.value, pic: w.pic || (xe && xe.pic ? xe.pic : "") });
                           },
                           required: !0,
@@ -37547,7 +37573,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               .map((V) =>
                                 d.jsx(
                                   "option",
-                                  { value: V.id, children: V.address },
+                                  { value: V.id, children: kgSiteOptionLabel(V) },
                                   V.id,
                                 ),
                               ),
@@ -37560,6 +37586,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         className: "site-history-box site-history-sticky",
                         children: [
                           d.jsx("strong", { children: "Site detail" }),
+                          kgSiteIsPause(kgSelectedSite) && d.jsx("div", { className: "site-history-line", style: { color: "#b45309", fontWeight: 800 }, children: "⚠ Site is PAUSE. Please check before assigning manpower." }),
+                          d.jsxs("div", { className: "site-history-line", children: ["Site status: ", kgSelectedSite.status || "active"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSiteForemanText(kgSelectedSite)] }),
                           d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
@@ -41481,6 +41509,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .status.closed {
         color: #7d3430;
         background: #fbe1df;
+      }
+      .warning-item.pause-site {
+        border-color: #f59e0b;
+        background: #fffbeb;
+        color: #92400e;
+        font-weight: 800;
       }
       .date-controls {
         display: flex;
