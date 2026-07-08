@@ -36248,6 +36248,41 @@ Worker : ${n}`;
       function kgCopy3AddressLine(t) {
         return `${t.address}${t.nightJob ? " - *Night Job*" : ""}`;
       }
+      function kgCopyPicSiteAddress(t) {
+        const r = Ca(t, "");
+        return r || "No address";
+      }
+      function kgCopyPicLine(t) {
+        var r;
+        const n = kgCopy3PersonParts(t),
+          l = kgCopyPicSiteAddress((r = t.site) == null ? void 0 : r.address),
+          s = kgSiteIsPause(t.site) ? " *(PAUSE)*" : "",
+          f = n.foremen && n.foremen.length ? n.foremen.join(" + ") : "-",
+          c = n.workers && n.workers.length ? n.workers.join(" + ") : "-";
+        return `- ${l}${s} - Foreman : ${f}
+Worker : ${c}`;
+      }
+      function kgCopyPic(t, r, n = [], l = "") {
+        const s = kgPlannerCleanPic(l) || "All P.I.C.",
+          f = kgSortAssignmentsByLorry(r || []).map(kgCopyPicLine).filter(Boolean),
+          c = kgCopy3LineList(
+            (n || [])
+              .filter((m) => kgSiteIsPause(m))
+              .map((m) => kgCopyPicSiteAddress(m.address)),
+          ),
+          m = [];
+        if (f.length) m.push(f.join(`
+
+`));
+        if (c.length)
+          m.push(["*Pause sites not added today*", ...c.map((v) => `- ${v} (PAUSE)`) ].join(`
+`));
+        return kgCleanCopyText([`*${kgCopyDateTitle(t)} - ${s}*`, m.join(`
+
+`) || "No site for this P.I.C."].join(`
+
+`));
+      }
       function kgCopy3(t, r, n = []) {
         const l = [], s = new Map();
         for (const E of kgSortAssignmentsByLorry(r)) {
@@ -36893,8 +36928,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await oe();
         }
         async function ee(V, xe = !1) {
-          const ke = V === 1 ? mC(n, kgVisibleAssignments, c, p.lorries) : V === 2 ? xC(n, kgVisibleAssignments) : kgCopy3(n, kgVisibleAssignments, c);
-          (await vC(ke), He(`Copy ${V} ready. Edit box first if needed.`));
+          const ke = V === 1
+            ? mC(n, kgVisibleAssignments, c, p.lorries)
+            : V === 2
+              ? xC(n, kgVisibleAssignments)
+              : V === 4
+                ? kgCopyPic(n, kgVisibleAssignments, je, kgPlannerPicFilter)
+                : kgCopy3(n, kgVisibleAssignments, c);
+          (await vC(ke), He(`${V === 4 ? "Copy P.I.C." : `Copy ${V}`} ready. Edit box first if needed.`));
         }
         return d.jsxs("div", {
           className: kgPhoneOnly ? "page phone-one-page-mode" : "page",
@@ -37364,7 +37405,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1, Copy 2 and Copy 3 follow the Boss/Project tick filter above. The Planner P.I.C. filter also filters active/pause not-added sites and site assignments together. Edit the copy box, then Copy again will copy your edited text.",
+                        "Copy 1, Copy 2 and Copy 3 follow the Boss/Project tick filter above. Copy P.I.C. copies the current P.I.C. site assignments with foreman/worker and shows pause sites. Edit the copy box, then Copy again will copy your edited text.",
                     }),
                   ],
                 }),
@@ -37385,6 +37426,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       className: "copy-button",
                       onClick: () => ee(3),
                       children: [d.jsx(jx, { size: 16 }), "Copy 3"],
+                    }),
+                    d.jsxs("button", {
+                      className: "copy-button alt",
+                      onClick: () => ee(4),
+                      children: [d.jsx(jx, { size: 16 }), "Copy P.I.C."],
                     }),
                     d.jsxs("button", {
                       className: "whatsapp-button",
