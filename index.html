@@ -36452,6 +36452,31 @@ Worker : ${n}`;
         notes: "",
         worker_ids: [],
       };
+      function kgPlannerCleanPic(t) {
+        return String(t || "").trim();
+      }
+      function kgPlannerPicKey(t) {
+        return kgPlannerCleanPic(t).toUpperCase();
+      }
+      function kgPlannerAssignmentPic(t) {
+        return kgPlannerCleanPic((t == null ? void 0 : t.pic) || ((t == null ? void 0 : t.site) || {}).pic || (t == null ? void 0 : t.site_pic));
+      }
+      function kgPlannerSitePic(t) {
+        return kgPlannerCleanPic((t == null ? void 0 : t.pic) || (t == null ? void 0 : t.site_pic));
+      }
+      function kgPlannerPicMatch(t, r) {
+        const n = kgPlannerPicKey(r);
+        return !n || kgPlannerPicKey(t) === n;
+      }
+      function kgPlannerPicOptionsFrom(t) {
+        const r = new Map();
+        (t || []).forEach((n) => {
+          const l = kgPlannerCleanPic(n),
+            s = kgPlannerPicKey(l);
+          s && !r.has(s) && r.set(s, l);
+        });
+        return [...r.values()].sort((n, l) => n.localeCompare(l, void 0, { numeric: !0, sensitivity: "base" }));
+      }
       function pC({ profile: t, phoneView: kgPhoneOnly = !1 }) {
         const r = t.role === "admin" || t.role === "operation",
           [n, l] = q.useState(ri(1)),
@@ -36473,8 +36498,11 @@ Worker : ${n}`;
           [J, j] = q.useState(""),
           [fe, G] = q.useState(!0),
           [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 }),
-          [kgActiveSitePicFilter, kgSetActiveSitePicFilter] = q.useState(""),
-          [kgAssignmentPicFilter, kgSetAssignmentPicFilter] = q.useState(""),
+          [kgPlannerPicFilter, kgSetPlannerPicFilter] = q.useState(""),
+          kgActiveSitePicFilter = kgPlannerPicFilter,
+          kgSetActiveSitePicFilter = kgSetPlannerPicFilter,
+          kgAssignmentPicFilter = kgPlannerPicFilter,
+          kgSetAssignmentPicFilter = kgSetPlannerPicFilter,
           [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
           [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1);
         async function de() {
@@ -36546,28 +36574,32 @@ Worker : ${n}`;
             () => s.filter((V) => kgSiteTypeMatches(V.site, kgSiteTypeFilter)),
             [s, kgSiteTypeFilter],
           ),
-          kgAssignmentPicOptions = [...new Set(kgAssignmentBase.map((V) => String((V == null ? void 0 : V.pic) || ((V == null ? void 0 : V.site) || {}).pic || (V == null ? void 0 : V.site_pic) || "").trim()).filter(Boolean))].sort((V, xe) => V.localeCompare(xe, void 0, { numeric: !0, sensitivity: "base" })),
+          kgAssignmentPicOptions = kgPlannerPicOptionsFrom(kgAssignmentBase.map((V) => kgPlannerAssignmentPic(V))),
           kgVisibleAssignments = q.useMemo(
-            () => kgAssignmentBase.filter((V) => !kgAssignmentPicFilter || String((V == null ? void 0 : V.pic) || ((V == null ? void 0 : V.site) || {}).pic || (V == null ? void 0 : V.site_pic) || "").trim() === kgAssignmentPicFilter),
-            [kgAssignmentBase, kgAssignmentPicFilter],
+            () => kgAssignmentBase.filter((V) => kgPlannerPicMatch(kgPlannerAssignmentPic(V), kgPlannerPicFilter)),
+            [kgAssignmentBase, kgPlannerPicFilter],
           ),
           ge = q.useMemo(() => Go(kgVisibleAssignments), [kgVisibleAssignments]),
           Ne = q.useMemo(() => op(kgVisibleAssignments), [kgVisibleAssignments]),
           Ye = q.useMemo(
             () =>
               new Set(
-                kgVisibleAssignments
+                kgAssignmentBase
                   .map((V) => {
                     var xe;
                     return Number((xe = V.site) == null ? void 0 : xe.id);
                   })
                   .filter(Boolean),
               ),
-            [kgVisibleAssignments],
+            [kgAssignmentBase],
           ),
           kgActiveSiteBase = p.sites.filter((V) => kgSiteTypeMatches(V, kgSiteTypeFilter) && !Ye.has(Number(V.id))),
-          kgActiveSitePicOptions = [...new Set(kgActiveSiteBase.map((V) => String((V == null ? void 0 : V.pic) || (V == null ? void 0 : V.site_pic) || "").trim()).filter(Boolean))].sort((V, xe) => V.localeCompare(xe, void 0, { numeric: !0, sensitivity: "base" })),
-          je = kgActiveSiteBase.filter((V) => !kgActiveSitePicFilter || String((V == null ? void 0 : V.pic) || (V == null ? void 0 : V.site_pic) || "").trim() === kgActiveSitePicFilter),
+          kgPlannerPicOptions = kgPlannerPicOptionsFrom([
+            ...kgAssignmentBase.map((V) => kgPlannerAssignmentPic(V)),
+            ...kgActiveSiteBase.map((V) => kgPlannerSitePic(V)),
+          ]),
+          kgActiveSitePicOptions = kgPlannerPicOptions,
+          je = kgActiveSiteBase.filter((V) => kgPlannerPicMatch(kgPlannerSitePic(V), kgPlannerPicFilter)),
           re = p.workers.filter((V) => !ge.has(Number(V.id))),
           kgSkilledWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "skilled"),
           kgGeneralWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "general"),
@@ -37003,6 +37035,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     " Project site",
                   ],
                 }),
+                d.jsxs("label", {
+                  className: "planner-pic-filter",
+                  style: { marginLeft: "auto", minWidth: "220px" },
+                  children: [
+                    "Filter whole planner P.I.C.",
+                    d.jsxs("select", {
+                      value: kgPlannerPicFilter,
+                      onChange: (V) => kgSetPlannerPicFilter(V.target.value),
+                      style: { flex: "1 1 auto", minWidth: 0, padding: "6px 8px", borderRadius: "10px", border: "1px solid #99f6e4" },
+                      children: [
+                        d.jsx("option", { value: "", children: "All P.I.C." }),
+                        ...kgPlannerPicOptions.map((V) => d.jsx("option", { value: V, children: V }, V)),
+                      ],
+                    }),
+                  ],
+                }),
               ],
             }),
             d.jsxs("div", {
@@ -37031,29 +37079,19 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
-                    d.jsxs("label", {
-                      className: "pic-filter-inline",
-                      style: { display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", marginBottom: "8px", fontSize: "12px", fontWeight: 700 },
-                      children: [
-                        "Filter P.I.C.",
-                        d.jsxs("select", {
-                          value: kgActiveSitePicFilter,
-                          onChange: (V) => kgSetActiveSitePicFilter(V.target.value),
-                          style: { flex: "1 1 auto", minWidth: 0, padding: "6px 8px", borderRadius: "10px", border: "1px solid #fed7aa" },
-                          children: [
-                            d.jsx("option", { value: "", children: "All P.I.C." }),
-                            ...kgActiveSitePicOptions.map((V) => d.jsx("option", { value: V, children: V }, V)),
-                          ],
-                        }),
-                      ],
-                    }),
+                    kgPlannerPicFilter &&
+                      d.jsxs("div", {
+                        className: "pic-filter-inline",
+                        style: { display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", marginBottom: "8px", fontSize: "12px", fontWeight: 700, color: "#0f766e" },
+                        children: ["Showing P.I.C.: ", d.jsx("strong", { children: kgPlannerPicFilter })],
+                      }),
                     d.jsx("div", {
                       className: "warning-list",
                       children:
                         je.length === 0
                           ? d.jsx("div", {
                               className: "warning-empty",
-                              children: kgActiveSitePicFilter ? "No active / pause sites for this P.I.C. filter." : "All active / pause sites have workers.",
+                              children: kgPlannerPicFilter ? "No active / pause sites for this P.I.C. filter." : "All active / pause sites have workers.",
                             })
                           : je.map((V) =>
                               d.jsxs(
@@ -37324,7 +37362,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1, Copy 2 and Copy 3 follow the Boss/Project tick filter above. Edit the copy box, then Copy again will copy your edited text.",
+                        "Copy 1, Copy 2 and Copy 3 follow the Boss/Project tick filter above. The Planner P.I.C. filter also filters active/pause not-added sites and site assignments together. Edit the copy box, then Copy again will copy your edited text.",
                     }),
                   ],
                 }),
@@ -37377,22 +37415,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             }),
                           ],
                         }),
-                        d.jsxs("label", {
-                          className: "pic-filter-inline",
-                          style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: 700, minWidth: "220px" },
-                          children: [
-                            "Filter P.I.C.",
-                            d.jsxs("select", {
-                              value: kgAssignmentPicFilter,
-                              onChange: (V) => kgSetAssignmentPicFilter(V.target.value),
-                              style: { flex: "1 1 auto", minWidth: 0, padding: "6px 8px", borderRadius: "10px", border: "1px solid #99f6e4" },
-                              children: [
-                                d.jsx("option", { value: "", children: "All P.I.C." }),
-                                ...kgAssignmentPicOptions.map((V) => d.jsx("option", { value: V, children: V }, V)),
-                              ],
-                            }),
-                          ],
-                        }),
+                        kgPlannerPicFilter &&
+                          d.jsxs("span", {
+                            className: "pic-filter-inline",
+                            style: { display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: "#0f766e" },
+                            children: ["P.I.C.: ", d.jsx("strong", { children: kgPlannerPicFilter })],
+                          }),
                         r &&
                           d.jsxs("button", {
                             className: "primary-button",
@@ -37411,7 +37439,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         : kgVisibleAssignments.length === 0
                           ? d.jsx("div", {
                               className: "empty-state",
-                              children: kgAssignmentPicFilter ? "No assignments for this P.I.C. filter." : "No assignments for this day.",
+                              children: kgPlannerPicFilter ? "No assignments for this P.I.C. filter." : "No assignments for this day.",
                             })
                           : kgRows.map((V) => {
                               var Qe, Ve;
@@ -43413,6 +43441,15 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .site-type-filter input[type="checkbox"] {
         width: 18px;
         height: 18px;
+      }
+      .site-type-filter select {
+        max-width: 180px;
+        font: inherit;
+        font-weight: 800;
+        background: #ffffff;
+      }
+      .site-type-filter .planner-pic-filter {
+        flex-wrap: nowrap;
       }
       .planner-type-filter,
       .calendar-type-filter {
