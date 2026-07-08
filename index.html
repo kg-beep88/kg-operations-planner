@@ -36581,6 +36581,8 @@ Worker : ${n}`;
           ),
           ge = q.useMemo(() => Go(kgVisibleAssignments), [kgVisibleAssignments]),
           Ne = q.useMemo(() => op(kgVisibleAssignments), [kgVisibleAssignments]),
+          kgAllAssignedWorkers = q.useMemo(() => Go(kgAssignmentBase), [kgAssignmentBase]),
+          kgAllAssignedForemen = q.useMemo(() => op(kgAssignmentBase), [kgAssignmentBase]),
           Ye = q.useMemo(
             () =>
               new Set(
@@ -36600,10 +36602,10 @@ Worker : ${n}`;
           ]),
           kgActiveSitePicOptions = kgPlannerPicOptions,
           je = kgActiveSiteBase.filter((V) => kgPlannerPicMatch(kgPlannerSitePic(V), kgPlannerPicFilter)),
-          re = p.workers.filter((V) => !ge.has(Number(V.id))),
+          re = p.workers.filter((V) => !kgAllAssignedWorkers.has(Number(V.id))),
           kgSkilledWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "skilled"),
           kgGeneralWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "general"),
-          X = p.foremen.filter((V) => !Ne.has(Number(V.id))),
+          X = p.foremen.filter((V) => !kgAllAssignedForemen.has(Number(V.id))),
           kgProjectForemenWithoutSite = X.filter((V) => kgForemanType(V) === "project"),
           kgBossForemenWithoutSite = X.filter((V) => kgForemanType(V) === "boss"),
           Te = new Set(
