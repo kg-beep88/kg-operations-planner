@@ -36275,7 +36275,7 @@ Worker : ${c}`;
 
 `));
         if (c.length)
-          m.push(["*Pause sites not added today*", ...c.map((v) => `- ${v} (PAUSE)`) ].join(`
+          m.push(["*Pause Today*", ...c.map((v) => `- ${v} (PAUSE)`) ].join(`
 `));
         return kgCleanCopyText([`*${kgCopyDateTitle(t)} - ${s}*`, m.join(`
 
@@ -37405,7 +37405,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("strong", { children: "WhatsApp copies" }),
                     d.jsx("span", {
                       children:
-                        "Copy 1, Copy 2 and Copy 3 follow the Boss/Project tick filter above. Copy P.I.C. copies the current P.I.C. site assignments with foreman/worker and shows pause sites. Edit the copy box, then Copy again will copy your edited text.",
+                        "Copy 1, Copy 2 and Copy 3 follow the Boss/Project tick filter above. Copy P.I.C. copies the current P.I.C. site assignments with foreman/worker and shows Pause Today sites. Edit the copy box, then Copy again will copy your edited text.",
                     }),
                   ],
                 }),
