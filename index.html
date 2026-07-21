@@ -16492,14 +16492,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       const _s = `
   id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed, lorry_id,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,is_boss_site,is_project_site),
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(*, worker:workers(id,name,nickname,status,worker_type))
 `,
         w0 = `
-  id, delivery_date, sent_on, notes, created_at, updated_at,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,is_boss_site,is_project_site),
+  id, delivery_date, delivery_driver, billing_date, billing_no, sent_on, notes, created_at, updated_at,
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
   delivery_order_items(
     id, catalog_item_id, category, item_name, size,
     quantity_delivered, quantity_returned, unit_cost, sort_order
@@ -16543,7 +16543,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               : c.error;
         return {
           data: {
-            sites: t.data || [],
+            sites: kgSortMasterRows(t.data || [], "sites", "address"),
             workers: kgSortNick(r.data || []),
             lorries: n.data || [],
             foremen: kgSortNick(l.data || []),
@@ -36145,6 +36145,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgSiteIsPause(t) {
         return String((t == null ? void 0 : t.status) || "").toLowerCase() === "pause";
       }
+      const kgBossPicChoices = ["DARREN", "C.MARK"],
+        kgProjectPicChoices = ["CHESTER", "YOLANDA", "SHAYNE", "WEI YEE", "RYAN"];
+      function kgSitePicChoices(t) {
+        return String(t || "boss").toLowerCase() === "project" ? kgProjectPicChoices : kgBossPicChoices;
+      }
+      function kgSiteSelectOptions(t, r) {
+        if (!t) return [];
+        if (typeof t.options == "function") return t.options(r || {});
+        return t.options || [];
+      }
       function kgSiteOptionLabel(t) {
         const r = Ca((t == null ? void 0 : t.address) || "");
         return kgSiteIsPause(t) ? `${r} (PAUSE)` : r;
@@ -38981,6 +38991,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         Nv = (t) => ({
           site_id: "",
           delivery_date: t,
+          delivery_driver: "",
+          billing_date: "",
+          billing_no: "",
           sent: !1,
           sent_on: null,
           notes: "",
@@ -39047,6 +39060,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             g({
               site_id: String(((Te = X.site) == null ? void 0 : Te.id) || ""),
               delivery_date: X.delivery_date,
+              delivery_driver: X.delivery_driver || "",
+              billing_date: X.billing_date || "",
+              billing_no: X.billing_no || "",
               sent: !!X.sent_on,
               sent_on: X.sent_on,
               notes: X.notes || "",
@@ -39112,9 +39128,27 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               _(!1));
             return;
           }
+          let kgDupQuery = qe
+            .from("delivery_orders")
+            .select("id")
+            .eq("delivery_date", p.delivery_date)
+            .eq("site_id", Number(p.site_id));
+          if (v !== "new") kgDupQuery = kgDupQuery.neq("id", v);
+          const { data: kgDupOrders, error: kgDupError } = await kgDupQuery.limit(1);
+          if (kgDupError) {
+            (D(kgDupError.message), _(!1));
+            return;
+          }
+          if ((kgDupOrders || []).length && !window.confirm("This site already has delivery on the same date. Save one more delivery order for this same site and date?")) {
+            _(!1);
+            return;
+          }
           const He = {
             delivery_date: p.delivery_date,
             site_id: Number(p.site_id),
+            delivery_driver: String(p.delivery_driver || "").trim() || null,
+            billing_date: p.billing_date || null,
+            billing_no: String(p.billing_no || "").trim() || null,
             sent_on: p.sent ? p.sent_on || new Date().toISOString() : null,
             notes: p.notes || null,
           };
@@ -39313,7 +39347,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     children: [
                       d.jsx("h2", { children: "Orders" }),
                       d.jsx("span", {
-                        children: "One delivery order per site per date",
+                        children: "Delivery orders for selected day. Same site/date will prompt before saving.",
                       }),
                     ],
                   }),
@@ -39357,6 +39391,16 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                         }),
                                         d.jsx("p", {
                                           children: X.notes || "No notes",
+                                        }),
+                                        d.jsxs("p", {
+                                          className: "muted",
+                                          children: [
+                                            "Driver: ",
+                                            X.delivery_driver || "-",
+                                            " · Billing: ",
+                                            X.billing_no || "-",
+                                            X.billing_date ? ` (${cp(X.billing_date)})` : "",
+                                          ],
                                         }),
                                       ],
                                     }),
@@ -39513,12 +39557,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               children: [
                                 d.jsx("option", {
                                   value: "",
-                                  children: "Choose active site",
+                                  children: "Choose active / pause site",
                                 }),
                                 s.sites.map((X) =>
                                   d.jsx(
                                     "option",
-                                    { value: X.id, children: X.address },
+                                    { value: X.id, children: `${X.address}${kgSiteIsPause(X) ? " (PAUSE)" : ""}${X.site_info ? ` · ${X.site_info}` : ""}` },
                                     X.id,
                                   ),
                                 ),
@@ -39535,6 +39579,39 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               onChange: (X) =>
                                 g({ ...p, delivery_date: X.target.value }),
                               required: !0,
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Delivery driver",
+                            d.jsx("input", {
+                              value: p.delivery_driver || "",
+                              onChange: (X) =>
+                                g({ ...p, delivery_driver: X.target.value }),
+                              placeholder: "Driver name / lorry",
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Billing date",
+                            d.jsx("input", {
+                              type: "date",
+                              value: p.billing_date || "",
+                              onChange: (X) =>
+                                g({ ...p, billing_date: X.target.value }),
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Billing no.",
+                            d.jsx("input", {
+                              value: p.billing_no || "",
+                              onChange: (X) =>
+                                g({ ...p, billing_no: X.target.value }),
+                              placeholder: "Invoice / billing no.",
                             }),
                           ],
                         }),
@@ -40241,10 +40318,15 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               : J.type === "select"
                                 ? d.jsx("select", {
                                     value: p[J.name] || "",
-                                    onChange: (j) =>
-                                      g({ ...p, [J.name]: j.target.value }),
+                                    onChange: (j) => {
+                                      const fe = j.target.value;
+                                      if (r.table === "sites" && J.name === "site_type") {
+                                        const G = kgSitePicChoices(fe);
+                                        g({ ...p, site_type: fe, pic: G.includes(p.pic) ? p.pic : "" });
+                                      } else g({ ...p, [J.name]: fe });
+                                    },
                                     required: J.required,
-                                    children: J.options.map(([j, fe]) =>
+                                    children: kgSiteSelectOptions(J, p).map(([j, fe]) =>
                                       d.jsx(
                                         "option",
                                         { value: j, children: fe },
@@ -40877,8 +40959,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           columns: [
             { key: "address", label: "Address" },
             { key: "site_type", label: "Site type" },
+            { key: "site_info", label: "Site info" },
             { key: "foreman_in_charge", label: "Foreman in charge" },
-            { key: "foreman_detail", label: "ID Firm detail" },
+            { key: "id_name_tel", label: "ID Name & Tel" },
+            { key: "lock_info", label: "Lock info" },
             { key: "pic", label: "P.I.C." },
             { key: "notes", label: "Notes" },
           ],
@@ -40894,12 +40978,32 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 ["project", "Project site"],
               ],
             },
+            {
+              name: "pic",
+              label: "P.I.C.",
+              type: "select",
+              required: !0,
+              options: (J) => [["", "Choose P.I.C."], ...kgSitePicChoices(J.site_type).map((j) => [j, j])],
+            },
+            {
+              name: "site_info",
+              label: "Site info",
+              type: "select",
+              options: [
+                ["", "Choose site info"],
+                ["Commercial", "Commercial"],
+                ["HDB", "HDB"],
+                ["Condo", "Condo"],
+                ["Landed", "Landed"],
+              ],
+            },
             { name: "foreman_in_charge", label: "Foreman in charge" },
+            { name: "id_name_tel", label: "ID Name & Tel", wide: !0 },
+            { name: "lock_info", label: "Lock info", wide: !0 },
             { name: "foreman_detail", label: "ID Firm detail", type: "textarea", wide: !0 },
-            { name: "pic", label: "P.I.C." },
             { name: "notes", label: "Notes", type: "textarea", wide: !0 },
           ],
-          defaults: { site_type: "boss", is_boss_site: !0, is_project_site: !1 },
+          defaults: { site_type: "boss", is_boss_site: !0, is_project_site: !1, pic: "", site_info: "" },
         },
         workers: {
           title: "Workers",
