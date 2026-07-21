@@ -35941,6 +35941,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }
         return r;
       }
+      function kgCommonWorkerOtTime(t, r) {
+        const n = (r || []).map((l) => String((t || {})[String(l)] || "").trim());
+        if (!n.length || n.some((l) => !l)) return "";
+        return new Set(n).size === 1 ? n[0] : "";
+      }
       function kgIsSubName(t) {
         return /^sub\s*[-–—]/i.test(String(t || "").trim());
       }
@@ -36574,6 +36579,7 @@ Worker : ${c}`;
         notes: "",
         worker_ids: [],
         worker_ot: {},
+        site_ot_time: "",
       };
       function kgPlannerCleanPic(t) {
         return String(t || "").trim();
@@ -36806,20 +36812,23 @@ Worker : ${c}`;
         }
         function N(V) {
           var xe;
-          const ke = kgAssignmentLorries(V).map((Le) => Number(Le.id));
+          const ke = kgAssignmentLorries(V).map((Le) => Number(Le.id)),
+            Le = (V.assignment_workers || []).map((Qe) => Number(Qe.worker_id)),
+            Qe = kgWorkerOtMapFromAssignment(V);
           (E(V.id),
             _({
               site_id: (xe = V.site) != null && xe.id ? String(V.site.id) : "",
               lorry_id: ke.length ? String(ke[0]) : "",
               lorry_ids: ke,
-              foreman_ids: ar(V).map((Le) => Number(Le.id)),
+              foreman_ids: ar(V).map((Ve) => Number(Ve.id)),
               shift: V.shift || "day",
               job_status: V.job_status || "CONTINUE JOB",
               pic: V.pic || "",
               is_confirmed: !!V.is_confirmed,
               notes: V.notes || "",
-              worker_ids: (V.assignment_workers || []).map((Le) => Number(Le.worker_id)),
-              worker_ot: kgWorkerOtMapFromAssignment(V),
+              worker_ids: Le,
+              worker_ot: Qe,
+              site_ot_time: kgCommonWorkerOtTime(Qe, Le),
             }));
         }
         function z(V) {
@@ -36835,11 +36844,13 @@ Worker : ${c}`;
           const xe = Number(V), ke = String(V);
           _((Le) => {
             const Qe = Le.worker_ids.includes(xe), Ve = { ...(Le.worker_ot || {}) };
-            Qe && delete Ve[ke];
+            Qe ? delete Ve[ke] : Le.site_ot_time && (Ve[ke] = Le.site_ot_time);
+            const Re = Qe ? Le.worker_ids.filter((At) => At !== xe) : [...Le.worker_ids, xe];
             return {
               ...Le,
-              worker_ids: Qe ? Le.worker_ids.filter((Re) => Re !== xe) : [...Le.worker_ids, xe],
+              worker_ids: Re,
               worker_ot: Ve,
+              site_ot_time: Re.length ? Le.site_ot_time || "" : "",
             };
           });
         }
@@ -36848,7 +36859,17 @@ Worker : ${c}`;
           _((Qe) => {
             const Ve = { ...(Qe.worker_ot || {}) };
             Le ? (Ve[ke] = Le) : delete Ve[ke];
-            return { ...Qe, worker_ot: Ve };
+            return { ...Qe, worker_ot: Ve, site_ot_time: kgCommonWorkerOtTime(Ve, Qe.worker_ids || []) };
+          });
+        }
+        function kgSetAllWorkerOt(V) {
+          const xe = String(V || "").trim();
+          _((ke) => {
+            const Le = { ...(ke.worker_ot || {}) };
+            (ke.worker_ids || []).forEach((Qe) => {
+              xe ? (Le[String(Qe)] = xe) : delete Le[String(Qe)];
+            });
+            return { ...ke, site_ot_time: xe, worker_ot: Le };
           });
         }
         function kgUsePastManpower(V) {
@@ -36856,7 +36877,7 @@ Worker : ${c}`;
             ke = (V.assignment_workers || [])
               .map((Le) => Number(Le.worker_id || (Le.worker && Le.worker.id)))
               .filter(Boolean);
-          _((Le) => ({ ...Le, foreman_ids: xe, worker_ids: ke, worker_ot: {} }));
+          _((Le) => ({ ...Le, foreman_ids: xe, worker_ids: ke, worker_ot: {}, site_ot_time: "" }));
           He(`Copied same foreman + workers from ${kgHistoryDate(V.plan_date)}.`);
         }
         function kgToggleLorry(V) {
@@ -38097,6 +38118,52 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                   );
                                 }),
                             }),
+                          ],
+                        }),
+                      ],
+                    }),
+                    d.jsxs("div", {
+                      className: "wide worker-ot-all",
+                      children: [
+                        d.jsx("strong", { children: "OT for all selected workers" }),
+                        d.jsx("span", {
+                          className: "field-help",
+                          children: "Choose once, then all ticked workers in this site use the same OT end time.",
+                        }),
+                        d.jsxs("div", {
+                          className: "worker-ot-row",
+                          children: [
+                            d.jsxs("span", {
+                              className: "inline-check worker-ot-check",
+                              children: [
+                                d.jsx("input", {
+                                  type: "checkbox",
+                                  checked: !!w.site_ot_time,
+                                  onChange: (V) => kgSetAllWorkerOt(V.target.checked ? "21:00" : ""),
+                                }),
+                                " Same OT for this site",
+                              ],
+                            }),
+                            w.site_ot_time &&
+                              d.jsxs("span", {
+                                className: "worker-ot-time",
+                                children: [
+                                  "End ",
+                                  d.jsx("input", {
+                                    type: "time",
+                                    value: w.site_ot_time,
+                                    onChange: (V) => kgSetAllWorkerOt(V.target.value),
+                                  }),
+                                  d.jsx("small", {
+                                    children: kgFormatOtHours(kgOtHoursFromEndTime(w.site_ot_time)) || "0hr OT",
+                                  }),
+                                  d.jsx("small", {
+                                    children: (w.worker_ids || []).length
+                                      ? `Applied to ${(w.worker_ids || []).length} worker${(w.worker_ids || []).length === 1 ? "" : "s"}`
+                                      : "Tick workers below; they will use this OT",
+                                  }),
+                                ],
+                              }),
                           ],
                         }),
                       ],
@@ -43983,6 +44050,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }
       }
       
+      .worker-ot-all {
+        border: 1px solid #facc15;
+        background: #fefce8;
+        border-radius: 14px;
+        padding: 10px 12px;
+      }
+      .worker-ot-all strong {
+        display: block;
+        margin-bottom: 3px;
+        color: #92400e;
+      }
       .worker-ot-row {
         display: flex;
         align-items: center;
