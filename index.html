@@ -39283,23 +39283,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         );
         async function Ye(X) {
           (X.preventDefault(), _(!0), D(""), L(""));
-          const Te = p.items.filter((F) => String(F.item_name || "").trim());
-          if (!Te.length) {
-            (D("Add at least one delivery item."), _(!1));
-            return;
-          }
-          const _e = Te.find(
-            (F) =>
-              Number(F.quantity_returned || 0) >
-              Number(F.quantity_delivered || 0),
-          );
-          if (_e) {
-            (D(
-              `Returned quantity cannot be more than delivered for ${_e.item_name}.`,
-            ),
-              _(!1));
-            return;
-          }
+          const Te = [];
           let kgDupQuery = qe
             .from("delivery_orders")
             .select("id")
@@ -39358,24 +39342,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               return;
             }
           }
-          const N = Te.map((F, U) => ({
-              delivery_order_id: P,
-              catalog_item_id: F.catalog_item_id
-                ? Number(F.catalog_item_id)
-                : null,
-              category: F.category,
-              item_name: String(F.item_name).trim(),
-              size: String(F.size || "").trim(),
-              quantity_delivered: Number(F.quantity_delivered || 0),
-              quantity_returned: Number(F.quantity_returned || 0),
-              unit_cost: Number(F.unit_cost || 0),
-              sort_order: U,
-            })),
-            { error: z } = await qe.from("delivery_order_items").insert(N);
-          if (z) {
-            (D(z.message), _(!1));
-            return;
-          }
+          // Delivered item rows are no longer saved from the Delivery form.
           (x(null),
             l(p.delivery_date),
             L("Delivery saved."),
@@ -39412,7 +39379,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           (L("Delivery deleted."), await he());
         }
         return d.jsxs("div", {
-          className: "page",
+          className: "page delivery-page-no-items",
           children: [
             d.jsxs("header", {
               className: "page-header planner-header",
@@ -39426,7 +39393,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Delivery" }),
                     d.jsx("p", {
                       children:
-                        "Add delivered items, editable cost, scaffolds, ladders and partial returns.",
+                        "Create delivery record by site, date, driver, type, remark and notes.",
                     }),
                   ],
                 }),
@@ -39689,7 +39656,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                         onClick: () => fe(X),
                                         children: [
                                           d.jsx(Ds, { size: 16 }),
-                                          "Edit / Return",
+                                          "Edit delivery",
                                         ],
                                       }),
                                       d.jsxs("button", {
@@ -39716,7 +39683,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 title:
                   v === "new"
                     ? "New delivery"
-                    : "Edit delivery / returns",
+                    : "Edit delivery",
                 onClose: () => x(null),
                 children: d.jsxs("form", {
                   className: "delivery-form",
