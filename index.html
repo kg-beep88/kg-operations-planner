@@ -33972,9 +33972,21 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function Av(t) {
         return t.map((r) => {
           var n;
+          const l = r.site || {};
           return {
             Date: r.delivery_date,
             Address: ((n = r.site) == null ? void 0 : n.address) || "",
+            "Site type": kgSiteTypeText(l),
+            "P.I.C": kgSitePicText(l),
+            "Site info": l.site_info || "",
+            "Foreman in charge": l.foreman_in_charge || "",
+            "ID Firm detail": l.foreman_detail || "",
+            "ID Name & Tel": l.id_name_tel || "",
+            "Lock info": l.lock_info || "",
+            "Notes from site": l.notes || "",
+            "Delivery driver": r.delivery_driver || "",
+            "Billing date": r.billing_date || "",
+            "Billing no.": r.billing_no || "",
             "DO sent": r.sent_on ? "Yes" : "No",
             "Sent time": r.sent_on || "",
             "Total cost": Yr(r),
@@ -33986,9 +33998,21 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return t.flatMap((r) =>
           (r.delivery_order_items || []).map((n) => {
             var l;
+            const s = r.site || {};
             return {
               Date: r.delivery_date,
               Address: ((l = r.site) == null ? void 0 : l.address) || "",
+              "Site type": kgSiteTypeText(s),
+              "P.I.C": kgSitePicText(s),
+              "Site info": s.site_info || "",
+              "Foreman in charge": s.foreman_in_charge || "",
+              "ID Firm detail": s.foreman_detail || "",
+              "ID Name & Tel": s.id_name_tel || "",
+              "Lock info": s.lock_info || "",
+              "Notes from site": s.notes || "",
+              "Delivery driver": r.delivery_driver || "",
+              "Billing date": r.billing_date || "",
+              "Billing no.": r.billing_no || "",
               Category: n.category,
               Item: n.item_name,
               Size: n.size || "",
@@ -35856,6 +35880,38 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             (t == null ? void 0 : t.foreman),
           "-",
         );
+      }
+      function kgSiteDetailRows(t) {
+        return [
+          ["Site type", kgSiteTypeText(t)],
+          ["P.I.C", kgSitePicText(t)],
+          ["Site info", Ca((t == null ? void 0 : t.site_info), "-")],
+          ["Foreman in charge", Ca((t == null ? void 0 : t.foreman_in_charge), "-")],
+          ["ID Firm detail", Ca((t == null ? void 0 : t.foreman_detail), "-")],
+          ["ID Name & Tel", Ca((t == null ? void 0 : t.id_name_tel), "-")],
+          ["Lock info", Ca((t == null ? void 0 : t.lock_info), "-")],
+          ["Notes from site", Ca((t == null ? void 0 : t.notes), "-")],
+        ];
+      }
+      function kgSiteDetailBlock(t, r = "Site detail") {
+        if (!t) return null;
+        const n = kgSiteDetailRows(t);
+        return d.jsxs("div", {
+          className: "site-detail-box",
+          children: [
+            d.jsx("strong", { children: r }),
+            ...n.map((l, s) =>
+              d.jsxs(
+                "span",
+                {
+                  className: s === n.length - 1 ? "site-detail-line site-note-red" : "site-detail-line",
+                  children: [d.jsxs("b", { children: [l[0], ": "] }), l[1]],
+                },
+                `${l[0]}-${s}`,
+              ),
+            ),
+          ],
+        });
       }
       function kgAlreadyAssignedForemanSites(t, r, n) {
         return (t || []).filter(
@@ -37727,7 +37783,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             d.jsxs("span", { children: ["Status: ", V.job_status || "CONTINUE JOB"] }),
                                             d.jsxs("span", { children: ["P.I.C.: ", V.pic || ((V.site || {}).pic) || "-"] }),
                                             d.jsxs("span", { children: ["Foreman in charge: ", ((V.site || {}).foreman_in_charge) || "-"] }),
-                                            d.jsxs("span", { children: ["Site note: ", ((V.site || {}).notes) || "-"] }),
                                             d.jsxs("span", {
                                               children: [
                                                 d.jsx(ei, { size: 15 }),
@@ -37755,9 +37810,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                           ],
                                         }),
                                         V.notes &&
-                                          d.jsx("p", {
-                                            className: "assignment-note",
-                                            children: V.notes,
+                                          d.jsxs("p", {
+                                            className: "assignment-note planner-note-yellow",
+                                            children: ["Planner note: ", V.notes],
+                                          }),
+                                        ((V.site || {}).notes) &&
+                                          d.jsxs("p", {
+                                            className: "assignment-note site-note-red",
+                                            children: ["Site note: ", (V.site || {}).notes],
                                           }),
                                       ],
                                     }),
@@ -37917,9 +37977,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           kgSiteIsPause(kgSelectedSite) && d.jsx("div", { className: "site-history-line", style: { color: "#b45309", fontWeight: 800 }, children: "⚠ Site is PAUSE. Please check before assigning manpower." }),
                           d.jsxs("div", { className: "site-history-line", children: ["Site status: ", kgSelectedSite.status || "active"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
-                          d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSiteForemanText(kgSelectedSite)] }),
+                          d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSelectedSite.foreman_detail || "-"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
-                          d.jsxs("div", { className: "site-history-line", children: ["Site note: ", kgSelectedSite.notes || "-"] }),
+                          w.notes && d.jsxs("div", { className: "site-history-line planner-note-yellow", children: ["Planner note: ", w.notes] }),
+                          d.jsxs("div", { className: "site-history-line site-note-red", children: ["Site note: ", kgSelectedSite.notes || "-"] }),
                           d.jsx("strong", { children: "Previous manpower / foreman went before" }),
                           d.jsx("small", { className: "site-history-note", children: "Latest 10 past records for this site" }),
                           kgSiteHistoryLoading
@@ -39109,6 +39170,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             X + Number(Te.quantity_delivered || 0) * Number(Te.unit_cost || 0),
           0,
         );
+        const kgSelectedDeliverySite = q.useMemo(
+          () => (s.sites || []).find((X) => String(X.id) === String(p.site_id)) || null,
+          [s.sites, p.site_id],
+        );
         async function Ye(X) {
           (X.preventDefault(), _(!0), D(""), L(""));
           const Te = p.items.filter((F) => String(F.item_name || "").trim());
@@ -39402,6 +39467,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             X.billing_date ? ` (${cp(X.billing_date)})` : "",
                                           ],
                                         }),
+                                        X.site && kgSiteDetailBlock(X.site, "Site detail"),
                                       ],
                                     }),
                                     d.jsxs("div", {
@@ -39570,6 +39636,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             }),
                           ],
                         }),
+                        kgSelectedDeliverySite && kgSiteDetailBlock(kgSelectedDeliverySite, "Selected site detail"),
                         d.jsxs("label", {
                           children: [
                             "Delivery date",
@@ -42172,6 +42239,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #556562;
         font-size: 13px;
       }
+      .assignment-note.planner-note-yellow,
+      .site-history-line.planner-note-yellow {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #f59e0b;
+        font-weight: 900;
+      }
+      .assignment-note.site-note-red,
+      .site-history-line.site-note-red {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+        font-weight: 900;
+      }
       .shift-pill {
         text-transform: uppercase;
         font-size: 10px;
@@ -43518,9 +43599,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         border-radius: 16px;
         background: #f0fdfa;
         color: #134e4a;
+        margin-top: 8px;
       }
       .site-detail-box strong { color: #0f766e; font-size: 15px; }
       .site-detail-box span { font-size: 14px; font-weight: 700; line-height: 1.35; }
+      .site-detail-line {
+        display: block;
+        padding: 3px 0;
+        overflow-wrap: anywhere;
+      }
+      .site-detail-line.site-note-red {
+        color: #b91c1c;
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        border-radius: 8px;
+        padding: 7px 9px;
+      }
       .site-history-box {
         display: grid;
         gap: 10px;
