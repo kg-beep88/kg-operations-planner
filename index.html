@@ -16204,6 +16204,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           { to: "/logistics", label: "Logistics", icon: b0 },
           { to: "/manpower-search", label: "Name Search", icon: fE },
           { to: "/deliveries", label: "Delivery", icon: Q0 },
+          { to: "/billing", label: "Billing", icon: ap },
           { to: "/sites", label: "Sites", icon: $S },
           { to: "/workers", label: "Workers", icon: Rs },
           { to: "/lorries", label: "Lorries", icon: b0 },
@@ -16491,15 +16492,15 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }).format(Number(t || 0));
       }
       const _s = `
-  id, plan_date, shift, notes, sort_order, job_status, pic, is_confirmed, lorry_id,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
+  id, plan_date, shift, notes, remark, sort_order, job_status, pic, is_confirmed, lorry_id,
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,remark,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(*, worker:workers(id,name,nickname,status,worker_type))
 `,
         w0 = `
-  id, delivery_date, delivery_driver, billing_date, billing_no, sent_on, notes, created_at, updated_at,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
+  id, delivery_date, delivery_driver, order_type, billing_date, billing_no, billing_status, billing_remark, sent_on, notes, remark, created_at, updated_at,
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,remark,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
   delivery_order_items(
     id, catalog_item_id, category, item_name, size,
     quantity_delivered, quantity_returned, unit_cost, sort_order
@@ -16590,6 +16591,37 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           0,
           Number(t.quantity_delivered || 0) - Number(t.quantity_returned || 0),
         );
+      }
+      const kgDeliveryOrderTypeOptions = [
+        ["site_order", "Site order"],
+        ["clear_site", "Clear site"],
+        ["clear_rubbish", "Clear rubbish"],
+      ];
+      function kgDeliveryOrderTypeText(t) {
+        const r = String(t || "site_order");
+        return (kgDeliveryOrderTypeOptions.find((n) => n[0] === r) || kgDeliveryOrderTypeOptions[0])[1];
+      }
+      const kgBillingStatusOptions = [
+        ["not_billed", "No billed"],
+        ["full_bill", "Full bill"],
+        ["phase_1_billed", "Phase 1 billed"],
+        ["phase_1_vo_billed", "Phase 1 VO billed"],
+        ["phase_2_billed", "Phase 2 billed"],
+        ["phase_2_vo_billed", "Phase 2 VO billed"],
+        ["phase_3_billed", "Phase 3 billed"],
+        ["phase_3_vo_billed", "Phase 3 VO billed"],
+        ["phase_4_billed", "Phase 4 billed"],
+        ["phase_4_vo_billed", "Phase 4 VO billed"],
+        ["phase_5_billed", "Phase 5 billed"],
+        ["phase_5_vo_billed", "Phase 5 VO billed"],
+        ["other_phase", "Other phase / remark"],
+      ];
+      function kgBillingStatusText(t) {
+        const r = String(t || "not_billed");
+        return (kgBillingStatusOptions.find((n) => n[0] === r) || kgBillingStatusOptions[0])[1];
+      }
+      function kgIsBilled(t) {
+        return String((t == null ? void 0 : t.billing_status) || "not_billed") !== "not_billed" || !!String((t == null ? void 0 : t.billing_no) || "").trim() || !!String((t == null ? void 0 : t.billing_date) || "").trim();
       }
       function bo(t, r = ["scaffold", "ladder"]) {
         const n = new Map();
@@ -33965,6 +33997,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               .join(" + "),
             "Worker shifts": (r.assignment_workers || []).length,
             "OT shift": kgAssignmentOtText(r),
+            Remark: r.remark || "",
             Notes: r.notes || "",
           };
         });
@@ -33984,12 +34017,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             "ID Name & Tel": l.id_name_tel || "",
             "Lock info": l.lock_info || "",
             "Notes from site": l.notes || "",
+            "Order type": kgDeliveryOrderTypeText(r.order_type),
             "Delivery driver": r.delivery_driver || "",
+            "Billing status": kgBillingStatusText(r.billing_status),
             "Billing date": r.billing_date || "",
             "Billing no.": r.billing_no || "",
+            "Billing remark": r.billing_remark || "",
             "DO sent": r.sent_on ? "Yes" : "No",
             "Sent time": r.sent_on || "",
             "Total cost": Yr(r),
+            Remark: r.remark || "",
             Notes: r.notes || "",
           };
         });
@@ -34010,9 +34047,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               "ID Name & Tel": s.id_name_tel || "",
               "Lock info": s.lock_info || "",
               "Notes from site": s.notes || "",
+              "Order type": kgDeliveryOrderTypeText(r.order_type),
               "Delivery driver": r.delivery_driver || "",
+              "Billing status": kgBillingStatusText(r.billing_status),
               "Billing date": r.billing_date || "",
               "Billing no.": r.billing_no || "",
+              "Billing remark": r.billing_remark || "",
+              Remark: r.remark || "",
+              Notes: r.notes || "",
               Category: n.category,
               Item: n.item_name,
               Size: n.size || "",
@@ -34494,7 +34536,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     ID: Pe.id,
                     Address: Pe.address,
                     "Site type": kgSiteTypeText(Pe),
+                    "Site info": Pe.site_info || "",
+                    "Foreman in charge": Pe.foreman_in_charge || "",
+                    "ID Firm detail": Pe.foreman_detail || "",
+                    "ID Name & Tel": Pe.id_name_tel || "",
+                    "Lock info": Pe.lock_info || "",
+                    "P.I.C.": Pe.pic || "",
                     Status: Pe.status,
+                    Remark: Pe.remark || "",
                     Notes: Pe.notes || "",
                     Created: Pe.created_at,
                     Updated: Pe.updated_at,
@@ -35890,6 +35939,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           ["ID Firm detail", Ca((t == null ? void 0 : t.foreman_detail), "-")],
           ["ID Name & Tel", Ca((t == null ? void 0 : t.id_name_tel), "-")],
           ["Lock info", Ca((t == null ? void 0 : t.lock_info), "-")],
+          ["Remark from site", Ca((t == null ? void 0 : t.remark), "-")],
           ["Notes from site", Ca((t == null ? void 0 : t.notes), "-")],
         ];
       }
@@ -35904,7 +35954,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               d.jsxs(
                 "span",
                 {
-                  className: s === n.length - 1 ? "site-detail-line site-note-red" : "site-detail-line",
+                  className: String(l[0]).toLowerCase().includes("remark") ? "site-detail-line remark-blue" : String(l[0]).toLowerCase().includes("note") ? "site-detail-line site-note-red" : "site-detail-line",
                   children: [d.jsxs("b", { children: [l[0], ": "] }), l[1]],
                 },
                 `${l[0]}-${s}`,
@@ -36642,6 +36692,7 @@ Worker : ${c}`;
         job_status: "CONTINUE JOB",
         pic: "",
         is_confirmed: !1,
+        remark: "",
         notes: "",
         worker_ids: [],
         worker_ot: {},
@@ -36891,6 +36942,7 @@ Worker : ${c}`;
               job_status: V.job_status || "CONTINUE JOB",
               pic: V.pic || "",
               is_confirmed: !!V.is_confirmed,
+              remark: V.remark || "",
               notes: V.notes || "",
               worker_ids: Le,
               worker_ot: Qe,
@@ -37082,6 +37134,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             job_status: w.job_status || "CONTINUE JOB",
             pic: w.pic || null,
             is_confirmed: !!w.is_confirmed,
+            remark: w.remark || null,
             notes: w.notes || null,
           };
           let Le = S;
@@ -37809,10 +37862,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             }),
                                           ],
                                         }),
+                                        V.remark &&
+                                          d.jsxs("p", {
+                                            className: "assignment-note remark-blue",
+                                            children: ["Planner remark: ", V.remark],
+                                          }),
                                         V.notes &&
                                           d.jsxs("p", {
-                                            className: "assignment-note planner-note-yellow",
+                                            className: "assignment-note site-note-red",
                                             children: ["Planner note: ", V.notes],
+                                          }),
+                                        ((V.site || {}).remark) &&
+                                          d.jsxs("p", {
+                                            className: "assignment-note remark-blue",
+                                            children: ["Site remark: ", (V.site || {}).remark],
                                           }),
                                         ((V.site || {}).notes) &&
                                           d.jsxs("p", {
@@ -37979,7 +38042,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           d.jsxs("div", { className: "site-history-line", children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSelectedSite.foreman_detail || "-"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["P.I.C.: ", kgSitePicText(kgSelectedSite)] }),
-                          w.notes && d.jsxs("div", { className: "site-history-line planner-note-yellow", children: ["Planner note: ", w.notes] }),
+                          w.remark && d.jsxs("div", { className: "site-history-line remark-blue", children: ["Planner remark: ", w.remark] }),
+                          w.notes && d.jsxs("div", { className: "site-history-line site-note-red", children: ["Planner note: ", w.notes] }),
+                          kgSelectedSite.remark && d.jsxs("div", { className: "site-history-line remark-blue", children: ["Site remark: ", kgSelectedSite.remark] }),
                           d.jsxs("div", { className: "site-history-line site-note-red", children: ["Site note: ", kgSelectedSite.notes || "-"] }),
                           d.jsx("strong", { children: "Previous manpower / foreman went before" }),
                           d.jsx("small", { className: "site-history-note", children: "Latest 10 past records for this site" }),
@@ -38279,11 +38344,24 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsxs("label", {
                       className: "wide",
                       children: [
+                        "Remark",
+                        d.jsx("textarea", {
+                          rows: "2",
+                          value: w.remark || "",
+                          onChange: (V) => _({ ...w, remark: V.target.value }),
+                          placeholder: "Remark shown in blue",
+                        }),
+                      ],
+                    }),
+                    d.jsxs("label", {
+                      className: "wide",
+                      children: [
                         "Notes",
                         d.jsx("textarea", {
                           rows: "3",
                           value: w.notes,
                           onChange: (V) => _({ ...w, notes: V.target.value }),
+                          placeholder: "Note shown in red",
                         }),
                       ],
                     }),
@@ -39053,10 +39131,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           site_id: "",
           delivery_date: t,
           delivery_driver: "",
+          order_type: "site_order",
           billing_date: "",
           billing_no: "",
+          billing_status: "not_billed",
+          billing_remark: "",
           sent: !1,
           sent_on: null,
+          remark: "",
           notes: "",
           items: [Wo()],
         });
@@ -39122,10 +39204,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               site_id: String(((Te = X.site) == null ? void 0 : Te.id) || ""),
               delivery_date: X.delivery_date,
               delivery_driver: X.delivery_driver || "",
+              order_type: X.order_type || "site_order",
               billing_date: X.billing_date || "",
               billing_no: X.billing_no || "",
+              billing_status: X.billing_status || "not_billed",
+              billing_remark: X.billing_remark || "",
               sent: !!X.sent_on,
               sent_on: X.sent_on,
+              remark: X.remark || "",
               notes: X.notes || "",
               items: (X.delivery_order_items || []).length
                 ? X.delivery_order_items.map((_e) => ({
@@ -39212,9 +39298,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             delivery_date: p.delivery_date,
             site_id: Number(p.site_id),
             delivery_driver: String(p.delivery_driver || "").trim() || null,
+            order_type: p.order_type || "site_order",
             billing_date: p.billing_date || null,
             billing_no: String(p.billing_no || "").trim() || null,
+            billing_status: p.billing_status || "not_billed",
+            billing_remark: String(p.billing_remark || "").trim() || null,
             sent_on: p.sent ? p.sent_on || new Date().toISOString() : null,
+            remark: p.remark || null,
             notes: p.notes || null,
           };
           let P = v;
@@ -39267,7 +39357,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           }
           (x(null),
             l(p.delivery_date),
-            L("Delivery order saved."),
+            L("Delivery saved."),
             await he(),
             _(!1));
         }
@@ -39280,8 +39370,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (_e) return D(_e.message);
           (L(
             Te
-              ? "Delivery order marked sent."
-              : "Delivery order marked not sent.",
+              ? "Delivery marked sent."
+              : "Delivery marked not sent.",
           ),
             await he());
         }
@@ -39289,7 +39379,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           var _e;
           if (
             !window.confirm(
-              `Delete the delivery order for ${(_e = X.site) == null ? void 0 : _e.address}?`,
+              `Delete the delivery for ${(_e = X.site) == null ? void 0 : _e.address}?`,
             )
           )
             return;
@@ -39298,7 +39388,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             .delete()
             .eq("id", X.id);
           if (Te) return D(Te.message);
-          (L("Delivery order deleted."), await he());
+          (L("Delivery deleted."), await he());
         }
         return d.jsxs("div", {
           className: "page",
@@ -39312,7 +39402,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       className: "eyebrow",
                       children: "Site deliveries",
                     }),
-                    d.jsx("h1", { children: "Delivery Orders" }),
+                    d.jsx("h1", { children: "Delivery" }),
                     d.jsx("p", {
                       children:
                         "Add delivered items, editable cost, scaffolds, ladders and partial returns.",
@@ -39347,7 +39437,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       d.jsxs("button", {
                         className: "primary-button",
                         onClick: j,
-                        children: [d.jsx(ti, { size: 17 }), "New DO"],
+                        children: [d.jsx(ti, { size: 17 }), "New delivery"],
                       }),
                   ],
                 }),
@@ -39357,7 +39447,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               className: "date-banner",
               children: [
                 d.jsx("strong", { children: D0(n) }),
-                d.jsx("span", { children: "Delivery order date" }),
+                d.jsx("span", { children: "Delivery date" }),
               ],
             }),
             d.jsxs("div", {
@@ -39410,9 +39500,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   className: "panel-heading",
                   children: d.jsxs("div", {
                     children: [
-                      d.jsx("h2", { children: "Orders" }),
+                      d.jsx("h2", { children: "Delivery list" }),
                       d.jsx("span", {
-                        children: "Delivery orders for selected day. Same site/date will prompt before saving.",
+                        children: "Site order / clear site / clear rubbish for selected day. Same site/date will prompt before saving.",
                       }),
                     ],
                   }),
@@ -39427,7 +39517,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     : c.length === 0
                       ? d.jsx("div", {
                           className: "empty-state",
-                          children: "No delivery orders for this date.",
+                          children: "No delivery for this date.",
                         })
                       : c.map((X) => {
                           var Te;
@@ -39454,19 +39544,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                               ? void 0
                                               : Te.address,
                                         }),
-                                        d.jsx("p", {
-                                          children: X.notes || "No notes",
-                                        }),
                                         d.jsxs("p", {
                                           className: "muted",
                                           children: [
-                                            "Driver: ",
+                                            "Type: ",
+                                            kgDeliveryOrderTypeText(X.order_type),
+                                            " · Driver: ",
                                             X.delivery_driver || "-",
                                             " · Billing: ",
+                                            kgBillingStatusText(X.billing_status),
+                                            " / ",
                                             X.billing_no || "-",
                                             X.billing_date ? ` (${cp(X.billing_date)})` : "",
                                           ],
                                         }),
+                                        X.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Remark: ", X.remark] }),
+                                        X.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Notes: ", X.notes] }),
                                         X.site && kgSiteDetailBlock(X.site, "Site detail"),
                                       ],
                                     }),
@@ -39601,8 +39694,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               d.jsx(hl, {
                 title:
                   v === "new"
-                    ? "New delivery order"
-                    : "Edit delivery order / returns",
+                    ? "New delivery"
+                    : "Edit delivery / returns",
                 onClose: () => x(null),
                 children: d.jsxs("form", {
                   className: "delivery-form",
@@ -39684,21 +39777,51 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                         d.jsxs("label", {
                           children: [
-                            "Delivery order sent?",
-                            d.jsxs("select", {
-                              value: p.sent ? "yes" : "no",
+                            "Billing status",
+                            d.jsx("select", {
+                              value: p.billing_status || "not_billed",
                               onChange: (X) =>
-                                g({ ...p, sent: X.target.value === "yes" }),
-                              children: [
-                                d.jsx("option", {
-                                  value: "no",
-                                  children: "No",
-                                }),
-                                d.jsx("option", {
-                                  value: "yes",
-                                  children: "Yes — sent today",
-                                }),
-                              ],
+                                g({ ...p, billing_status: X.target.value }),
+                              children: kgBillingStatusOptions.map((X) =>
+                                d.jsx("option", { value: X[0], children: X[1] }, X[0]),
+                              ),
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Billing remark",
+                            d.jsx("input", {
+                              value: p.billing_remark || "",
+                              onChange: (X) =>
+                                g({ ...p, billing_remark: X.target.value }),
+                              placeholder: "Phase detail / VO no.",
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Delivery type",
+                            d.jsx("select", {
+                              value: p.order_type || "site_order",
+                              onChange: (X) =>
+                                g({ ...p, order_type: X.target.value }),
+                              children: kgDeliveryOrderTypeOptions.map((X) =>
+                                d.jsx("option", { value: X[0], children: X[1] }, X[0]),
+                              ),
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          className: "wide",
+                          children: [
+                            "Remark",
+                            d.jsx("textarea", {
+                              rows: "2",
+                              value: p.remark || "",
+                              onChange: (X) =>
+                                g({ ...p, remark: X.target.value }),
+                              placeholder: "Remark shown in blue",
                             }),
                           ],
                         }),
@@ -39711,6 +39834,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               value: p.notes,
                               onChange: (X) =>
                                 g({ ...p, notes: X.target.value }),
+                              placeholder: "Note shown in red",
                             }),
                           ],
                         }),
@@ -39943,7 +40067,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsxs("div", {
                       className: "order-total-bar",
                       children: [
-                        d.jsx("span", { children: "Delivery order total" }),
+                        d.jsx("span", { children: "Delivery total" }),
                         d.jsx("strong", { children: rr(Ne) }),
                       ],
                     }),
@@ -39961,7 +40085,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           disabled: w,
                           children: [
                             d.jsx(b0, { size: 17 }),
-                            w ? "Saving…" : "Save delivery order",
+                            w ? "Saving…" : "Save delivery",
                           ],
                         }),
                       ],
@@ -39971,6 +40095,97 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               }),
           ],
         });
+      }
+      function kgBillingPage({ profile: t }) {
+        const r = t.role === "admin" || t.role === "operation",
+          [n, l] = q.useState(ri(0).slice(0, 7)),
+          [s, f] = q.useState([]),
+          [c, m] = q.useState(!0),
+          [v, x] = q.useState(""),
+          [p, g] = q.useState("");
+        async function S() {
+          (m(!0), x(""), g(""));
+          const { start: D, endExclusive: I } = lh(n),
+            { data: L, error: W } = await qe
+              .from("delivery_orders")
+              .select(w0)
+              .gte("delivery_date", D)
+              .lt("delivery_date", I)
+              .order("delivery_date")
+              .order("created_at");
+          W ? x(W.message) : f((L || []).sort((he, J) => Number(kgIsBilled(he)) - Number(kgIsBilled(J)) || String(he.delivery_date || "").localeCompare(String(J.delivery_date || ""))));
+          m(!1);
+        }
+        q.useEffect(() => {
+          S();
+        }, [n]);
+        const E = s.filter((D) => !kgIsBilled(D));
+        function w(D, I) {
+          f((L) => L.map((W) => W.id === D.id ? { ...W, ...I } : W));
+        }
+        async function _(D) {
+          if (!r) return;
+          x("");
+          if (!kgIsBilled(D) && !window.confirm("This site is no billed. Keep it as No billed?")) return;
+          const { error: I } = await qe.from("delivery_orders").update({
+            billing_status: D.billing_status || "not_billed",
+            billing_date: D.billing_date || null,
+            billing_no: String(D.billing_no || "").trim() || null,
+            billing_remark: String(D.billing_remark || "").trim() || null,
+          }).eq("id", D.id);
+          I ? x(I.message) : (g("Billing updated."), await S());
+        }
+        return d.jsxs("div", { className: "page billing-page", children: [
+          d.jsxs("header", { className: "page-header planner-header", children: [
+            d.jsxs("div", { children: [
+              d.jsx("p", { className: "eyebrow", children: "Billing follow up" }),
+              d.jsx("h1", { children: "Billing" }),
+              d.jsx("p", { children: "Check site orders that are not billed, then mark phase bill / VO bill / full bill." }),
+            ] }),
+            d.jsxs("div", { className: "date-controls", children: [
+              d.jsxs("label", { className: "date-picker", children: [
+                d.jsx(fl, { size: 18 }),
+                d.jsx("input", { type: "month", value: n, onChange: (D) => l(D.target.value) }),
+              ] }),
+              d.jsx("button", { className: "secondary-button", onClick: S, children: "Refresh" }),
+            ] }),
+          ] }),
+          E.length > 0 && d.jsxs("div", { className: "error-box", children: ["⚠ ", E.length, " site order", E.length === 1 ? "" : "s", " no billed yet."] }),
+          v && d.jsx("div", { className: "error-box", children: v }),
+          p && d.jsx("div", { className: "success-box", children: p }),
+          d.jsx("section", { className: "panel", children: c ? d.jsx("div", { className: "empty-state", children: "Loading billing…" }) : s.length === 0 ? d.jsx("div", { className: "empty-state", children: "No delivery / site order in this month." }) : d.jsx("div", { className: "table-wrap", children: d.jsxs("table", { className: "data-table billing-table", children: [
+            d.jsx("thead", { children: d.jsxs("tr", { children: [
+              d.jsx("th", { children: "Date" }),
+              d.jsx("th", { children: "Site" }),
+              d.jsx("th", { children: "Type" }),
+              d.jsx("th", { children: "PIC" }),
+              d.jsx("th", { children: "Billing status" }),
+              d.jsx("th", { children: "Billing date" }),
+              d.jsx("th", { children: "Billing no." }),
+              d.jsx("th", { children: "Remark" }),
+              r && d.jsx("th", {}),
+            ] }) }),
+            d.jsx("tbody", { children: s.map((D) => {
+              const I = D.site || {}, L = !kgIsBilled(D);
+              return d.jsxs("tr", { className: L ? "billing-not-billed" : "", children: [
+                d.jsx("td", { "data-label": "Date", children: cp(D.delivery_date) }),
+                d.jsxs("td", { "data-label": "Site", children: [
+                  d.jsx("strong", { children: I.address || "-" }),
+                  L && d.jsx("div", { className: "billing-warning-text", children: "SITE NO BILLED" }),
+                  I.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Site remark: ", I.remark] }),
+                  I.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Site note: ", I.notes] }),
+                ] }),
+                d.jsx("td", { "data-label": "Type", children: kgDeliveryOrderTypeText(D.order_type) }),
+                d.jsx("td", { "data-label": "PIC", children: kgSitePicText(I) }),
+                d.jsx("td", { "data-label": "Billing status", children: r ? d.jsx("select", { value: D.billing_status || "not_billed", onChange: (W) => w(D, { billing_status: W.target.value }), children: kgBillingStatusOptions.map((W) => d.jsx("option", { value: W[0], children: W[1] }, W[0])) }) : kgBillingStatusText(D.billing_status) }),
+                d.jsx("td", { "data-label": "Billing date", children: r ? d.jsx("input", { type: "date", value: D.billing_date || "", onChange: (W) => w(D, { billing_date: W.target.value }) }) : D.billing_date || "-" }),
+                d.jsx("td", { "data-label": "Billing no.", children: r ? d.jsx("input", { value: D.billing_no || "", onChange: (W) => w(D, { billing_no: W.target.value }), placeholder: "Billing no." }) : D.billing_no || "-" }),
+                d.jsx("td", { "data-label": "Remark", children: r ? d.jsx("input", { value: D.billing_remark || "", onChange: (W) => w(D, { billing_remark: W.target.value }), placeholder: "Phase / VO remark" }) : D.billing_remark || "-" }),
+                r && d.jsx("td", { children: d.jsx("button", { className: "primary-button small-button", onClick: () => _(D), children: "Save" }) }),
+              ] }, D.id);
+            }) }),
+          ] }) }) }),
+        ] });
       }
       function vs({ profile: t, config: r }) {
         const n = t.role === "admin" || t.role === "operation",
@@ -41031,6 +41246,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "id_name_tel", label: "ID Name & Tel" },
             { key: "lock_info", label: "Lock info" },
             { key: "pic", label: "P.I.C." },
+            { key: "remark", label: "Remark" },
             { key: "notes", label: "Notes" },
           ],
           fields: [
@@ -41068,9 +41284,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "id_name_tel", label: "ID Name & Tel", wide: !0 },
             { name: "lock_info", label: "Lock info", wide: !0 },
             { name: "foreman_detail", label: "ID Firm detail", type: "textarea", wide: !0 },
+            { name: "remark", label: "Remark", type: "textarea", wide: !0 },
             { name: "notes", label: "Notes", type: "textarea", wide: !0 },
           ],
-          defaults: { site_type: "boss", is_boss_site: !0, is_project_site: !1, pic: "", site_info: "" },
+          defaults: { site_type: "boss", is_boss_site: !0, is_project_site: !1, pic: "", site_info: "", remark: "" },
         },
         workers: {
           title: "Workers",
@@ -41240,7 +41457,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             address: "Address", name: "Name", nickname: "Nickname", phone: "Phone", pass: "Pass", license: "License", status: "Status",
             registration_no: "Lorry number", driver_name: "Driver", foreman_type: "Foreman type", plan_date: "Date", site_id: "Site", lorry_id: "Lorry",
             worker_id: "Worker", foreman_id: "Foreman", shift: "Shift", job_status: "Job status", pic: "P.I.C.", is_confirmed: "Site confirm", notes: "Notes", ot_end_time: "OT end time", ot_hours: "OT hours",
-            title: "Title", body: "Text", sent_on: "DO sent", item_name: "Item", quantity_delivered: "Delivered", quantity_returned: "Returned", unit_cost: "Unit price",
+            title: "Title", body: "Text", sent_on: "Sent", order_type: "Delivery type", billing_status: "Billing status", billing_remark: "Billing remark", remark: "Remark", item_name: "Item", quantity_delivered: "Delivered", quantity_returned: "Returned", unit_cost: "Unit price",
           };
         function p(E) {
           if (E == null || E === "") return "blank";
@@ -41328,6 +41545,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       d.jsx(jn, {
                         path: "/deliveries",
                         element: d.jsx(gC, { profile: t }),
+                      }),
+                      d.jsx(jn, {
+                        path: "/billing",
+                        element: d.jsx(kgBillingPage, { profile: t }),
                       }),
                       d.jsx(jn, {
                         path: "/sites",
@@ -41427,7 +41648,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         async function kgFetchDay(sourceDate) {
           const { data: assignments, error: aErr } = await qe
             .from("site_assignments")
-            .select("id,site_id,lorry_id,foreman_id,shift,notes,job_status,pic,is_confirmed")
+            .select("id,site_id,lorry_id,foreman_id,shift,notes,remark,job_status,pic,is_confirmed")
             .eq("plan_date", sourceDate)
             .order("id");
           if (aErr) throw new Error(aErr.message);
@@ -42239,13 +42460,15 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         color: #556562;
         font-size: 13px;
       }
-      .assignment-note.planner-note-yellow,
-      .site-history-line.planner-note-yellow {
-        background: #fef3c7;
-        color: #92400e;
-        border: 1px solid #f59e0b;
+      .assignment-note.remark-blue,
+      .site-history-line.remark-blue {
+        background: #dbeafe;
+        color: #1d4ed8;
+        border: 1px solid #93c5fd;
         font-weight: 900;
       }
+      .assignment-note.planner-note-yellow,
+      .site-history-line.planner-note-yellow,
       .assignment-note.site-note-red,
       .site-history-line.site-note-red {
         background: #fee2e2;
@@ -43607,6 +43830,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         display: block;
         padding: 3px 0;
         overflow-wrap: anywhere;
+      }
+      .site-detail-line.remark-blue {
+        color: #1d4ed8;
+        background: #dbeafe;
+        border: 1px solid #93c5fd;
+        border-radius: 8px;
+        padding: 7px 9px;
       }
       .site-detail-line.site-note-red {
         color: #b91c1c;
