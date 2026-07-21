@@ -39262,23 +39262,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         );
         async function Ye(X) {
           (X.preventDefault(), _(!0), D(""), L(""));
-          const Te = p.items.filter((F) => String(F.item_name || "").trim());
-          if (!Te.length) {
-            (D("Add at least one delivery item."), _(!1));
-            return;
-          }
-          const _e = Te.find(
-            (F) =>
-              Number(F.quantity_returned || 0) >
-              Number(F.quantity_delivered || 0),
-          );
-          if (_e) {
-            (D(
-              `Returned quantity cannot be more than delivered for ${_e.item_name}.`,
-            ),
-              _(!1));
-            return;
-          }
+          const Te = [];
           let kgDupQuery = qe
             .from("delivery_orders")
             .select("id")
@@ -39337,24 +39321,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               return;
             }
           }
-          const N = Te.map((F, U) => ({
-              delivery_order_id: P,
-              catalog_item_id: F.catalog_item_id
-                ? Number(F.catalog_item_id)
-                : null,
-              category: F.category,
-              item_name: String(F.item_name).trim(),
-              size: String(F.size || "").trim(),
-              quantity_delivered: Number(F.quantity_delivered || 0),
-              quantity_returned: Number(F.quantity_returned || 0),
-              unit_cost: Number(F.unit_cost || 0),
-              sort_order: U,
-            })),
-            { error: z } = await qe.from("delivery_order_items").insert(N);
-          if (z) {
-            (D(z.message), _(!1));
-            return;
-          }
           (x(null),
             l(p.delivery_date),
             L("Delivery saved."),
@@ -39405,7 +39371,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Delivery" }),
                     d.jsx("p", {
                       children:
-                        "Add delivered items, editable cost, scaffolds, ladders and partial returns.",
+                        "Plan delivery only: choose site, date, driver, type, remark and notes. No item entry needed.",
                     }),
                   ],
                 }),
@@ -39471,8 +39437,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx(ap, {}),
                     d.jsxs("div", {
                       children: [
-                        d.jsx("strong", { children: rr(J.cost) }),
-                        d.jsx("span", { children: "Total cost" }),
+                        d.jsx("strong", { children: c.length }),
+                        d.jsx("span", { children: "Delivery planned" }),
                       ],
                     }),
                   ],
@@ -39483,8 +39449,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx(Lx, {}),
                     d.jsxs("div", {
                       children: [
-                        d.jsx("strong", { children: J.outstanding }),
-                        d.jsx("span", { children: "Items outstanding" }),
+                        d.jsx("strong", { children: "-" }),
+                        d.jsx("span", { children: "No item list" }),
                       ],
                     }),
                   ],
@@ -39547,15 +39513,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                         d.jsxs("p", {
                                           className: "muted",
                                           children: [
-                                            "Type: ",
+                                            "Date: ",
+                                            X.delivery_date ? cp(X.delivery_date) : "-",
+                                            " · Type: ",
                                             kgDeliveryOrderTypeText(X.order_type),
                                             " · Driver: ",
                                             X.delivery_driver || "-",
-                                            " · Billing: ",
-                                            kgBillingStatusText(X.billing_status),
-                                            " / ",
-                                            X.billing_no || "-",
-                                            X.billing_date ? ` (${cp(X.billing_date)})` : "",
                                           ],
                                         }),
                                         X.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Remark: ", X.remark] }),
@@ -39567,84 +39530,16 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                       className: "delivery-total",
                                       children: [
                                         d.jsx("span", {
-                                          children: "Total cost",
+                                          children: "Planned",
                                         }),
                                         d.jsx("strong", {
-                                          children: rr(Yr(X)),
+                                          children: X.delivery_date ? cp(X.delivery_date) : "-",
                                         }),
                                       ],
                                     }),
                                   ],
                                 }),
-                                d.jsxs("div", {
-                                  className: "delivery-items-table",
-                                  children: [
-                                    d.jsxs("div", {
-                                      className: "delivery-item header",
-                                      children: [
-                                        d.jsx("span", { children: "Item" }),
-                                        d.jsx("span", {
-                                          children: "Delivered",
-                                        }),
-                                        d.jsx("span", { children: "Returned" }),
-                                        d.jsx("span", {
-                                          children: "Outstanding",
-                                        }),
-                                        d.jsx("span", {
-                                          children: "Unit cost",
-                                        }),
-                                        d.jsx("span", { children: "Total" }),
-                                      ],
-                                    }),
-                                    (X.delivery_order_items || []).map((_e) =>
-                                      d.jsxs(
-                                        "div",
-                                        {
-                                          className: "delivery-item",
-                                          children: [
-                                            d.jsxs("span", {
-                                              children: [
-                                                d.jsx("b", {
-                                                  children: _e.item_name,
-                                                }),
-                                                d.jsxs("small", {
-                                                  children: [
-                                                    _e.category,
-                                                    _e.size
-                                                      ? ` · ${_e.size}`
-                                                      : "",
-                                                  ],
-                                                }),
-                                              ],
-                                            }),
-                                            d.jsx("span", {
-                                              children: Number(
-                                                _e.quantity_delivered,
-                                              ),
-                                            }),
-                                            d.jsx("span", {
-                                              children: Number(
-                                                _e.quantity_returned,
-                                              ),
-                                            }),
-                                            d.jsx("span", { children: cl(_e) }),
-                                            d.jsx("span", {
-                                              children: rr(_e.unit_cost),
-                                            }),
-                                            d.jsx("span", {
-                                              children: rr(
-                                                Number(
-                                                  _e.quantity_delivered || 0,
-                                                ) * Number(_e.unit_cost || 0),
-                                              ),
-                                            }),
-                                          ],
-                                        },
-                                        _e.id,
-                                      ),
-                                    ),
-                                  ],
-                                }),
+                                d.jsx("div", { className: "muted", children: "Delivery planned only. No item list." }),
                                 r &&
                                   d.jsxs("div", {
                                     className: "delivery-actions",
@@ -39755,52 +39650,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                         d.jsxs("label", {
                           children: [
-                            "Billing date",
-                            d.jsx("input", {
-                              type: "date",
-                              value: p.billing_date || "",
-                              onChange: (X) =>
-                                g({ ...p, billing_date: X.target.value }),
-                            }),
-                          ],
-                        }),
-                        d.jsxs("label", {
-                          children: [
-                            "Billing no.",
-                            d.jsx("input", {
-                              value: p.billing_no || "",
-                              onChange: (X) =>
-                                g({ ...p, billing_no: X.target.value }),
-                              placeholder: "Invoice / billing no.",
-                            }),
-                          ],
-                        }),
-                        d.jsxs("label", {
-                          children: [
-                            "Billing status",
-                            d.jsx("select", {
-                              value: p.billing_status || "not_billed",
-                              onChange: (X) =>
-                                g({ ...p, billing_status: X.target.value }),
-                              children: kgBillingStatusOptions.map((X) =>
-                                d.jsx("option", { value: X[0], children: X[1] }, X[0]),
-                              ),
-                            }),
-                          ],
-                        }),
-                        d.jsxs("label", {
-                          children: [
-                            "Billing remark",
-                            d.jsx("input", {
-                              value: p.billing_remark || "",
-                              onChange: (X) =>
-                                g({ ...p, billing_remark: X.target.value }),
-                              placeholder: "Phase detail / VO no.",
-                            }),
-                          ],
-                        }),
-                        d.jsxs("label", {
-                          children: [
                             "Delivery type",
                             d.jsx("select", {
                               value: p.order_type || "site_order",
@@ -39840,237 +39689,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
-                    d.jsxs("div", {
-                      className: "items-editor-heading",
-                      children: [
-                        d.jsxs("div", {
-                          children: [
-                            d.jsx("strong", { children: "Delivered items" }),
-                            d.jsx("span", {
-                              children:
-                                "Cost is editable. Return quantity may be less than delivered.",
-                            }),
-                          ],
-                        }),
-                        d.jsxs("button", {
-                          type: "button",
-                          className: "secondary-button",
-                          onClick: oe,
-                          children: [d.jsx(ti, { size: 16 }), "Add item"],
-                        }),
-                      ],
-                    }),
-                    d.jsx("div", {
-                      className: "items-editor",
-                      children: p.items.map((X, Te) =>
-                        d.jsxs(
-                          "div",
-                          {
-                            className: "item-editor-card",
-                            children: [
-                              d.jsxs("div", {
-                                className: "item-editor-top",
-                                children: [
-                                  d.jsxs("strong", {
-                                    children: ["Item ", Te + 1],
-                                  }),
-                                  p.items.length > 1 &&
-                                    d.jsx("button", {
-                                      type: "button",
-                                      className: "icon-button danger",
-                                      onClick: () => ge(Te),
-                                      children: d.jsx(N0, { size: 15 }),
-                                    }),
-                                ],
-                              }),
-                              d.jsxs("div", {
-                                className: "form-grid item-grid",
-                                children: [
-                                  d.jsxs("label", {
-                                    className: "wide",
-                                    children: [
-                                      "Choose saved item",
-                                      d.jsxs("select", {
-                                        value: X.catalog_item_id || "",
-                                        onChange: (_e) =>
-                                          de(Te, _e.target.value),
-                                        children: [
-                                          d.jsx("option", {
-                                            value: "",
-                                            children: "Custom item",
-                                          }),
-                                          s.catalog.map((_e) =>
-                                            d.jsxs(
-                                              "option",
-                                              {
-                                                value: _e.id,
-                                                children: [
-                                                  _e.category,
-                                                  " · ",
-                                                  _e.item_name,
-                                                  _e.size
-                                                    ? ` · ${_e.size}`
-                                                    : "",
-                                                  " · ",
-                                                  rr(_e.default_unit_cost),
-                                                ],
-                                              },
-                                              _e.id,
-                                            ),
-                                          ),
-                                        ],
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("label", {
-                                    children: [
-                                      "Category",
-                                      d.jsxs("select", {
-                                        value: X.category,
-                                        onChange: (_e) =>
-                                          G(Te, { category: _e.target.value }),
-                                        children: [
-                                          d.jsx("option", {
-                                            value: "material",
-                                            children: "Material",
-                                          }),
-                                          d.jsx("option", {
-                                            value: "scaffold",
-                                            children: "Scaffold",
-                                          }),
-                                          d.jsx("option", {
-                                            value: "ladder",
-                                            children: "Ladder",
-                                          }),
-                                          d.jsx("option", {
-                                            value: "other",
-                                            children: "Other",
-                                          }),
-                                        ],
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("label", {
-                                    children: [
-                                      "Item name",
-                                      d.jsx("input", {
-                                        value: X.item_name,
-                                        onChange: (_e) =>
-                                          G(Te, {
-                                            item_name: _e.target.value,
-                                            catalog_item_id: "",
-                                          }),
-                                        required: !0,
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("label", {
-                                    children: [
-                                      "Size",
-                                      d.jsx("input", {
-                                        value: X.size || "",
-                                        onChange: (_e) =>
-                                          G(Te, {
-                                            size: _e.target.value,
-                                            catalog_item_id: "",
-                                          }),
-                                        placeholder: "Example: 6 ft, 2 m",
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("label", {
-                                    children: [
-                                      "Delivered quantity",
-                                      d.jsx("input", {
-                                        type: "number",
-                                        min: "0",
-                                        step: "0.01",
-                                        value: X.quantity_delivered,
-                                        onChange: (_e) =>
-                                          G(Te, {
-                                            quantity_delivered: _e.target.value,
-                                          }),
-                                        required: !0,
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("label", {
-                                    children: [
-                                      "Returned quantity",
-                                      d.jsx("input", {
-                                        type: "number",
-                                        min: "0",
-                                        step: "0.01",
-                                        value: X.quantity_returned,
-                                        onChange: (_e) =>
-                                          G(Te, {
-                                            quantity_returned: _e.target.value,
-                                          }),
-                                        required: !0,
-                                      }),
-                                      d.jsx("span", {
-                                        className: "field-help",
-                                        children:
-                                          "Use this to return only a few.",
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("label", {
-                                    children: [
-                                      "Unit cost (SGD)",
-                                      d.jsx("input", {
-                                        type: "number",
-                                        min: "0",
-                                        step: "0.01",
-                                        value: X.unit_cost,
-                                        onChange: (_e) =>
-                                          G(Te, { unit_cost: _e.target.value }),
-                                        required: !0,
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("div", {
-                                    className: "calculated-box",
-                                    children: [
-                                      d.jsx("span", {
-                                        children: "Outstanding",
-                                      }),
-                                      d.jsx("strong", {
-                                        children: Math.max(
-                                          0,
-                                          Number(X.quantity_delivered || 0) -
-                                            Number(X.quantity_returned || 0),
-                                        ),
-                                      }),
-                                    ],
-                                  }),
-                                  d.jsxs("div", {
-                                    className: "calculated-box",
-                                    children: [
-                                      d.jsx("span", { children: "Item total" }),
-                                      d.jsx("strong", {
-                                        children: rr(
-                                          Number(X.quantity_delivered || 0) *
-                                            Number(X.unit_cost || 0),
-                                        ),
-                                      }),
-                                    ],
-                                  }),
-                                ],
-                              }),
-                            ],
-                          },
-                          Te,
-                        ),
-                      ),
-                    }),
-                    d.jsxs("div", {
-                      className: "order-total-bar",
-                      children: [
-                        d.jsx("span", { children: "Delivery total" }),
-                        d.jsx("strong", { children: rr(Ne) }),
-                      ],
-                    }),
+                    d.jsx("div", { className: "muted", children: "Delivery planned only. No item list needed." }),
                     d.jsxs("div", {
                       className: "form-actions",
                       children: [
@@ -40098,95 +39717,104 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
       function kgBillingPage({ profile: t }) {
         const r = t.role === "admin" || t.role === "operation",
-          [n, l] = q.useState(ri(0).slice(0, 7)),
+          [n, l] = q.useState(""),
           [s, f] = q.useState([]),
           [c, m] = q.useState(!0),
           [v, x] = q.useState(""),
           [p, g] = q.useState("");
-        async function S() {
+        function S(L) {
+          return String((L == null ? void 0 : L.billing_status) || "not_billed") === "full_bill";
+        }
+        async function E() {
           (m(!0), x(""), g(""));
-          const { start: D, endExclusive: I } = lh(n),
-            { data: L, error: W } = await qe
-              .from("delivery_orders")
-              .select(w0)
-              .gte("delivery_date", D)
-              .lt("delivery_date", I)
-              .order("delivery_date")
-              .order("created_at");
-          W ? x(W.message) : f((L || []).sort((he, J) => Number(kgIsBilled(he)) - Number(kgIsBilled(J)) || String(he.delivery_date || "").localeCompare(String(J.delivery_date || ""))));
+          const { data: L, error: W } = await qe
+            .from("sites")
+            .select("*")
+            .order("address");
+          W ? x(W.message) : f(kgSortMasterRows(L || [], "sites", "address"));
           m(!1);
         }
         q.useEffect(() => {
-          S();
-        }, [n]);
-        const E = s.filter((D) => !kgIsBilled(D));
-        function w(D, I) {
-          f((L) => L.map((W) => W.id === D.id ? { ...W, ...I } : W));
+          E();
+        }, []);
+        const w = s.filter((L) => !S(L)),
+          _ = s.filter(S),
+          T = q.useMemo(() => {
+            const L = n.trim().toLowerCase();
+            return L ? s.filter((W) => String(W.address || "").toLowerCase().includes(L)) : s;
+          }, [s, n]);
+        function D(L, W) {
+          f((he) => he.map((J) => J.id === L.id ? { ...J, ...W } : J));
         }
-        async function _(D) {
+        async function I(L) {
           if (!r) return;
           x("");
-          if (!kgIsBilled(D) && !window.confirm("This site is no billed. Keep it as No billed?")) return;
-          const { error: I } = await qe.from("delivery_orders").update({
-            billing_status: D.billing_status || "not_billed",
-            billing_date: D.billing_date || null,
-            billing_no: String(D.billing_no || "").trim() || null,
-            billing_remark: String(D.billing_remark || "").trim() || null,
-          }).eq("id", D.id);
-          I ? x(I.message) : (g("Billing updated."), await S());
+          const W = String(L.billing_status || "not_billed");
+          if (W !== "full_bill" && !window.confirm("This site no full bill yet. Save as not fully billed?")) return;
+          const { error: he } = await qe.from("sites").update({
+            billing_status: W,
+            billing_date: L.billing_date || null,
+            billing_no: String(L.billing_no || "").trim() || null,
+            billing_remark: String(L.billing_remark || "").trim() || null,
+          }).eq("id", L.id);
+          he ? x(he.message) : (g("Billing updated."), await E());
         }
         return d.jsxs("div", { className: "page billing-page", children: [
           d.jsxs("header", { className: "page-header planner-header", children: [
             d.jsxs("div", { children: [
               d.jsx("p", { className: "eyebrow", children: "Billing follow up" }),
               d.jsx("h1", { children: "Billing" }),
-              d.jsx("p", { children: "Check site orders that are not billed, then mark phase bill / VO bill / full bill." }),
+              d.jsx("p", { children: "Choose address from Sites, then update billing status. Warning will remain until Full bill is selected." }),
             ] }),
             d.jsxs("div", { className: "date-controls", children: [
               d.jsxs("label", { className: "date-picker", children: [
-                d.jsx(fl, { size: 18 }),
-                d.jsx("input", { type: "month", value: n, onChange: (D) => l(D.target.value) }),
+                d.jsx(fE, { size: 18 }),
+                d.jsx("input", { value: n, onChange: (L) => l(L.target.value), placeholder: "Search address" }),
               ] }),
-              d.jsx("button", { className: "secondary-button", onClick: S, children: "Refresh" }),
+              d.jsx("button", { className: "secondary-button", onClick: E, children: "Refresh" }),
             ] }),
           ] }),
-          E.length > 0 && d.jsxs("div", { className: "error-box", children: ["⚠ ", E.length, " site order", E.length === 1 ? "" : "s", " no billed yet."] }),
+          w.length > 0 && d.jsxs("div", { className: "error-box", children: ["⚠ ", w.length, " site", w.length === 1 ? "" : "s", " no full bill yet."] }),
           v && d.jsx("div", { className: "error-box", children: v }),
           p && d.jsx("div", { className: "success-box", children: p }),
-          d.jsx("section", { className: "panel", children: c ? d.jsx("div", { className: "empty-state", children: "Loading billing…" }) : s.length === 0 ? d.jsx("div", { className: "empty-state", children: "No delivery / site order in this month." }) : d.jsx("div", { className: "table-wrap", children: d.jsxs("table", { className: "data-table billing-table", children: [
+          d.jsxs("div", { className: "summary-grid three", children: [
+            d.jsxs("div", { className: "summary-card", children: [d.jsx($S, {}), d.jsxs("div", { children: [d.jsx("strong", { children: s.length }), d.jsx("span", { children: "Total sites" })] })] }),
+            d.jsxs("div", { className: "summary-card", children: [d.jsx(lp, {}), d.jsxs("div", { children: [d.jsx("strong", { children: w.length }), d.jsx("span", { children: "No full bill yet" })] })] }),
+            d.jsxs("div", { className: "summary-card", children: [d.jsx(cE, {}), d.jsxs("div", { children: [d.jsx("strong", { children: _.length }), d.jsx("span", { children: "Full bill" })] })] }),
+          ] }),
+          d.jsx("section", { className: "panel", children: c ? d.jsx("div", { className: "empty-state", children: "Loading billing…" }) : T.length === 0 ? d.jsx("div", { className: "empty-state", children: "No site found." }) : d.jsx("div", { className: "table-wrap", children: d.jsxs("table", { className: "data-table billing-table", children: [
             d.jsx("thead", { children: d.jsxs("tr", { children: [
-              d.jsx("th", { children: "Date" }),
               d.jsx("th", { children: "Site" }),
-              d.jsx("th", { children: "Type" }),
               d.jsx("th", { children: "PIC" }),
+              d.jsx("th", { children: "Status" }),
               d.jsx("th", { children: "Billing status" }),
               d.jsx("th", { children: "Billing date" }),
               d.jsx("th", { children: "Billing no." }),
               d.jsx("th", { children: "Remark" }),
               r && d.jsx("th", {}),
             ] }) }),
-            d.jsx("tbody", { children: s.map((D) => {
-              const I = D.site || {}, L = !kgIsBilled(D);
-              return d.jsxs("tr", { className: L ? "billing-not-billed" : "", children: [
-                d.jsx("td", { "data-label": "Date", children: cp(D.delivery_date) }),
+            d.jsx("tbody", { children: T.map((L) => {
+              const W = !S(L);
+              return d.jsxs("tr", { className: W ? "billing-not-billed" : "", children: [
                 d.jsxs("td", { "data-label": "Site", children: [
-                  d.jsx("strong", { children: I.address || "-" }),
-                  L && d.jsx("div", { className: "billing-warning-text", children: "SITE NO BILLED" }),
-                  I.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Site remark: ", I.remark] }),
-                  I.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Site note: ", I.notes] }),
+                  d.jsx("strong", { children: L.address || "-" }),
+                  W && d.jsx("div", { className: "billing-warning-text", children: "SITE NO FULL BILL YET" }),
+                  L.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Site remark: ", L.remark] }),
+                  L.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Site note: ", L.notes] }),
                 ] }),
-                d.jsx("td", { "data-label": "Type", children: kgDeliveryOrderTypeText(D.order_type) }),
-                d.jsx("td", { "data-label": "PIC", children: kgSitePicText(I) }),
-                d.jsx("td", { "data-label": "Billing status", children: r ? d.jsx("select", { value: D.billing_status || "not_billed", onChange: (W) => w(D, { billing_status: W.target.value }), children: kgBillingStatusOptions.map((W) => d.jsx("option", { value: W[0], children: W[1] }, W[0])) }) : kgBillingStatusText(D.billing_status) }),
-                d.jsx("td", { "data-label": "Billing date", children: r ? d.jsx("input", { type: "date", value: D.billing_date || "", onChange: (W) => w(D, { billing_date: W.target.value }) }) : D.billing_date || "-" }),
-                d.jsx("td", { "data-label": "Billing no.", children: r ? d.jsx("input", { value: D.billing_no || "", onChange: (W) => w(D, { billing_no: W.target.value }), placeholder: "Billing no." }) : D.billing_no || "-" }),
-                d.jsx("td", { "data-label": "Remark", children: r ? d.jsx("input", { value: D.billing_remark || "", onChange: (W) => w(D, { billing_remark: W.target.value }), placeholder: "Phase / VO remark" }) : D.billing_remark || "-" }),
-                r && d.jsx("td", { children: d.jsx("button", { className: "primary-button small-button", onClick: () => _(D), children: "Save" }) }),
-              ] }, D.id);
+                d.jsx("td", { "data-label": "PIC", children: kgSitePicText(L) }),
+                d.jsx("td", { "data-label": "Status", children: kgSiteIsPause(L) ? "Pause" : String(L.status || "active").toUpperCase() }),
+                d.jsx("td", { "data-label": "Billing status", children: r ? d.jsx("select", { value: L.billing_status || "not_billed", onChange: (he) => D(L, { billing_status: he.target.value }), children: kgBillingStatusOptions.map((he) => d.jsx("option", { value: he[0], children: he[1] }, he[0])) }) : kgBillingStatusText(L.billing_status) }),
+                d.jsx("td", { "data-label": "Billing date", children: r ? d.jsx("input", { type: "date", value: L.billing_date || "", onChange: (he) => D(L, { billing_date: he.target.value }) }) : L.billing_date || "-" }),
+                d.jsx("td", { "data-label": "Billing no.", children: r ? d.jsx("input", { value: L.billing_no || "", onChange: (he) => D(L, { billing_no: he.target.value }), placeholder: "Billing no." }) : L.billing_no || "-" }),
+                d.jsx("td", { "data-label": "Remark", children: r ? d.jsx("input", { value: L.billing_remark || "", onChange: (he) => D(L, { billing_remark: he.target.value }), placeholder: "Phase / VO remark" }) : L.billing_remark || "-" }),
+                r && d.jsx("td", { children: d.jsx("button", { className: "primary-button small-button", onClick: () => I(L), children: "Save" }) }),
+              ] }, L.id);
             }) }),
           ] }) }) }),
         ] });
       }
+
       function vs({ profile: t, config: r }) {
         const n = t.role === "admin" || t.role === "operation",
           kgCanDelete =
@@ -44508,6 +44136,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .worker-ot-time { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
       .worker-ot-time small { color: #b45309; font-weight: 800; }
       .worker-ot-check { font-size: 12px; font-weight: 800; }
+
+      .delivery-items-table, .items-editor, .items-editor-heading, .order-total-bar { display: none !important; }
 </style>
   </head>
   <body>
