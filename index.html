@@ -39284,6 +39284,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         async function Ye(X) {
           (X.preventDefault(), _(!0), D(""), L(""));
           const Te = p.items.filter((F) => String(F.item_name || "").trim());
+          if (!Te.length) {
+            (D("Add at least one delivery item."), _(!1));
+            return;
+          }
           const _e = Te.find(
             (F) =>
               Number(F.quantity_returned || 0) >
@@ -39354,25 +39358,23 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               return;
             }
           }
-          if (Te.length) {
-            const N = Te.map((F, U) => ({
-                delivery_order_id: P,
-                catalog_item_id: F.catalog_item_id
-                  ? Number(F.catalog_item_id)
-                  : null,
-                category: F.category,
-                item_name: String(F.item_name).trim(),
-                size: String(F.size || "").trim(),
-                quantity_delivered: Number(F.quantity_delivered || 0),
-                quantity_returned: Number(F.quantity_returned || 0),
-                unit_cost: Number(F.unit_cost || 0),
-                sort_order: U,
-              })),
-              { error: z } = await qe.from("delivery_order_items").insert(N);
-            if (z) {
-              (D(z.message), _(!1));
-              return;
-            }
+          const N = Te.map((F, U) => ({
+              delivery_order_id: P,
+              catalog_item_id: F.catalog_item_id
+                ? Number(F.catalog_item_id)
+                : null,
+              category: F.category,
+              item_name: String(F.item_name).trim(),
+              size: String(F.size || "").trim(),
+              quantity_delivered: Number(F.quantity_delivered || 0),
+              quantity_returned: Number(F.quantity_returned || 0),
+              unit_cost: Number(F.unit_cost || 0),
+              sort_order: U,
+            })),
+            { error: z } = await qe.from("delivery_order_items").insert(N);
+          if (z) {
+            (D(z.message), _(!1));
+            return;
           }
           (x(null),
             l(p.delivery_date),
@@ -39424,7 +39426,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Delivery" }),
                     d.jsx("p", {
                       children:
-                        "Add site delivery, driver, remark and notes without item entry.",
+                        "Add delivered items, editable cost, scaffolds, ladders and partial returns.",
                     }),
                   ],
                 }),
@@ -39811,6 +39813,237 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             }),
                           ],
                         }),
+                      ],
+                    }),
+                    d.jsxs("div", {
+                      className: "items-editor-heading",
+                      children: [
+                        d.jsxs("div", {
+                          children: [
+                            d.jsx("strong", { children: "Delivered items" }),
+                            d.jsx("span", {
+                              children:
+                                "Cost is editable. Return quantity may be less than delivered.",
+                            }),
+                          ],
+                        }),
+                        d.jsxs("button", {
+                          type: "button",
+                          className: "secondary-button",
+                          onClick: oe,
+                          children: [d.jsx(ti, { size: 16 }), "Add item"],
+                        }),
+                      ],
+                    }),
+                    d.jsx("div", {
+                      className: "items-editor",
+                      children: p.items.map((X, Te) =>
+                        d.jsxs(
+                          "div",
+                          {
+                            className: "item-editor-card",
+                            children: [
+                              d.jsxs("div", {
+                                className: "item-editor-top",
+                                children: [
+                                  d.jsxs("strong", {
+                                    children: ["Item ", Te + 1],
+                                  }),
+                                  p.items.length > 1 &&
+                                    d.jsx("button", {
+                                      type: "button",
+                                      className: "icon-button danger",
+                                      onClick: () => ge(Te),
+                                      children: d.jsx(N0, { size: 15 }),
+                                    }),
+                                ],
+                              }),
+                              d.jsxs("div", {
+                                className: "form-grid item-grid",
+                                children: [
+                                  d.jsxs("label", {
+                                    className: "wide",
+                                    children: [
+                                      "Choose saved item",
+                                      d.jsxs("select", {
+                                        value: X.catalog_item_id || "",
+                                        onChange: (_e) =>
+                                          de(Te, _e.target.value),
+                                        children: [
+                                          d.jsx("option", {
+                                            value: "",
+                                            children: "Custom item",
+                                          }),
+                                          s.catalog.map((_e) =>
+                                            d.jsxs(
+                                              "option",
+                                              {
+                                                value: _e.id,
+                                                children: [
+                                                  _e.category,
+                                                  " · ",
+                                                  _e.item_name,
+                                                  _e.size
+                                                    ? ` · ${_e.size}`
+                                                    : "",
+                                                  " · ",
+                                                  rr(_e.default_unit_cost),
+                                                ],
+                                              },
+                                              _e.id,
+                                            ),
+                                          ),
+                                        ],
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("label", {
+                                    children: [
+                                      "Category",
+                                      d.jsxs("select", {
+                                        value: X.category,
+                                        onChange: (_e) =>
+                                          G(Te, { category: _e.target.value }),
+                                        children: [
+                                          d.jsx("option", {
+                                            value: "material",
+                                            children: "Material",
+                                          }),
+                                          d.jsx("option", {
+                                            value: "scaffold",
+                                            children: "Scaffold",
+                                          }),
+                                          d.jsx("option", {
+                                            value: "ladder",
+                                            children: "Ladder",
+                                          }),
+                                          d.jsx("option", {
+                                            value: "other",
+                                            children: "Other",
+                                          }),
+                                        ],
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("label", {
+                                    children: [
+                                      "Item name",
+                                      d.jsx("input", {
+                                        value: X.item_name,
+                                        onChange: (_e) =>
+                                          G(Te, {
+                                            item_name: _e.target.value,
+                                            catalog_item_id: "",
+                                          }),
+                                        required: !0,
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("label", {
+                                    children: [
+                                      "Size",
+                                      d.jsx("input", {
+                                        value: X.size || "",
+                                        onChange: (_e) =>
+                                          G(Te, {
+                                            size: _e.target.value,
+                                            catalog_item_id: "",
+                                          }),
+                                        placeholder: "Example: 6 ft, 2 m",
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("label", {
+                                    children: [
+                                      "Delivered quantity",
+                                      d.jsx("input", {
+                                        type: "number",
+                                        min: "0",
+                                        step: "0.01",
+                                        value: X.quantity_delivered,
+                                        onChange: (_e) =>
+                                          G(Te, {
+                                            quantity_delivered: _e.target.value,
+                                          }),
+                                        required: !0,
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("label", {
+                                    children: [
+                                      "Returned quantity",
+                                      d.jsx("input", {
+                                        type: "number",
+                                        min: "0",
+                                        step: "0.01",
+                                        value: X.quantity_returned,
+                                        onChange: (_e) =>
+                                          G(Te, {
+                                            quantity_returned: _e.target.value,
+                                          }),
+                                        required: !0,
+                                      }),
+                                      d.jsx("span", {
+                                        className: "field-help",
+                                        children:
+                                          "Use this to return only a few.",
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("label", {
+                                    children: [
+                                      "Unit cost (SGD)",
+                                      d.jsx("input", {
+                                        type: "number",
+                                        min: "0",
+                                        step: "0.01",
+                                        value: X.unit_cost,
+                                        onChange: (_e) =>
+                                          G(Te, { unit_cost: _e.target.value }),
+                                        required: !0,
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("div", {
+                                    className: "calculated-box",
+                                    children: [
+                                      d.jsx("span", {
+                                        children: "Outstanding",
+                                      }),
+                                      d.jsx("strong", {
+                                        children: Math.max(
+                                          0,
+                                          Number(X.quantity_delivered || 0) -
+                                            Number(X.quantity_returned || 0),
+                                        ),
+                                      }),
+                                    ],
+                                  }),
+                                  d.jsxs("div", {
+                                    className: "calculated-box",
+                                    children: [
+                                      d.jsx("span", { children: "Item total" }),
+                                      d.jsx("strong", {
+                                        children: rr(
+                                          Number(X.quantity_delivered || 0) *
+                                            Number(X.unit_cost || 0),
+                                        ),
+                                      }),
+                                    ],
+                                  }),
+                                ],
+                              }),
+                            ],
+                          },
+                          Te,
+                        ),
+                      ),
+                    }),
+                    d.jsxs("div", {
+                      className: "order-total-bar",
+                      children: [
+                        d.jsx("span", { children: "Delivery total" }),
+                        d.jsx("strong", { children: rr(Ne) }),
                       ],
                     }),
                     d.jsxs("div", {
