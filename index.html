@@ -16621,10 +16621,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return (kgBillingStatusOptions.find((n) => n[0] === r) || kgBillingStatusOptions[0])[1];
       }
       function kgIsBilled(t) {
-        return String((t == null ? void 0 : t.billing_status) || "not_billed") === "full_bill";
-      }
-      function kgBillingNeedsFollowUp(t) {
-        return !kgIsBilled(t);
+        return String((t == null ? void 0 : t.billing_status) || "not_billed") !== "not_billed" || !!String((t == null ? void 0 : t.billing_no) || "").trim() || !!String((t == null ? void 0 : t.billing_date) || "").trim();
       }
       function bo(t, r = ["scaffold", "ladder"]) {
         const n = new Map();
@@ -36775,7 +36772,7 @@ Worker : ${c}`;
                 .order("sort_order"),
               qe
                 .from("delivery_orders")
-                .select("id,delivery_date,sent_on,delivery_driver,order_type,site:sites(id,address,is_boss_site,is_project_site)")
+                .select("id,delivery_date,sent_on,site:sites(id,address,is_boss_site,is_project_site)")
                 .eq("delivery_date", n),
             ]),
             Le =
@@ -37431,16 +37428,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                   children: [
                                     d.jsx(al, { size: 14 }),
                                     kgSiteOptionLabel(V),
-                                    d.jsx("small", {
-                                      style: { display: "block", width: "100%", color: "#0f766e", fontWeight: 800, marginTop: "2px" },
-                                      children: (() => {
-                                        const kgSiteDeliveries = (v || []).filter((Re) => {
-                                          var At;
-                                          return Number((At = Re.site) == null ? void 0 : At.id) === Number(V.id);
-                                        });
-                                        return kgSiteDeliveries.length ? `Delivery: ${kgSiteDeliveries.map((Re) => cp(Re.delivery_date)).join(" / ")}` : "Delivery: No delivery made";
-                                      })(),
-                                    }),
                                     r && d.jsx(ti, { size: 14 }),
                                   ],
                                 },
@@ -37793,14 +37780,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                   Number(
                                     (Qe = V.site) == null ? void 0 : Qe.id,
                                   ),
-                                ),
-                                kgSiteDeliveriesToday = (v || []).filter((Re) => {
-                                  var At, Ct;
-                                  return Number((At = Re.site) == null ? void 0 : At.id) === Number((Ct = V.site) == null ? void 0 : Ct.id);
-                                }),
-                                kgDeliveryText = kgSiteDeliveriesToday.length
-                                  ? kgSiteDeliveriesToday.map((Re) => `${cp(Re.delivery_date)}${Re.delivery_driver ? ` · ${Re.delivery_driver}` : ""}${Re.order_type ? ` · ${kgDeliveryOrderTypeText(Re.order_type)}` : ""}`).join(" / ")
-                                  : "No delivery made";
+                                );
                               return d.jsxs(
                                 "article",
                                 {
@@ -37855,7 +37835,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             }),
                                             d.jsxs("span", { children: ["Status: ", V.job_status || "CONTINUE JOB"] }),
                                             d.jsxs("span", { children: ["P.I.C.: ", V.pic || ((V.site || {}).pic) || "-"] }),
-                                            d.jsxs("span", { children: ["Delivery: ", kgDeliveryText] }),
                                             d.jsxs("span", { children: ["Foreman in charge: ", ((V.site || {}).foreman_in_charge) || "-"] }),
                                             d.jsxs("span", {
                                               children: [
@@ -39776,6 +39755,52 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                         d.jsxs("label", {
                           children: [
+                            "Billing date",
+                            d.jsx("input", {
+                              type: "date",
+                              value: p.billing_date || "",
+                              onChange: (X) =>
+                                g({ ...p, billing_date: X.target.value }),
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Billing no.",
+                            d.jsx("input", {
+                              value: p.billing_no || "",
+                              onChange: (X) =>
+                                g({ ...p, billing_no: X.target.value }),
+                              placeholder: "Invoice / billing no.",
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Billing status",
+                            d.jsx("select", {
+                              value: p.billing_status || "not_billed",
+                              onChange: (X) =>
+                                g({ ...p, billing_status: X.target.value }),
+                              children: kgBillingStatusOptions.map((X) =>
+                                d.jsx("option", { value: X[0], children: X[1] }, X[0]),
+                              ),
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
+                            "Billing remark",
+                            d.jsx("input", {
+                              value: p.billing_remark || "",
+                              onChange: (X) =>
+                                g({ ...p, billing_remark: X.target.value }),
+                              placeholder: "Phase detail / VO no.",
+                            }),
+                          ],
+                        }),
+                        d.jsxs("label", {
+                          children: [
                             "Delivery type",
                             d.jsx("select", {
                               value: p.order_type || "site_order",
@@ -40077,8 +40102,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [s, f] = q.useState([]),
           [c, m] = q.useState(!0),
           [v, x] = q.useState(""),
-          [p, g] = q.useState(""),
-          [kgSelectedSiteId, kgSetSelectedSiteId] = q.useState("");
+          [p, g] = q.useState("");
         async function S() {
           (m(!0), x(""), g(""));
           const { start: D, endExclusive: I } = lh(n),
@@ -40089,83 +40113,47 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               .lt("delivery_date", I)
               .order("delivery_date")
               .order("created_at");
-          W
-            ? x(W.message)
-            : f((L || []).sort((he, J) => Number(kgIsBilled(he)) - Number(kgIsBilled(J)) || String(he.delivery_date || "").localeCompare(String(J.delivery_date || "")) || String(((he.site || {}).address) || "").localeCompare(String(((J.site || {}).address) || ""), void 0, { numeric: !0, sensitivity: "base" })));
+          W ? x(W.message) : f((L || []).sort((he, J) => Number(kgIsBilled(he)) - Number(kgIsBilled(J)) || String(he.delivery_date || "").localeCompare(String(J.delivery_date || ""))));
           m(!1);
         }
         q.useEffect(() => {
           S();
         }, [n]);
-        const kgSiteOptions = q.useMemo(() => {
-            const D = new Map();
-            for (const I of s || []) {
-              const L = I.site || {}, W = L.id == null ? "" : String(L.id);
-              W && !D.has(W) && D.set(W, L);
-            }
-            return [...D.values()].sort((I, L) => String(I.address || "").localeCompare(String(L.address || ""), void 0, { numeric: !0, sensitivity: "base" }));
-          }, [s]),
-          kgFilteredOrders = q.useMemo(
-            () => kgSelectedSiteId ? (s || []).filter((D) => String(((D.site || {}).id) || "") === String(kgSelectedSiteId)) : (s || []),
-            [s, kgSelectedSiteId],
-          ),
-          E = kgFilteredOrders.filter((D) => kgBillingNeedsFollowUp(D)),
-          kgBillingSummary = q.useMemo(
-            () => ({
-              total: kgFilteredOrders.length,
-              full: kgFilteredOrders.filter((D) => kgIsBilled(D)).length,
-              followUp: E.length,
-              siteOrder: kgFilteredOrders.filter((D) => String(D.order_type || "site_order") === "site_order").length,
-            }),
-            [kgFilteredOrders, E.length],
-          );
+        const E = s.filter((D) => !kgIsBilled(D));
         function w(D, I) {
           f((L) => L.map((W) => W.id === D.id ? { ...W, ...I } : W));
         }
         async function _(D) {
           if (!r) return;
           x("");
-          if (kgBillingNeedsFollowUp(D) && !window.confirm("No bill yet / not fully billed. This order will keep showing until you choose Full bill. Save this billing status?")) return;
+          if (!kgIsBilled(D) && !window.confirm("This site is no billed. Keep it as No billed?")) return;
           const { error: I } = await qe.from("delivery_orders").update({
             billing_status: D.billing_status || "not_billed",
             billing_date: D.billing_date || null,
             billing_no: String(D.billing_no || "").trim() || null,
             billing_remark: String(D.billing_remark || "").trim() || null,
           }).eq("id", D.id);
-          I ? x(I.message) : (g("Billing saved."), await S());
+          I ? x(I.message) : (g("Billing updated."), await S());
         }
         return d.jsxs("div", { className: "page billing-page", children: [
           d.jsxs("header", { className: "page-header planner-header", children: [
             d.jsxs("div", { children: [
               d.jsx("p", { className: "eyebrow", children: "Billing follow up" }),
               d.jsx("h1", { children: "Billing" }),
-              d.jsx("p", { children: "Choose address, update bill status here, and it will keep warning until the order is Full bill." }),
+              d.jsx("p", { children: "Check site orders that are not billed, then mark phase bill / VO bill / full bill." }),
             ] }),
             d.jsxs("div", { className: "date-controls", children: [
               d.jsxs("label", { className: "date-picker", children: [
                 d.jsx(fl, { size: 18 }),
                 d.jsx("input", { type: "month", value: n, onChange: (D) => l(D.target.value) }),
               ] }),
-              d.jsxs("label", { className: "date-picker", children: [
-                d.jsx(al, { size: 18 }),
-                d.jsxs("select", { value: kgSelectedSiteId, onChange: (D) => kgSetSelectedSiteId(D.target.value), children: [
-                  d.jsx("option", { value: "", children: "All address" }),
-                  kgSiteOptions.map((D) => d.jsx("option", { value: String(D.id), children: D.address || "-" }, D.id)),
-                ] }),
-              ] }),
               d.jsx("button", { className: "secondary-button", onClick: S, children: "Refresh" }),
             ] }),
           ] }),
-          d.jsxs("section", { className: "summary-grid", children: [
-            d.jsxs("div", { className: "summary-card", children: [d.jsx(Q0, {}), d.jsxs("div", { children: [d.jsx("strong", { children: kgBillingSummary.total }), d.jsx("span", { children: "Orders shown" })] })] }),
-            d.jsxs("div", { className: "summary-card", children: [d.jsx(JS, {}), d.jsxs("div", { children: [d.jsx("strong", { children: kgBillingSummary.full }), d.jsx("span", { children: "Full bill" })] })] }),
-            d.jsxs("div", { className: "summary-card", children: [d.jsx(Ds, {}), d.jsxs("div", { children: [d.jsx("strong", { children: kgBillingSummary.followUp }), d.jsx("span", { children: "No full bill yet" })] })] }),
-            d.jsxs("div", { className: "summary-card", children: [d.jsx(al, {}), d.jsxs("div", { children: [d.jsx("strong", { children: kgBillingSummary.siteOrder }), d.jsx("span", { children: "Site order" })] })] }),
-          ] }),
-          E.length > 0 && d.jsxs("div", { className: "error-box", children: ["⚠ ", E.length, " order", E.length === 1 ? "" : "s", " no bill yet / not fully billed. It will stop showing only after Full bill."] }),
+          E.length > 0 && d.jsxs("div", { className: "error-box", children: ["⚠ ", E.length, " site order", E.length === 1 ? "" : "s", " no billed yet."] }),
           v && d.jsx("div", { className: "error-box", children: v }),
           p && d.jsx("div", { className: "success-box", children: p }),
-          d.jsx("section", { className: "panel", children: c ? d.jsx("div", { className: "empty-state", children: "Loading billing…" }) : kgFilteredOrders.length === 0 ? d.jsx("div", { className: "empty-state", children: kgSelectedSiteId ? "No order for this address in this month." : "No delivery / site order in this month." }) : d.jsx("div", { className: "table-wrap", children: d.jsxs("table", { className: "data-table billing-table", children: [
+          d.jsx("section", { className: "panel", children: c ? d.jsx("div", { className: "empty-state", children: "Loading billing…" }) : s.length === 0 ? d.jsx("div", { className: "empty-state", children: "No delivery / site order in this month." }) : d.jsx("div", { className: "table-wrap", children: d.jsxs("table", { className: "data-table billing-table", children: [
             d.jsx("thead", { children: d.jsxs("tr", { children: [
               d.jsx("th", { children: "Date" }),
               d.jsx("th", { children: "Site" }),
@@ -40177,13 +40165,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               d.jsx("th", { children: "Remark" }),
               r && d.jsx("th", {}),
             ] }) }),
-            d.jsx("tbody", { children: kgFilteredOrders.map((D) => {
-              const I = D.site || {}, L = kgBillingNeedsFollowUp(D);
+            d.jsx("tbody", { children: s.map((D) => {
+              const I = D.site || {}, L = !kgIsBilled(D);
               return d.jsxs("tr", { className: L ? "billing-not-billed" : "", children: [
                 d.jsx("td", { "data-label": "Date", children: cp(D.delivery_date) }),
                 d.jsxs("td", { "data-label": "Site", children: [
                   d.jsx("strong", { children: I.address || "-" }),
-                  L && d.jsx("div", { className: "billing-warning-text", children: "NO BILL YET / NOT FULL BILL" }),
+                  L && d.jsx("div", { className: "billing-warning-text", children: "SITE NO BILLED" }),
                   I.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Site remark: ", I.remark] }),
                   I.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Site note: ", I.notes] }),
                 ] }),
