@@ -16495,7 +16495,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
   site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,is_boss_site,is_project_site),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
-  assignment_workers(worker_id, sort_order, worker:workers(id,name,nickname,status,worker_type))
+  assignment_workers(*, worker:workers(id,name,nickname,status,worker_type))
 `,
         w0 = `
   id, delivery_date, sent_on, notes, created_at, updated_at,
@@ -33964,6 +33964,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               .filter(Boolean)
               .join(" + "),
             "Worker shifts": (r.assignment_workers || []).length,
+            "OT shift": kgAssignmentOtText(r),
             Notes: r.notes || "",
           };
         });
@@ -34120,6 +34121,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   foremen: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
+                  otHours: 0,
                   order: null,
                 });
               const xe = B.get(V);
@@ -34128,6 +34130,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 ((xe.foremanShifts += 1), xe.foremen.add(Number(ke.id)));
               for (const ke of ee.assignment_workers || [])
                 ((xe.workerShifts += 1), xe.workers.add(Number(ke.worker_id)));
+              xe.otHours += kgAssignmentOtHours(ee);
             }
             for (const ee of T) {
               const V = Number((ue = ee.site) == null ? void 0 : ue.id);
@@ -34139,6 +34142,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   foremen: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
+                  otHours: 0,
                   order: null,
                 }),
                 (B.get(V).order = ee));
@@ -34165,6 +34169,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   foremen: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
+                  otHours: 0,
                   orderCount: 0,
                   sentOrders: 0,
                   cost: 0,
@@ -34176,6 +34181,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 (xe.foremen.add(Number(ke.id)), (xe.foremanShifts += 1));
               for (const ke of ee.assignment_workers || [])
                 (xe.workers.add(Number(ke.worker_id)), (xe.workerShifts += 1));
+              xe.otHours += kgAssignmentOtHours(ee);
             }
             for (const ee of T) {
               const V = Number((ue = ee.site) == null ? void 0 : ue.id);
@@ -34187,6 +34193,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   foremen: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
+                  otHours: 0,
                   orderCount: 0,
                   sentOrders: 0,
                   cost: 0,
@@ -34222,6 +34229,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   foremanNames: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
+                  otHours: 0,
                   shifts: new Set(),
                   order: null,
                 });
@@ -34235,6 +34243,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 (V.workers.add(Number(xe.worker_id)),
                   V.workerNames.add(kgNameNick(xe.worker)),
                   (V.workerShifts += 1));
+              V.otHours += kgAssignmentOtHours(ue);
             }
             for (const ue of ge) {
               const ee = ue.delivery_date;
@@ -34247,6 +34256,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   foremanNames: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
+                  otHours: 0,
                   shifts: new Set(),
                   order: null,
                 }),
@@ -34272,6 +34282,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 0,
               ),
               foremanShifts: oe.reduce((B, me) => B + ar(me).length, 0),
+              otHours: oe.reduce((B, me) => B + kgAssignmentOtHours(me), 0),
               deliveryCost: ge.reduce((B, me) => B + Yr(me), 0),
               sentOrders: ge.filter((B) => B.sent_on).length,
             }),
@@ -34327,6 +34338,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     "Unique foremen": ue.foremen.size,
                     "Worker shifts": ue.workerShifts,
                     "Unique workers": ue.workers.size,
+                    "OT shift": kgFormatOtHours(ue.otHours) || "",
                     "DO sent": `${ue.sentOrders}/${ue.orderCount}`,
                     "Delivery cost": ue.cost,
                     "Scaffold and ladder outstanding":
@@ -34358,6 +34370,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     "Foreman shifts": ee.foremanShifts,
                     Workers: [...ee.workerNames].filter(Boolean).join(", "),
                     "Worker shifts": ee.workerShifts,
+                    "OT shift": kgFormatOtHours(ee.otHours) || "",
                     "DO sent":
                       (V = ee.order) != null && V.sent_on ? "Yes" : "No",
                     "Delivery cost": ee.order ? Yr(ee.order) : 0,
@@ -34940,6 +34953,18 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 d.jsxs("div", {
                   className: "summary-card",
                   children: [
+                    d.jsx(sp, {}),
+                    d.jsxs("div", {
+                      children: [
+                        d.jsx("strong", { children: kgFormatOtHours(z.otHours) || "0hr OT" }),
+                        d.jsx("span", { children: "OT shift" }),
+                      ],
+                    }),
+                  ],
+                }),
+                d.jsxs("div", {
+                  className: "summary-card",
+                  children: [
                     d.jsx(ei, {}),
                     d.jsxs("div", {
                       children: [
@@ -35014,6 +35039,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                 d.jsx("th", { children: "Unique foremen" }),
                                 d.jsx("th", { children: "Worker shifts" }),
                                 d.jsx("th", { children: "Unique workers" }),
+                                d.jsx("th", { children: "OT shift" }),
                                 d.jsx("th", { children: "Delivery order" }),
                                 d.jsx("th", { children: "Delivery cost" }),
                                 d.jsx("th", {
@@ -35026,14 +35052,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                             children: I
                               ? d.jsx("tr", {
                                   children: d.jsx("td", {
-                                    colSpan: "8",
+                                    colSpan: "9",
                                     children: "Loading summary…",
                                   }),
                                 })
                               : He.length === 0
                                 ? d.jsx("tr", {
                                     children: d.jsx("td", {
-                                      colSpan: "8",
+                                      colSpan: "9",
                                       className: "empty-cell",
                                       children:
                                         "No site planning or delivery orders for this date.",
@@ -35069,6 +35095,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                           d.jsx("td", {
                                             "data-label": "Unique workers",
                                             children: B.workers.size,
+                                          }),
+                                          d.jsx("td", {
+                                            "data-label": "OT shift",
+                                            children: kgFormatOtHours(B.otHours) || "",
                                           }),
                                           d.jsx("td", {
                                             "data-label": "Delivery order",
@@ -35111,6 +35141,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                 d.jsx("th", { children: "Unique foremen" }),
                                 d.jsx("th", { children: "Worker shifts" }),
                                 d.jsx("th", { children: "Unique workers" }),
+                                d.jsx("th", { children: "OT shift" }),
                                 d.jsx("th", { children: "DO sent" }),
                                 d.jsx("th", { children: "Delivery cost" }),
                                 d.jsx("th", {
@@ -35123,14 +35154,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                             children: I
                               ? d.jsx("tr", {
                                   children: d.jsx("td", {
-                                    colSpan: "9",
+                                    colSpan: "10",
                                     children: "Loading month…",
                                   }),
                                 })
                               : P.length === 0
                                 ? d.jsx("tr", {
                                     children: d.jsx("td", {
-                                      colSpan: "9",
+                                      colSpan: "10",
                                       className: "empty-cell",
                                       children: "No records for this month.",
                                     }),
@@ -35169,6 +35200,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                           d.jsx("td", {
                                             "data-label": "Unique workers",
                                             children: B.workers.size,
+                                          }),
+                                          d.jsx("td", {
+                                            "data-label": "OT shift",
+                                            children: kgFormatOtHours(B.otHours) || "",
                                           }),
                                           d.jsxs("td", {
                                             "data-label": "DO sent",
@@ -35212,6 +35247,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                 d.jsx("th", { children: "Foreman shifts" }),
                                 d.jsx("th", { children: "Workers" }),
                                 d.jsx("th", { children: "Worker shifts" }),
+                                d.jsx("th", { children: "OT shift" }),
                                 d.jsx("th", { children: "DO sent" }),
                                 d.jsx("th", { children: "Delivery cost" }),
                                 d.jsx("th", {
@@ -35224,14 +35260,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                             children: I
                               ? d.jsx("tr", {
                                   children: d.jsx("td", {
-                                    colSpan: "9",
+                                    colSpan: "10",
                                     children: "Loading site…",
                                   }),
                                 })
                               : N.length === 0
                                 ? d.jsx("tr", {
                                     children: d.jsx("td", {
-                                      colSpan: "9",
+                                      colSpan: "10",
                                       className: "empty-cell",
                                       children:
                                         "No records for this site and month.",
@@ -35275,6 +35311,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                           d.jsx("td", {
                                             "data-label": "Worker shifts",
                                             children: B.workerShifts,
+                                          }),
+                                          d.jsx("td", {
+                                            "data-label": "OT shift",
+                                            children: kgFormatOtHours(B.otHours) || "",
                                           }),
                                           d.jsx("td", {
                                             "data-label": "DO sent",
@@ -35854,6 +35894,53 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgExcelDate(t) {
         return t ? cp(t).replaceAll(".", "/") : "";
       }
+      function kgOtHoursFromEndTime(t) {
+        const r = String(t || "").trim();
+        if (!r) return 0;
+        const n = r.match(/^(\d{1,2})(?::(\d{2}))?/);
+        if (!n) return 0;
+        let l = Number(n[1] || 0), s = Number(n[2] || 0);
+        if (!Number.isFinite(l) || !Number.isFinite(s)) return 0;
+        l = Math.max(0, Math.min(23, l));
+        s = Math.max(0, Math.min(59, s));
+        let f = l + s / 60;
+        if (f < 6) f += 24;
+        if (f < 18) return 0;
+        return Math.max(0, Math.round((f - 18) * 4) / 4);
+      }
+      function kgFormatOtHours(t) {
+        const r = Number(t || 0);
+        if (!r) return "";
+        const n = Number.isInteger(r) ? String(r) : String(r).replace(/\.00$/, "").replace(/0$/, "");
+        return `${n}${r === 1 ? "hr" : "hrs"} OT`;
+      }
+      function kgWorkerOtHours(t) {
+        const r = Number((t == null ? void 0 : t.ot_hours) || 0);
+        if (r > 0) return r;
+        return kgOtHoursFromEndTime((t == null ? void 0 : t.ot_end_time) || (t == null ? void 0 : t.ot_time) || "");
+      }
+      function kgAssignmentOtHours(t) {
+        return (t.assignment_workers || []).reduce((r, n) => r + kgWorkerOtHours(n), 0);
+      }
+      function kgAssignmentOtText(t) {
+        return (t.assignment_workers || [])
+          .map((r) => {
+            const n = kgWorkerOtHours(r), l = kgFormatOtHours(n);
+            if (!l) return "";
+            const s = kgCopy3CleanChinaSubName(kgCopyPersonName(r.worker) || kgNameNick(r.worker));
+            return `${s || "Worker"} ${l}`;
+          })
+          .filter(Boolean)
+          .join(" + ");
+      }
+      function kgWorkerOtMapFromAssignment(t) {
+        const r = {};
+        for (const n of (t == null ? void 0 : t.assignment_workers) || []) {
+          const l = n.worker_id || (n.worker && n.worker.id), s = String(n.ot_end_time || n.ot_time || "").trim();
+          l && s && (r[String(l)] = s);
+        }
+        return r;
+      }
       function kgIsSubName(t) {
         return /^sub\s*[-–—]/i.test(String(t || "").trim());
       }
@@ -35939,7 +36026,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             FS: m,
             SUB: kgSubWorkerCount(l),
             CHINA: kgChinaWorkerCount(l),
-            "OT SHIFT": "",
+            "OT SHIFT": kgAssignmentOtText(l),
             __kgDateKey: c,
             __kgLorryGroup: f || "__NO_LORRY__",
           });
@@ -36486,6 +36573,7 @@ Worker : ${c}`;
         is_confirmed: !1,
         notes: "",
         worker_ids: [],
+        worker_ot: {},
       };
       function kgPlannerCleanPic(t) {
         return String(t || "").trim();
@@ -36731,6 +36819,7 @@ Worker : ${c}`;
               is_confirmed: !!V.is_confirmed,
               notes: V.notes || "",
               worker_ids: (V.assignment_workers || []).map((Le) => Number(Le.worker_id)),
+              worker_ot: kgWorkerOtMapFromAssignment(V),
             }));
         }
         function z(V) {
@@ -36743,20 +36832,31 @@ Worker : ${c}`;
           }));
         }
         function F(V) {
-          const xe = Number(V);
-          _((ke) => ({
-            ...ke,
-            worker_ids: ke.worker_ids.includes(xe)
-              ? ke.worker_ids.filter((Le) => Le !== xe)
-              : [...ke.worker_ids, xe],
-          }));
+          const xe = Number(V), ke = String(V);
+          _((Le) => {
+            const Qe = Le.worker_ids.includes(xe), Ve = { ...(Le.worker_ot || {}) };
+            Qe && delete Ve[ke];
+            return {
+              ...Le,
+              worker_ids: Qe ? Le.worker_ids.filter((Re) => Re !== xe) : [...Le.worker_ids, xe],
+              worker_ot: Ve,
+            };
+          });
+        }
+        function kgSetWorkerOt(V, xe) {
+          const ke = String(V), Le = String(xe || "").trim();
+          _((Qe) => {
+            const Ve = { ...(Qe.worker_ot || {}) };
+            Le ? (Ve[ke] = Le) : delete Ve[ke];
+            return { ...Qe, worker_ot: Ve };
+          });
         }
         function kgUsePastManpower(V) {
           const xe = ar(V).map((ke) => Number(ke.id)).filter(Boolean),
             ke = (V.assignment_workers || [])
               .map((Le) => Number(Le.worker_id || (Le.worker && Le.worker.id)))
               .filter(Boolean);
-          _((Le) => ({ ...Le, foreman_ids: xe, worker_ids: ke }));
+          _((Le) => ({ ...Le, foreman_ids: xe, worker_ids: ke, worker_ot: {} }));
           He(`Copied same foreman + workers from ${kgHistoryDate(V.plan_date)}.`);
         }
         function kgToggleLorry(V) {
@@ -36798,12 +36898,15 @@ Worker : ${c}`;
         }
         function kgWorkerCheckCard(V) {
           const xe = s.filter(
-            (ke) =>
-              ke.id !== S &&
-              (ke.assignment_workers || []).some(
-                (Le) => Number(Le.worker_id) === Number(V.id),
-              ),
-          );
+              (Le) =>
+                Le.id !== S &&
+                (Le.assignment_workers || []).some(
+                  (Qe) => Number(Qe.worker_id) === Number(V.id),
+                ),
+            ),
+            ke = w.worker_ids.includes(Number(V.id)),
+            Le = ((w.worker_ot || {})[String(V.id)] || "").trim(),
+            Qe = kgFormatOtHours(kgOtHoursFromEndTime(Le));
           return d.jsxs(
             "label",
             {
@@ -36811,7 +36914,7 @@ Worker : ${c}`;
               children: [
                 d.jsx("input", {
                   type: "checkbox",
-                  checked: w.worker_ids.includes(Number(V.id)),
+                  checked: ke,
                   onChange: () => F(V.id),
                 }),
                 d.jsxs("span", {
@@ -36823,11 +36926,43 @@ Worker : ${c}`;
                         children: [
                           "Already: ",
                           xe
-                            .map((ke) => {
-                              var Le;
-                              return (Le = ke.site) == null ? void 0 : Le.address;
+                            .map((Ve) => {
+                              var Re;
+                              return (Re = Ve.site) == null ? void 0 : Re.address;
                             })
                             .join(", "),
+                        ],
+                      }),
+                    ke &&
+                      d.jsxs("div", {
+                        className: "worker-ot-row",
+                        onClick: (Ve) => Ve.stopPropagation(),
+                        onMouseDown: (Ve) => Ve.stopPropagation(),
+                        children: [
+                          d.jsxs("span", {
+                            className: "inline-check worker-ot-check",
+                            children: [
+                              d.jsx("input", {
+                                type: "checkbox",
+                                checked: !!Le,
+                                onChange: (Ve) => kgSetWorkerOt(V.id, Ve.target.checked ? "21:00" : ""),
+                              }),
+                              " OT",
+                            ],
+                          }),
+                          Le &&
+                            d.jsxs("span", {
+                              className: "worker-ot-time",
+                              children: [
+                                "End ",
+                                d.jsx("input", {
+                                  type: "time",
+                                  value: Le,
+                                  onChange: (Ve) => kgSetWorkerOt(V.id, Ve.target.value),
+                                }),
+                                d.jsx("small", { children: Qe || "0hr OT" }),
+                              ],
+                            }),
                         ],
                       }),
                   ],
@@ -36888,8 +37023,16 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             if (Ve) return j(Ve.message);
           }
           if (w.worker_ids.length) {
-            const Qe = w.worker_ids.map((Re, At) => ({ assignment_id: Le, worker_id: Number(Re), sort_order: At })),
-              { error: Ve } = await qe.from("assignment_workers").insert(Qe);
+            const Qe = w.worker_ids.map((Re, At) => {
+              const Tt = String(((w.worker_ot || {})[String(Re)] || "")).trim(), Dt = { assignment_id: Le, worker_id: Number(Re), sort_order: At };
+              return Tt ? { ...Dt, ot_end_time: Tt, ot_hours: kgOtHoursFromEndTime(Tt) } : Dt;
+            });
+            let { error: Ve } = await qe.from("assignment_workers").insert(Qe);
+            if (Ve && /ot_end_time|ot_hours|schema cache|column/i.test(String(Ve.message || Ve.details || ""))) {
+              const Re = Qe.map(({ ot_end_time: At, ot_hours: Tt, ...Dt }) => Dt);
+              ({ error: Ve } = await qe.from("assignment_workers").insert(Re));
+              if (!Ve) He("Assignment saved without OT. Run the OT SQL file once, then save again.");
+            }
             if (Ve) return j(Ve.message);
           }
           (E(null), _(Bo), await oe(), He(xe.length ? "Saved. Duplicate assignment confirmed." : "Assignment saved."));
@@ -40858,7 +41001,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           x = {
             address: "Address", name: "Name", nickname: "Nickname", phone: "Phone", pass: "Pass", license: "License", status: "Status",
             registration_no: "Lorry number", driver_name: "Driver", foreman_type: "Foreman type", plan_date: "Date", site_id: "Site", lorry_id: "Lorry",
-            worker_id: "Worker", foreman_id: "Foreman", shift: "Shift", job_status: "Job status", pic: "P.I.C.", is_confirmed: "Site confirm", notes: "Notes",
+            worker_id: "Worker", foreman_id: "Foreman", shift: "Shift", job_status: "Job status", pic: "P.I.C.", is_confirmed: "Site confirm", notes: "Notes", ot_end_time: "OT end time", ot_hours: "OT hours",
             title: "Title", body: "Text", sent_on: "DO sent", item_name: "Item", quantity_delivered: "Delivered", quantity_returned: "Returned", unit_cost: "Unit price",
           };
         function p(E) {
@@ -43839,7 +43982,27 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           max-width: 100%;
         }
       }
-      </style>
+      
+      .worker-ot-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px dashed #cbd5e1;
+      }
+      .worker-ot-row input[type="time"] {
+        width: 92px;
+        padding: 4px 6px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      .worker-ot-time { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+      .worker-ot-time small { color: #b45309; font-weight: 800; }
+      .worker-ot-check { font-size: 12px; font-weight: 800; }
+</style>
   </head>
   <body>
     <div id="root"></div>
