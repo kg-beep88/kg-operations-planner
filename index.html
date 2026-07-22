@@ -16204,6 +16204,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           { to: "/logistics", label: "Logistics", icon: b0 },
           { to: "/manpower-search", label: "Name Search", icon: fE },
           { to: "/deliveries", label: "Delivery", icon: Q0 },
+          { to: "/checker", label: "Checker", icon: fE },
           { to: "/billing", label: "Billing", icon: ap },
           { to: "/sites", label: "Sites", icon: $S },
           { to: "/workers", label: "Workers", icon: Rs },
@@ -16616,6 +16617,30 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         ["phase_5_vo_billed", "Phase 5 VO billed"],
         ["other_phase", "Other phase / remark"],
       ];
+      const kgBillingPromptOptions = [
+        ["full_only", "Full bill only"],
+        ["phase2", "Phase 1 + VO to Phase 2"],
+        ["phase3", "Phase 1 + VO to Phase 3"],
+        ["phase4", "Phase 1 + VO to Phase 4"],
+        ["phase5", "Phase 1 + VO to Phase 5"],
+      ];
+      function kgBillingPromptText(t) {
+        const r = String(t || "full_only");
+        return (kgBillingPromptOptions.find((n) => n[0] === r) || kgBillingPromptOptions[0])[1];
+      }
+      function kgBillingStatusOptionsForPlan(t) {
+        const r = String(t || "full_only");
+        if (r === "full_only") return [
+          ["not_billed", "No billed"],
+          ["full_bill", "Full bill"],
+        ];
+        const n = Math.max(2, Math.min(5, Number((r.match(/phase(\d+)/) || [])[1] || 2))),
+          l = [["not_billed", "No billed"]];
+        for (let s = 1; s <= n; s++)
+          (l.push([`phase_${s}_billed`, `Phase ${s} billed`]),
+            l.push([`phase_${s}_vo_billed`, `Phase ${s} VO billed`]));
+        return [...l, ["full_bill", "Full bill"], ["other_phase", "Other phase / remark"]];
+      }
       function kgBillingStatusText(t) {
         const r = String(t || "not_billed");
         return (kgBillingStatusOptions.find((n) => n[0] === r) || kgBillingStatusOptions[0])[1];
@@ -36448,10 +36473,8 @@ Please check before assigning manpower.`);
         };
       }
       function kgCopy3PeopleText(t) {
-        const r = t.foremen && t.foremen.length ? t.foremen.join(" + ") : "-",
-          n = t.workers && t.workers.length ? t.workers.join(" + ") : "-";
-        return `Foreman : ${r}
-Worker : ${n}`;
+        const r = kgCopy3LineList([...(t.foremen || []), ...(t.workers || [])]);
+        return r.length ? r.join(" + ") : "-";
       }
       function kgCopy3AddressLine(t) {
         return `${t.address}${t.nightJob ? " - *Night Job*" : ""}`;
@@ -39158,7 +39181,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [S, E] = q.useState(!0),
           [w, _] = q.useState(!1),
           [T, D] = q.useState(""),
-          [I, L] = q.useState("");
+          [I, L] = q.useState(""),
+          [kgDeliverySearch, kgSetDeliverySearch] = q.useState("");
         async function W() {
           const X = await sh();
           (X.error && D(X.error.message), f(X.data));
@@ -39194,6 +39218,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           }),
           [c],
         );
+        const kgVisibleDeliveries = q.useMemo(() => {
+          const X = kgDeliverySearch.trim().toLowerCase();
+          return X
+            ? c.filter((Te) => String((Te.site && Te.site.address) || "").toLowerCase().includes(X))
+            : c;
+        }, [c, kgDeliverySearch]);
         function j() {
           (x("new"), g(Nv(n)), D(""));
         }
@@ -39394,6 +39424,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
+                    d.jsxs("label", {
+                      className: "date-picker",
+                      children: [
+                        d.jsx(fE, { size: 18 }),
+                        d.jsx("input", {
+                          value: kgDeliverySearch,
+                          onChange: (X) => kgSetDeliverySearch(X.target.value),
+                          placeholder: "Search address",
+                        }),
+                      ],
+                    }),
                     d.jsx("button", {
                       className: "icon-button",
                       onClick: () => l(wr(n, 1)),
@@ -39480,12 +39521,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         className: "empty-state",
                         children: "Loading…",
                       })
-                    : c.length === 0
+                    : kgVisibleDeliveries.length === 0
                       ? d.jsx("div", {
                           className: "empty-state",
-                          children: "No delivery for this date.",
+                          children: c.length ? "No delivery matched this address." : "No delivery for this date.",
                         })
-                      : c.map((X) => {
+                      : kgVisibleDeliveries.map((X) => {
                           var Te;
                           return d.jsxs(
                             "article",
@@ -39715,6 +39756,120 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           ],
         });
       }
+      function kgCheckerPage({ profile: t }) {
+        const [r, n] = q.useState(""),
+          [l, s] = q.useState({ sites: [], assignments: [], deliveries: [] }),
+          [f, c] = q.useState(!0),
+          [m, v] = q.useState("");
+        async function x() {
+          (c(!0), v(""));
+          const [p, g, S] = await Promise.all([
+            qe.from("sites").select("*").order("address"),
+            qe.from("site_assignments").select(_s).order("plan_date", { ascending: !1 }).limit(1000),
+            qe.from("delivery_orders").select(w0).order("delivery_date", { ascending: !1 }).limit(1000),
+          ]);
+          const E = [p, g, S].find((w) => w.error);
+          E ? v(E.error.message) : s({
+            sites: kgSortMasterRows(p.data || [], "sites", "address"),
+            assignments: g.data || [],
+            deliveries: S.data || [],
+          });
+          c(!1);
+        }
+        q.useEffect(() => {
+          x();
+        }, []);
+        const p = q.useMemo(() => {
+          const S = r.trim().toLowerCase();
+          if (!S) return [];
+          return (l.sites || []).filter((E) =>
+            [
+              E.address,
+              E.status,
+              E.pic,
+              E.foreman_in_charge,
+              E.foreman_detail,
+              E.id_name_tel,
+              E.lock_info,
+              E.site_info,
+              E.remark,
+              E.notes,
+            ].join(" ").toLowerCase().includes(S),
+          ).slice(0, 50);
+        }, [l.sites, r]);
+        function g(S) {
+          return (l.assignments || []).filter((E) => String(E.site && E.site.id) === String(S.id));
+        }
+        function S(E) {
+          return (l.deliveries || []).filter((w) => String(w.site && w.site.id) === String(E.id));
+        }
+        function E(w) {
+          const _ = kgAssignmentLorryRows(w).map((T) => T.lorry ? kgLorryText(T.lorry) : "No lorry").filter(Boolean).join(" + ") || "No lorry",
+            T = ar(w).map(kgForemanCopy2Person).filter(Boolean).join(" + ") || "-",
+            D = (w.assignment_workers || []).map((I) => kgCopyPersonName(I.worker)).filter(Boolean).join(" + ") || "-";
+          return d.jsxs("div", { className: "checker-row", children: [
+            d.jsxs("strong", { children: [w.plan_date ? cp(w.plan_date) : "No date", " · ", String(w.job_status || "new").toUpperCase()] }),
+            d.jsxs("div", { className: "muted", children: ["P.I.C.: ", w.pic || kgSitePicText(w.site), " · Lorry: ", _] }),
+            d.jsxs("div", { children: [d.jsx("b", { children: "Foreman: " }), T] }),
+            d.jsxs("div", { children: [d.jsx("b", { children: "Worker: " }), D] }),
+            w.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Planner remark: ", w.remark] }),
+            w.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Planner note: ", w.notes] }),
+          ] }, w.id);
+        }
+        function w(_) {
+          return d.jsxs("div", { className: "checker-row", children: [
+            d.jsxs("strong", { children: [_.delivery_date ? cp(_.delivery_date) : "No date", " · ", kgDeliveryOrderTypeText(_.order_type)] }),
+            d.jsxs("div", { className: "muted", children: ["Driver: ", _.delivery_driver || "-", " · Sent: ", _.sent_on ? "Yes" : "No"] }),
+            _.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Delivery remark: ", _.remark] }),
+            _.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Delivery note: ", _.notes] }),
+          ] }, _.id);
+        }
+        return d.jsxs("div", { className: "page checker-page", children: [
+          d.jsxs("header", { className: "page-header planner-header", children: [
+            d.jsxs("div", { children: [
+              d.jsx("p", { className: "eyebrow", children: "Address checker" }),
+              d.jsx("h1", { children: "Checker" }),
+              d.jsx("p", { children: "Search address to see site detail, planner detail, billing and delivery dates in one page." }),
+            ] }),
+            d.jsxs("div", { className: "date-controls", children: [
+              d.jsxs("label", { className: "date-picker", children: [
+                d.jsx(fE, { size: 18 }),
+                d.jsx("input", { value: r, onChange: (_) => n(_.target.value), placeholder: "Search address" }),
+              ] }),
+              d.jsx("button", { className: "secondary-button", onClick: x, children: "Refresh" }),
+            ] }),
+          ] }),
+          m && d.jsx("div", { className: "error-box", children: m }),
+          f ? d.jsx("div", { className: "empty-state", children: "Loading checker…" }) : !r.trim() ? d.jsx("div", { className: "empty-state", children: "Type an address to check everything for that site." }) : p.length === 0 ? d.jsx("div", { className: "empty-state", children: "No address found." }) : d.jsx("div", { className: "checker-list", children: p.map((_) => {
+            const T = g(_),
+              D = S(_),
+              I = String(_.billing_status || "not_billed") === "full_bill";
+            return d.jsxs("article", { className: "delivery-card checker-card", children: [
+              d.jsxs("div", { className: "delivery-card-head", children: [
+                d.jsxs("div", { children: [
+                  d.jsx("h3", { children: _.address || "No address" }),
+                  d.jsxs("p", { className: "muted", children: ["Status: ", kgSiteIsPause(_) ? "Pause" : String(_.status || "active").toUpperCase(), " · P.I.C.: ", kgSitePicText(_), " · Site info: ", _.site_info || "-"] }),
+                ] }),
+                d.jsxs("div", { className: "delivery-total", children: [
+                  d.jsx("span", { children: "Billing" }),
+                  d.jsx("strong", { children: I ? "Full bill" : "No full bill" }),
+                ] }),
+              ] }),
+              kgSiteDetailBlock(_, "Site information"),
+              d.jsxs("div", { className: I ? "success-box" : "error-box", children: [I ? "Billing completed: " : "⚠ Billing prompt: ", kgBillingStatusText(_.billing_status), " · ", kgBillingPromptText(_.billing_plan), _.billing_no ? ` · No: ${_.billing_no}` : "", _.billing_date ? ` · Date: ${cp(_.billing_date)}` : "", _.billing_remark ? ` · ${_.billing_remark}` : ""] }),
+              d.jsxs("section", { className: "panel nested-panel", children: [
+                d.jsx("h3", { children: "Planner detail" }),
+                T.length ? T.map(E) : d.jsx("div", { className: "empty-state", children: "No planner detail found." }),
+              ] }),
+              d.jsxs("section", { className: "panel nested-panel", children: [
+                d.jsx("h3", { children: "Delivery date" }),
+                D.length ? D.map(w) : d.jsx("div", { className: "empty-state", children: "No delivery made." }),
+              ] }),
+            ] }, _.id);
+          }) }),
+        ] });
+      }
+
       function kgBillingPage({ profile: t }) {
         const r = t.role === "admin" || t.role === "operation",
           [n, l] = q.useState(""),
@@ -39753,6 +39908,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (W !== "full_bill" && !window.confirm("This site no full bill yet. Save as not fully billed?")) return;
           const { error: he } = await qe.from("sites").update({
             billing_status: W,
+            billing_plan: L.billing_plan || "full_only",
             billing_date: L.billing_date || null,
             billing_no: String(L.billing_no || "").trim() || null,
             billing_remark: String(L.billing_remark || "").trim() || null,
@@ -39764,7 +39920,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             d.jsxs("div", { children: [
               d.jsx("p", { className: "eyebrow", children: "Billing follow up" }),
               d.jsx("h1", { children: "Billing" }),
-              d.jsx("p", { children: "Choose address from Sites, then update billing status. Warning will remain until Full bill is selected." }),
+              d.jsx("p", { children: "Choose address from Sites, choose billing prompt type, then update billing. Warning will remain until Full bill is selected." }),
             ] }),
             d.jsxs("div", { className: "date-controls", children: [
               d.jsxs("label", { className: "date-picker", children: [
@@ -39787,6 +39943,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               d.jsx("th", { children: "Site" }),
               d.jsx("th", { children: "PIC" }),
               d.jsx("th", { children: "Status" }),
+              d.jsx("th", { children: "Billing prompt" }),
               d.jsx("th", { children: "Billing status" }),
               d.jsx("th", { children: "Billing date" }),
               d.jsx("th", { children: "Billing no." }),
@@ -39794,17 +39951,20 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               r && d.jsx("th", {}),
             ] }) }),
             d.jsx("tbody", { children: T.map((L) => {
-              const W = !S(L);
+              const W = !S(L),
+                he = kgBillingStatusOptionsForPlan(L.billing_plan),
+                J = he.some((j) => j[0] === String(L.billing_status || "not_billed")) ? String(L.billing_status || "not_billed") : "not_billed";
               return d.jsxs("tr", { className: W ? "billing-not-billed" : "", children: [
                 d.jsxs("td", { "data-label": "Site", children: [
                   d.jsx("strong", { children: L.address || "-" }),
-                  W && d.jsx("div", { className: "billing-warning-text", children: "SITE NO FULL BILL YET" }),
+                  W && d.jsxs("div", { className: "billing-warning-text", children: ["SITE NO FULL BILL YET · ", kgBillingPromptText(L.billing_plan)] }),
                   L.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Site remark: ", L.remark] }),
                   L.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Site note: ", L.notes] }),
                 ] }),
                 d.jsx("td", { "data-label": "PIC", children: kgSitePicText(L) }),
                 d.jsx("td", { "data-label": "Status", children: kgSiteIsPause(L) ? "Pause" : String(L.status || "active").toUpperCase() }),
-                d.jsx("td", { "data-label": "Billing status", children: r ? d.jsx("select", { value: L.billing_status || "not_billed", onChange: (he) => D(L, { billing_status: he.target.value }), children: kgBillingStatusOptions.map((he) => d.jsx("option", { value: he[0], children: he[1] }, he[0])) }) : kgBillingStatusText(L.billing_status) }),
+                d.jsx("td", { "data-label": "Billing prompt", children: r ? d.jsx("select", { value: L.billing_plan || "full_only", onChange: (j) => { const fe = j.target.value, G = kgBillingStatusOptionsForPlan(fe); D(L, { billing_plan: fe, billing_status: G.some((de) => de[0] === String(L.billing_status || "not_billed")) ? String(L.billing_status || "not_billed") : "not_billed" }); }, children: kgBillingPromptOptions.map((j) => d.jsx("option", { value: j[0], children: j[1] }, j[0])) }) : kgBillingPromptText(L.billing_plan) }),
+                d.jsx("td", { "data-label": "Billing status", children: r ? d.jsx("select", { value: J, onChange: (j) => D(L, { billing_status: j.target.value }), children: he.map((j) => d.jsx("option", { value: j[0], children: j[1] }, j[0])) }) : kgBillingStatusText(L.billing_status) }),
                 d.jsx("td", { "data-label": "Billing date", children: r ? d.jsx("input", { type: "date", value: L.billing_date || "", onChange: (he) => D(L, { billing_date: he.target.value }) }) : L.billing_date || "-" }),
                 d.jsx("td", { "data-label": "Billing no.", children: r ? d.jsx("input", { value: L.billing_no || "", onChange: (he) => D(L, { billing_no: he.target.value }), placeholder: "Billing no." }) : L.billing_no || "-" }),
                 d.jsx("td", { "data-label": "Remark", children: r ? d.jsx("input", { value: L.billing_remark || "", onChange: (he) => D(L, { billing_remark: he.target.value }), placeholder: "Phase / VO remark" }) : L.billing_remark || "-" }),
@@ -41173,6 +41333,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       d.jsx(jn, {
                         path: "/deliveries",
                         element: d.jsx(gC, { profile: t }),
+                      }),
+                      d.jsx(jn, {
+                        path: "/checker",
+                        element: d.jsx(kgCheckerPage, { profile: t }),
                       }),
                       d.jsx(jn, {
                         path: "/billing",
@@ -43440,6 +43604,32 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         text-transform: none;
         letter-spacing: 0;
         color: var(--ink);
+      }
+
+
+      .checker-list {
+        display: grid;
+        gap: 14px;
+      }
+      .checker-card {
+        gap: 12px;
+      }
+      .checker-row {
+        display: grid;
+        gap: 5px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #ffffff;
+        margin-top: 8px;
+        overflow-wrap: anywhere;
+      }
+      .nested-panel {
+        margin-top: 10px;
+        padding: 12px;
+      }
+      .nested-panel h3 {
+        margin: 0 0 8px;
       }
 
       .site-detail-box {
