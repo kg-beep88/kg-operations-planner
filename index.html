@@ -39827,19 +39827,19 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           ] }, _.id);
         }
         return d.jsxs("div", { className: "page checker-page", children: [
-          d.jsxs("header", { className: "page-header planner-header", children: [
+          d.jsx("header", { className: "page-header checker-title-header", children:
             d.jsxs("div", { children: [
               d.jsx("p", { className: "eyebrow", children: "Address checker" }),
               d.jsx("h1", { children: "Checker" }),
               d.jsx("p", { children: "Search address to see site detail, planner detail, billing and delivery dates in one page." }),
+            ] })
+          }),
+          d.jsxs("div", { className: "checker-search-hero", children: [
+            d.jsxs("label", { className: "checker-big-search", children: [
+              d.jsx(fE, { size: 24 }),
+              d.jsx("input", { value: r, onChange: (_) => n(_.target.value), placeholder: "Search address, example 182" }),
             ] }),
-            d.jsxs("div", { className: "date-controls", children: [
-              d.jsxs("label", { className: "date-picker", children: [
-                d.jsx(fE, { size: 18 }),
-                d.jsx("input", { value: r, onChange: (_) => n(_.target.value), placeholder: "Search address" }),
-              ] }),
-              d.jsx("button", { className: "secondary-button", onClick: x, children: "Refresh" }),
-            ] }),
+            d.jsx("button", { className: "secondary-button checker-refresh-button", onClick: x, children: "Refresh" }),
           ] }),
           m && d.jsx("div", { className: "error-box", children: m }),
           f ? d.jsx("div", { className: "empty-state", children: "Loading checker…" }) : !r.trim() ? d.jsx("div", { className: "empty-state", children: "Type an address to check everything for that site." }) : p.length === 0 ? d.jsx("div", { className: "empty-state", children: "No address found." }) : d.jsx("div", { className: "checker-list", children: p.map((_) => {
@@ -43609,6 +43609,50 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
 
 
+      .checker-title-header {
+        justify-content: center;
+        text-align: center;
+      }
+      .checker-title-header > div {
+        max-width: 780px;
+        margin: 0 auto;
+      }
+      .checker-search-hero {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        margin: 8px auto 20px;
+        flex-wrap: wrap;
+      }
+      .checker-big-search {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: min(760px, 100%);
+        min-height: 62px;
+        padding: 0 20px;
+        border: 2px solid var(--brand);
+        border-radius: 999px;
+        background: #ffffff;
+        box-shadow: 0 12px 30px rgba(15, 118, 110, 0.12);
+        color: var(--brand);
+      }
+      .checker-big-search input {
+        width: 100%;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .checker-refresh-button {
+        min-height: 54px;
+        border-radius: 999px;
+        padding-inline: 22px;
+      }
       .checker-list {
         display: grid;
         gap: 14px;
