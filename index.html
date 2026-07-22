@@ -16642,11 +16642,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return [...l, ["full_bill", "Full bill"], ["other_phase", "Other phase / remark"]];
       }
       function kgBillingStatusText(t) {
-        const r = String(t || "not_billed");
+        const r = String(t || "full_bill");
         return (kgBillingStatusOptions.find((n) => n[0] === r) || kgBillingStatusOptions[0])[1];
       }
       function kgIsBilled(t) {
-        return String((t == null ? void 0 : t.billing_status) || "not_billed") !== "not_billed" || !!String((t == null ? void 0 : t.billing_no) || "").trim() || !!String((t == null ? void 0 : t.billing_date) || "").trim();
+        return String((t == null ? void 0 : t.billing_status) || "full_bill") !== "not_billed" || !!String((t == null ? void 0 : t.billing_no) || "").trim() || !!String((t == null ? void 0 : t.billing_date) || "").trim();
       }
       function bo(t, r = ["scaffold", "ladder"]) {
         const n = new Map();
@@ -39880,7 +39880,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [v, x] = q.useState(""),
           [p, g] = q.useState("");
         function S(L) {
-          return String((L == null ? void 0 : L.billing_status) || "not_billed") === "full_bill";
+          return String((L == null ? void 0 : L.billing_status) || "full_bill") === "full_bill";
         }
         async function E() {
           (m(!0), x(""), g(""));
@@ -39906,7 +39906,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         async function I(L) {
           if (!r) return;
           x("");
-          const W = String(L.billing_status || "not_billed");
+          const W = String(L.billing_status || "full_bill");
           if (W !== "full_bill" && !window.confirm("This site no full bill yet. Save as not fully billed?")) return;
           const { error: he } = await qe.from("sites").update({
             billing_status: W,
@@ -39922,7 +39922,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             d.jsxs("div", { children: [
               d.jsx("p", { className: "eyebrow", children: "Billing follow up" }),
               d.jsx("h1", { children: "Billing" }),
-              d.jsx("p", { children: "Choose address from Sites, choose billing prompt type, then update billing. Warning will remain until Full bill is selected." }),
+              d.jsx("p", { children: "Billing defaults to Full bill first. Choose address from Sites and adjust billing prompt/status when needed. Warning will show only when not Full bill." }),
             ] }),
             d.jsxs("div", { className: "date-controls", children: [
               d.jsxs("label", { className: "date-picker", children: [
@@ -39955,7 +39955,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             d.jsx("tbody", { children: T.map((L) => {
               const W = !S(L),
                 he = kgBillingStatusOptionsForPlan(L.billing_plan),
-                J = he.some((j) => j[0] === String(L.billing_status || "not_billed")) ? String(L.billing_status || "not_billed") : "not_billed";
+                J = he.some((j) => j[0] === String(L.billing_status || "full_bill")) ? String(L.billing_status || "full_bill") : "full_bill";
               return d.jsxs("tr", { className: W ? "billing-not-billed" : "", children: [
                 d.jsxs("td", { "data-label": "Site", children: [
                   d.jsx("strong", { children: L.address || "-" }),
@@ -39965,7 +39965,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 ] }),
                 d.jsx("td", { "data-label": "PIC", children: kgSitePicText(L) }),
                 d.jsx("td", { "data-label": "Status", children: kgSiteIsPause(L) ? "Pause" : String(L.status || "active").toUpperCase() }),
-                d.jsx("td", { "data-label": "Billing prompt", children: r ? d.jsx("select", { value: L.billing_plan || "full_only", onChange: (j) => { const fe = j.target.value, G = kgBillingStatusOptionsForPlan(fe); D(L, { billing_plan: fe, billing_status: G.some((de) => de[0] === String(L.billing_status || "not_billed")) ? String(L.billing_status || "not_billed") : "not_billed" }); }, children: kgBillingPromptOptions.map((j) => d.jsx("option", { value: j[0], children: j[1] }, j[0])) }) : kgBillingPromptText(L.billing_plan) }),
+                d.jsx("td", { "data-label": "Billing prompt", children: r ? d.jsx("select", { value: L.billing_plan || "full_only", onChange: (j) => { const fe = j.target.value, G = kgBillingStatusOptionsForPlan(fe); D(L, { billing_plan: fe, billing_status: G.some((de) => de[0] === String(L.billing_status || "full_bill")) ? String(L.billing_status || "full_bill") : "full_bill" }); }, children: kgBillingPromptOptions.map((j) => d.jsx("option", { value: j[0], children: j[1] }, j[0])) }) : kgBillingPromptText(L.billing_plan) }),
                 d.jsx("td", { "data-label": "Billing status", children: r ? d.jsx("select", { value: J, onChange: (j) => D(L, { billing_status: j.target.value }), children: he.map((j) => d.jsx("option", { value: j[0], children: j[1] }, j[0])) }) : kgBillingStatusText(L.billing_status) }),
                 d.jsx("td", { "data-label": "Billing date", children: r ? d.jsx("input", { type: "date", value: L.billing_date || "", onChange: (he) => D(L, { billing_date: he.target.value }) }) : L.billing_date || "-" }),
                 d.jsx("td", { "data-label": "Billing no.", children: r ? d.jsx("input", { value: L.billing_no || "", onChange: (he) => D(L, { billing_no: he.target.value }), placeholder: "Billing no." }) : L.billing_no || "-" }),
