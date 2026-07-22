@@ -39846,12 +39846,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               kgSiteDetailBlock(_, "Site information"),
               d.jsxs("div", { className: I ? "success-box" : "error-box", children: [I ? "Billing completed: " : "⚠ Billing prompt: ", kgBillingStatusText(_.billing_status), " · ", kgBillingPromptText(_.billing_plan), _.billing_no ? ` · No: ${_.billing_no}` : "", _.billing_date ? ` · Date: ${cp(_.billing_date)}` : "", _.billing_remark ? ` · ${_.billing_remark}` : ""] }),
               d.jsxs("section", { className: "panel nested-panel", children: [
-                d.jsx("h3", { children: "Planner detail" }),
-                T.length ? T.map(E) : d.jsx("div", { className: "empty-state", children: "No planner detail found." }),
-              ] }),
-              d.jsxs("section", { className: "panel nested-panel", children: [
                 d.jsx("h3", { children: "Delivery date" }),
                 D.length ? D.map(w) : d.jsx("div", { className: "empty-state", children: "No delivery made." }),
+              ] }),
+              d.jsxs("section", { className: "panel nested-panel", children: [
+                d.jsx("h3", { children: "Planner detail" }),
+                T.length ? T.map(E) : d.jsx("div", { className: "empty-state", children: "No planner detail found." }),
               ] }),
             ] }, _.id);
           }) }),
