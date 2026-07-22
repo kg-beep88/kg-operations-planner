@@ -39440,12 +39440,6 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       onClick: () => l(wr(n, 1)),
                       children: d.jsx(Os, {}),
                     }),
-                    r &&
-                      d.jsxs("button", {
-                        className: "primary-button",
-                        onClick: j,
-                        children: [d.jsx(ti, { size: 17 }), "New delivery"],
-                      }),
                   ],
                 }),
               ],
@@ -39503,16 +39497,24 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             d.jsxs("section", {
               className: "panel",
               children: [
-                d.jsx("div", {
+                d.jsxs("div", {
                   className: "panel-heading",
-                  children: d.jsxs("div", {
-                    children: [
-                      d.jsx("h2", { children: "Delivery list" }),
-                      d.jsx("span", {
-                        children: "Site order / clear site / clear rubbish. Orders are auto marked sent. Delete removes the delivery.",
+                  children: [
+                    d.jsxs("div", {
+                      children: [
+                        d.jsx("h2", { children: "Delivery list" }),
+                        d.jsx("span", {
+                          children: "Site order / clear site / clear rubbish. Orders are auto marked sent. Delete removes the delivery.",
+                        }),
+                      ],
+                    }),
+                    r &&
+                      d.jsxs("button", {
+                        className: "primary-button",
+                        onClick: j,
+                        children: [d.jsx(ti, { size: 17 }), "New delivery"],
                       }),
-                    ],
-                  }),
+                  ],
                 }),
                 d.jsx("div", {
                   className: "delivery-list",
