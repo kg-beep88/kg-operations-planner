@@ -34134,6 +34134,19 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .select(w0)
                 .eq("delivery_date", s)
                 .order("created_at")));
+          else if (n === "site" && v)
+            ((B = qe
+              .from("site_assignments")
+              .select(_s)
+              .eq("site_id", Number(v))
+              .order("plan_date")
+              .limit(1e4)),
+              (me = qe
+                .from("delivery_orders")
+                .select(w0)
+                .eq("site_id", Number(v))
+                .order("delivery_date")
+                .limit(1e4)));
           else {
             const { start: xe, endExclusive: ke } = lh(c);
             ((B = qe
@@ -34160,7 +34173,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }, []),
           q.useEffect(() => {
             G();
-          }, [n, s, c]),
+          }, [n, s, c, v]),
           q.useEffect(() => {
             !v && S.length && x(String(S[0].id));
           }, [S, v]));
@@ -34214,6 +34227,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   foremanShifts: 0,
                   otHours: 0,
                   order: null,
+                  orders: [],
                 });
               const xe = B.get(V);
               xe.assignments.push(ee);
@@ -34323,6 +34337,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   otHours: 0,
                   shifts: new Set(),
                   order: null,
+                  orders: [],
                 });
               const V = B.get(ee);
               V.shifts.add(ue.shift);
@@ -34350,8 +34365,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   otHours: 0,
                   shifts: new Set(),
                   order: null,
+                  orders: [],
                 }),
-                (B.get(ee).order = ue));
+                (B.get(ee).order = B.get(ee).order || ue),
+                B.get(ee).orders.push(ue));
             }
             return [...B.values()].sort((ue, ee) =>
               ue.date.localeCompare(ee.date),
@@ -35009,6 +35026,61 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     }),
                 ],
               }),
+            n === "day" &&
+              d.jsxs("section", {
+                className: "panel",
+                children: [
+                  d.jsx("div", {
+                    className: "panel-heading",
+                    children: d.jsxs("div", {
+                      children: [
+                        d.jsx("h2", { children: "Delivery address for this date" }),
+                        d.jsx("span", { children: "Delivery planned on the selected summary date" }),
+                      ],
+                    }),
+                  }),
+                  d.jsx("div", {
+                    className: "table-wrap",
+                    children: d.jsxs("table", {
+                      children: [
+                        d.jsx("thead", {
+                          children: d.jsxs("tr", {
+                            children: [
+                              d.jsx("th", { children: "Delivery date" }),
+                              d.jsx("th", { children: "Address" }),
+                              d.jsx("th", { children: "Type" }),
+                              d.jsx("th", { children: "Driver" }),
+                              d.jsx("th", { children: "Remark" }),
+                            ],
+                          }),
+                        }),
+                        d.jsx("tbody", {
+                          children: ge.length === 0
+                            ? d.jsx("tr", {
+                                children: d.jsx("td", { colSpan: "5", className: "empty-cell", children: "No delivery planned for this date." }),
+                              })
+                            : ge.map((B) => {
+                                var me;
+                                return d.jsxs(
+                                  "tr",
+                                  {
+                                    children: [
+                                      d.jsx("td", { "data-label": "Delivery date", children: B.delivery_date }),
+                                      d.jsx("td", { "data-label": "Address", children: d.jsx("strong", { children: ((me = B.site) == null ? void 0 : me.address) || "" }) }),
+                                      d.jsx("td", { "data-label": "Type", children: kgDeliveryOrderTypeText(B.order_type) }),
+                                      d.jsx("td", { "data-label": "Driver", children: B.delivery_driver || "—" }),
+                                      d.jsx("td", { "data-label": "Remark", children: B.remark || "—" }),
+                                    ],
+                                  },
+                                  B.id,
+                                );
+                              }),
+                        }),
+                      ],
+                    }),
+                  }),
+                ],
+              }),
             d.jsxs("div", {
               className: "summary-grid six",
               children: [
@@ -35132,17 +35204,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                           d.jsx("thead", {
                             children: d.jsxs("tr", {
                               children: [
-                                d.jsx("th", { children: "Address" }),
-                                d.jsx("th", { children: "Foreman shifts" }),
-                                d.jsx("th", { children: "Unique foremen" }),
+                                d.jsx("th", { children: "Address / Delivery address" }),
                                 d.jsx("th", { children: "Worker shifts" }),
-                                d.jsx("th", { children: "Unique workers" }),
                                 d.jsx("th", { children: "OT shift" }),
-                                d.jsx("th", { children: "Delivery order" }),
-                                d.jsx("th", { children: "Delivery cost" }),
-                                d.jsx("th", {
-                                  children: "Scaffold / ladder outstanding",
-                                }),
                               ],
                             }),
                           }),
@@ -35150,14 +35214,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                             children: I
                               ? d.jsx("tr", {
                                   children: d.jsx("td", {
-                                    colSpan: "9",
+                                    colSpan: "3",
                                     children: "Loading summary…",
                                   }),
                                 })
                               : He.length === 0
                                 ? d.jsx("tr", {
                                     children: d.jsx("td", {
-                                      colSpan: "9",
+                                      colSpan: "3",
                                       className: "empty-cell",
                                       children:
                                         "No site planning or delivery orders for this date.",
@@ -35179,45 +35243,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                             }),
                                           }),
                                           d.jsx("td", {
-                                            "data-label": "Foreman shifts",
-                                            children: B.foremanShifts,
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Unique foremen",
-                                            children: B.foremen.size,
-                                          }),
-                                          d.jsx("td", {
                                             "data-label": "Worker shifts",
                                             children: B.workerShifts,
                                           }),
                                           d.jsx("td", {
-                                            "data-label": "Unique workers",
-                                            children: B.workers.size,
-                                          }),
-                                          d.jsx("td", {
                                             "data-label": "OT shift",
                                             children: kgFormatOtHours(B.otHours) || "",
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Delivery order",
-                                            children: d.jsx("span", {
-                                              className: `do-pill ${(ue = B.order) != null && ue.sent_on ? "sent" : "not-sent"}`,
-                                              children:
-                                                (ee = B.order) != null &&
-                                                ee.sent_on
-                                                  ? "Yes"
-                                                  : "No",
-                                            }),
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Delivery cost",
-                                            children: rr(
-                                              B.order ? Yr(B.order) : 0,
-                                            ),
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Equipment",
-                                            children: S0(B.order),
                                           }),
                                         ],
                                       },
@@ -35334,116 +35365,152 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                         ],
                       }),
                     n === "site" &&
-                      d.jsxs("table", {
+                      d.jsxs(d.Fragment, {
                         children: [
-                          d.jsx("thead", {
-                            children: d.jsxs("tr", {
-                              children: [
-                                d.jsx("th", { children: "Date" }),
-                                d.jsx("th", { children: "Shifts" }),
-                                d.jsx("th", { children: "Foremen" }),
-                                d.jsx("th", { children: "Foreman shifts" }),
-                                d.jsx("th", { children: "Workers" }),
-                                d.jsx("th", { children: "Worker shifts" }),
-                                d.jsx("th", { children: "OT shift" }),
-                                d.jsx("th", { children: "DO sent" }),
-                                d.jsx("th", { children: "Delivery cost" }),
-                                d.jsx("th", {
-                                  children: "Equipment outstanding",
+                          d.jsxs("table", {
+                            children: [
+                              d.jsx("thead", {
+                                children: d.jsxs("tr", {
+                                  children: [
+                                    d.jsx("th", { children: "Delivery date" }),
+                                    d.jsx("th", { children: "Delivery address" }),
+                                    d.jsx("th", { children: "Delivery type" }),
+                                    d.jsx("th", { children: "Driver" }),
+                                    d.jsx("th", { children: "Remark" }),
+                                    d.jsx("th", { children: "Notes" }),
+                                  ],
                                 }),
-                              ],
-                            }),
+                              }),
+                              d.jsx("tbody", {
+                                children: I
+                                  ? d.jsx("tr", {
+                                      children: d.jsx("td", {
+                                        colSpan: "6",
+                                        children: "Loading delivery…",
+                                      }),
+                                    })
+                                  : ge.length === 0
+                                    ? d.jsx("tr", {
+                                        children: d.jsx("td", {
+                                          colSpan: "6",
+                                          className: "empty-cell",
+                                          children: "No delivery order for this site.",
+                                        }),
+                                      })
+                                    : ge.map((B) => {
+                                        var me;
+                                        return d.jsxs(
+                                          "tr",
+                                          {
+                                            children: [
+                                              d.jsx("td", {
+                                                "data-label": "Delivery date",
+                                                children: d.jsx("strong", { children: B.delivery_date }),
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Delivery address",
+                                                children: ((me = B.site) == null ? void 0 : me.address) || "",
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Delivery type",
+                                                children: kgDeliveryOrderTypeText(B.order_type),
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Driver",
+                                                children: B.delivery_driver || "—",
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Remark",
+                                                children: B.remark || "—",
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Notes",
+                                                children: B.notes || "—",
+                                              }),
+                                            ],
+                                          },
+                                          B.id,
+                                        );
+                                      }),
+                              }),
+                            ],
                           }),
-                          d.jsx("tbody", {
-                            children: I
-                              ? d.jsx("tr", {
-                                  children: d.jsx("td", {
-                                    colSpan: "10",
-                                    children: "Loading site…",
-                                  }),
-                                })
-                              : N.length === 0
-                                ? d.jsx("tr", {
-                                    children: d.jsx("td", {
-                                      colSpan: "10",
-                                      className: "empty-cell",
-                                      children:
-                                        "No records for this site and month.",
-                                    }),
-                                  })
-                                : N.map((B) => {
-                                    var me, ue;
-                                    return d.jsxs(
-                                      "tr",
-                                      {
-                                        children: [
-                                          d.jsx("td", {
-                                            "data-label": "Date",
-                                            children: d.jsx("strong", {
-                                              children: B.date,
-                                            }),
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Shifts",
-                                            children:
-                                              [...B.shifts].join(", ") || "—",
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Foremen",
-                                            children:
-                                              [...B.foremanNames]
-                                                .filter(Boolean)
-                                                .join(", ") || "—",
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Foreman shifts",
-                                            children: B.foremanShifts,
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Workers",
-                                            children:
-                                              [...B.workerNames]
-                                                .filter(Boolean)
-                                                .join(", ") || "—",
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Worker shifts",
-                                            children: B.workerShifts,
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "OT shift",
-                                            children: kgFormatOtHours(B.otHours) || "",
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "DO sent",
-                                            children: d.jsx("span", {
-                                              className: `do-pill ${(me = B.order) != null && me.sent_on ? "sent" : "not-sent"}`,
-                                              children:
-                                                (ue = B.order) != null &&
-                                                ue.sent_on
-                                                  ? "Yes"
-                                                  : "No",
-                                            }),
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Delivery cost",
-                                            children: rr(
-                                              B.order ? Yr(B.order) : 0,
-                                            ),
-                                          }),
-                                          d.jsx("td", {
-                                            "data-label": "Equipment",
-                                            children: S0(B.order),
-                                          }),
-                                        ],
-                                      },
-                                      B.date,
-                                    );
-                                  }),
+                          d.jsx("h3", { style: { margin: "18px 0 8px" }, children: "Planner detail" }),
+                          d.jsxs("table", {
+                            children: [
+                              d.jsx("thead", {
+                                children: d.jsxs("tr", {
+                                  children: [
+                                    d.jsx("th", { children: "Date" }),
+                                    d.jsx("th", { children: "Shifts" }),
+                                    d.jsx("th", { children: "Foremen" }),
+                                    d.jsx("th", { children: "Foreman shifts" }),
+                                    d.jsx("th", { children: "Workers" }),
+                                    d.jsx("th", { children: "Worker shifts" }),
+                                    d.jsx("th", { children: "OT shift" }),
+                                  ],
+                                }),
+                              }),
+                              d.jsx("tbody", {
+                                children: I
+                                  ? d.jsx("tr", {
+                                      children: d.jsx("td", {
+                                        colSpan: "7",
+                                        children: "Loading planner…",
+                                      }),
+                                    })
+                                  : N.filter((B) => B.workerShifts || B.foremanShifts || B.shifts.size).length === 0
+                                    ? d.jsx("tr", {
+                                        children: d.jsx("td", {
+                                          colSpan: "7",
+                                          className: "empty-cell",
+                                          children: "No planner records for this site.",
+                                        }),
+                                      })
+                                    : N.filter((B) => B.workerShifts || B.foremanShifts || B.shifts.size).map((B) =>
+                                        d.jsxs(
+                                          "tr",
+                                          {
+                                            children: [
+                                              d.jsx("td", {
+                                                "data-label": "Date",
+                                                children: d.jsx("strong", { children: B.date }),
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Shifts",
+                                                children: [...B.shifts].join(", ") || "—",
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Foremen",
+                                                children: [...B.foremanNames].filter(Boolean).join(", ") || "—",
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Foreman shifts",
+                                                children: B.foremanShifts,
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Workers",
+                                                children: [...B.workerNames].filter(Boolean).join(", ") || "—",
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Worker shifts",
+                                                children: B.workerShifts,
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "OT shift",
+                                                children: kgFormatOtHours(B.otHours) || "",
+                                              }),
+                                            ],
+                                          },
+                                          B.date,
+                                        ),
+                                      ),
+                              }),
+                            ],
                           }),
                         ],
                       }),
-                  ],
+                                      ],
                 }),
               ],
             }),
@@ -39424,17 +39491,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         }),
                       ],
                     }),
-                    d.jsxs("label", {
-                      className: "date-picker",
-                      children: [
-                        d.jsx(fE, { size: 18 }),
-                        d.jsx("input", {
-                          value: kgDeliverySearch,
-                          onChange: (X) => kgSetDeliverySearch(X.target.value),
-                          placeholder: "Search address",
-                        }),
-                      ],
-                    }),
+
                     d.jsx("button", {
                       className: "icon-button",
                       onClick: () => l(wr(n, 1)),
@@ -39443,6 +39500,23 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   ],
                 }),
               ],
+            }),
+            d.jsx("div", {
+              className: "checker-search-wrap",
+              style: { display: "flex", justifyContent: "center", margin: "16px 0 10px" },
+              children: d.jsxs("label", {
+                className: "date-picker",
+                style: { width: "min(760px, 100%)", padding: "12px 16px", fontSize: "18px" },
+                children: [
+                  d.jsx(fE, { size: 22 }),
+                  d.jsx("input", {
+                    value: kgDeliverySearch,
+                    onChange: (X) => kgSetDeliverySearch(X.target.value),
+                    placeholder: "Search delivery address",
+                    style: { fontSize: "18px", width: "100%" },
+                  }),
+                ],
+              }),
             }),
             d.jsxs("div", {
               className: "date-banner",
