@@ -34211,6 +34211,13 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           Te = p.foremen.filter((B) => !Ye.has(Number(B.id))),
           kgProjectForemenWithoutSite = Te.filter((B) => kgForemanType(B) === "project"),
           kgBossForemenWithoutSite = Te.filter((B) => kgForemanType(B) === "boss"),
+          kgNotFullBilledSites = q.useMemo(
+            () =>
+              S.filter((B) => String(B.billing_status || "full_bill") !== "full_bill").sort((B, me) =>
+                String(B.address || "").localeCompare(String(me.address || "")),
+              ),
+            [S],
+          ),
           _e = q.useMemo(() => bo(ge), [ge]),
           He = q.useMemo(() => {
             var me, ue;
@@ -34842,188 +34849,62 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               ],
             }),
             n === "day" &&
-              d.jsxs("div", {
-                className: "warning-grid",
+              d.jsxs("section", {
+                className: `warning-panel ${kgNotFullBilledSites.length ? "danger" : "ok"}`,
+                style: { gridColumn: "1 / -1", marginBottom: 16 },
                 children: [
-                  d.jsxs("section", {
-                    className: `warning-panel ${re.length ? "danger" : "ok"}`,
+                  d.jsxs("div", {
+                    className: "warning-heading",
                     children: [
+                      d.jsx(lp, { size: 20 }),
                       d.jsxs("div", {
-                        className: "warning-heading",
                         children: [
-                          d.jsx(lp, { size: 20 }),
-                          d.jsxs("div", {
+                          d.jsx("strong", { children: "Billing not fully billed prompt" }),
+                          d.jsxs("span", {
                             children: [
-                              d.jsx("strong", {
-                                children: "Active sites without workers",
-                              }),
-                              d.jsxs("span", {
-                                children: [
-                                  re.length,
-                                  " site",
-                                  re.length === 1 ? "" : "s",
-                                ],
-                              }),
+                              kgNotFullBilledSites.length,
+                              " site",
+                              kgNotFullBilledSites.length === 1 ? "" : "s",
+                              " need follow up",
                             ],
                           }),
                         ],
                       }),
-                      d.jsx("div", {
-                        className: "warning-list",
-                        children:
-                          re.length === 0
-                            ? d.jsx("div", {
-                                className: "warning-empty",
-                                children: "All active sites are already added for this day.",
-                              })
-                            : re.map((B) =>
-                                d.jsxs(
-                                  "div",
-                                  {
-                                    className: "warning-item static",
+                    ],
+                  }),
+                  d.jsx("div", {
+                    className: "warning-list",
+                    children:
+                      kgNotFullBilledSites.length === 0
+                        ? d.jsx("div", {
+                            className: "warning-empty",
+                            children: "All site billing is Full bill.",
+                          })
+                        : kgNotFullBilledSites.map((B) =>
+                            d.jsxs(
+                              "div",
+                              {
+                                className: "warning-item static",
+                                children: [
+                                  d.jsx(al, { size: 14 }),
+                                  d.jsxs("span", {
                                     children: [
-                                      d.jsx(al, { size: 14 }),
-                                      B.address,
+                                      d.jsx("strong", { children: B.address }),
+                                      " — ",
+                                      kgBillingStatusText(B.billing_status),
+                                      " · ",
+                                      kgBillingPromptText(B.billing_plan),
+                                      B.pic ? ` · PIC: ${B.pic}` : "",
+                                      B.billing_no ? ` · Bill no: ${B.billing_no}` : "",
+                                      B.billing_date ? ` · ${cp(B.billing_date)}` : "",
                                     ],
-                                  },
-                                  B.id,
-                                ),
-                              ),
-                      }),
-                    ],
-                  }),
-                  d.jsxs("section", {
-                    className: `warning-panel ${X.length ? "warn" : "ok"}`,
-                    children: [
-                      d.jsxs("div", {
-                        className: "warning-heading",
-                        children: [
-                          d.jsx(up, { size: 20 }),
-                          d.jsxs("div", {
-                            children: [
-                              d.jsx("strong", {
-                                children: "Active workers without site",
-                              }),
-                              d.jsxs("span", {
-                                children: [
-                                  X.length,
-                                  " worker",
-                                  X.length === 1 ? "" : "s",
+                                  }),
                                 ],
-                              }),
-                            ],
-                          }),
-                        ],
-                      }),
-                      d.jsx("div", {
-                        className: "warning-list chips",
-                        children:
-                          X.length === 0
-                            ? d.jsx("div", {
-                                className: "warning-empty",
-                                children: "All active workers are assigned.",
-                              })
-                            : X.map((B) =>
-                                d.jsx(
-                                  "span",
-                                  {
-                                    className: "warning-chip",
-                                    children: kgNameNick(B),
-                                  },
-                                  B.id,
-                                ),
-                              ),
-                      }),
-                    ],
+                              },
+                              B.id,
+                            ),
+                          ),
                   }),
-                  d.jsxs("section", {
-                      className: `warning-panel ${kgProjectForemenWithoutSite.length ? "warn" : "ok"}`,
-                      children: [
-                        d.jsxs("div", {
-                          className: "warning-heading",
-                          children: [
-                            d.jsx(ei, { size: 20 }),
-                            d.jsxs("div", {
-                              children: [
-                                d.jsx("strong", {
-                                  children: "Project foremen without site",
-                                }),
-                                d.jsxs("span", {
-                                  children: [
-                                    kgProjectForemenWithoutSite.length,
-                                    " ",
-                                    kgProjectForemenWithoutSite.length === 1 ? "foreman" : "foremen",
-                                  ],
-                                }),
-                              ],
-                            }),
-                          ],
-                        }),
-                        d.jsx("div", {
-                          className: "warning-list chips",
-                          children:
-                            kgProjectForemenWithoutSite.length === 0
-                              ? d.jsx("div", {
-                                  className: "warning-empty",
-                                  children: "All project foremen are assigned.",
-                                })
-                              : kgProjectForemenWithoutSite.map((B) =>
-                                  d.jsx(
-                                    "span",
-                                    {
-                                      className: "warning-chip",
-                                      children: kgNameNick(B),
-                                    },
-                                    B.id,
-                                  ),
-                                ),
-                        }),
-                      ],
-                    }),
-                  d.jsxs("section", {
-                      className: `warning-panel ${kgBossForemenWithoutSite.length ? "warn" : "ok"}`,
-                      children: [
-                        d.jsxs("div", {
-                          className: "warning-heading",
-                          children: [
-                            d.jsx(ei, { size: 20 }),
-                            d.jsxs("div", {
-                              children: [
-                                d.jsx("strong", {
-                                  children: "Boss foremen without site",
-                                }),
-                                d.jsxs("span", {
-                                  children: [
-                                    kgBossForemenWithoutSite.length,
-                                    " ",
-                                    kgBossForemenWithoutSite.length === 1 ? "foreman" : "foremen",
-                                  ],
-                                }),
-                              ],
-                            }),
-                          ],
-                        }),
-                        d.jsx("div", {
-                          className: "warning-list chips",
-                          children:
-                            kgBossForemenWithoutSite.length === 0
-                              ? d.jsx("div", {
-                                  className: "warning-empty",
-                                  children: "All boss foremen are assigned.",
-                                })
-                              : kgBossForemenWithoutSite.map((B) =>
-                                  d.jsx(
-                                    "span",
-                                    {
-                                      className: "warning-chip",
-                                      children: kgNameNick(B),
-                                    },
-                                    B.id,
-                                  ),
-                                ),
-                        }),
-                      ],
-                    }),
                 ],
               }),
             n === "day" &&
