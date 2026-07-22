@@ -34048,7 +34048,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             "Billing date": r.billing_date || "",
             "Billing no.": r.billing_no || "",
             "Billing remark": r.billing_remark || "",
-            "DO sent": r.sent_on ? "Yes" : "No",
+            "DO sent": "Yes",
             "Sent time": r.sent_on || "",
             "Total cost": Yr(r),
             Remark: r.remark || "",
@@ -39159,8 +39159,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           billing_no: "",
           billing_status: "not_billed",
           billing_remark: "",
-          sent: !1,
-          sent_on: null,
+          sent: !0,
+          sent_on: new Date().toISOString(),
           remark: "",
           notes: "",
           items: [Wo()],
@@ -39205,7 +39205,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         const J = q.useMemo(
           () => ({
             cost: c.reduce((X, Te) => X + Yr(Te), 0),
-            sent: c.filter((X) => X.sent_on).length,
+            sent: c.length,
             outstanding: c.reduce(
               (X, Te) =>
                 X +
@@ -39317,7 +39317,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             billing_no: String(p.billing_no || "").trim() || null,
             billing_status: p.billing_status || "not_billed",
             billing_remark: String(p.billing_remark || "").trim() || null,
-            sent_on: p.sent ? p.sent_on || new Date().toISOString() : null,
+            sent_on: p.sent_on || new Date().toISOString(),
             remark: p.remark || null,
             notes: p.notes || null,
           };
@@ -39401,7 +39401,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("h1", { children: "Delivery" }),
                     d.jsx("p", {
                       children:
-                        "Plan delivery only: choose site, date, driver, type, remark and notes. No item entry needed.",
+                        "Plan delivery only. New delivery orders are auto marked sent; delete to remove.",
                     }),
                   ],
                 }),
@@ -39509,7 +39509,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     children: [
                       d.jsx("h2", { children: "Delivery list" }),
                       d.jsx("span", {
-                        children: "Site order / clear site / clear rubbish for selected day. Same site/date will prompt before saving.",
+                        children: "Site order / clear site / clear rubbish. Orders are auto marked sent. Delete removes the delivery.",
                       }),
                     ],
                   }),
@@ -39539,11 +39539,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     d.jsxs("div", {
                                       children: [
                                         d.jsxs("span", {
-                                          className: `do-pill ${X.sent_on ? "sent" : "not-sent"}`,
-                                          children: [
-                                            "Sent: ",
-                                            X.sent_on ? "Yes" : "No",
-                                          ],
+                                          className: "do-pill sent",
+                                          children: "Sent: Yes",
                                         }),
                                         d.jsx("h3", {
                                           children:
@@ -39585,26 +39582,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                   d.jsxs("div", {
                                     className: "delivery-actions",
                                     children: [
-                                      d.jsxs("button", {
-                                        className: X.sent_on
-                                          ? "secondary-button"
-                                          : "primary-button",
-                                        onClick: () => je(X),
-                                        children: [
-                                          X.sent_on
-                                            ? d.jsx(Lx, { size: 16 })
-                                            : d.jsx(JS, { size: 16 }),
-                                          X.sent_on
-                                            ? "Mark not sent"
-                                            : "Mark sent today",
-                                        ],
-                                      }),
+                                      d.jsx("span", { className: "muted", children: "Auto marked sent" }),
                                       d.jsxs("button", {
                                         className: "secondary-button",
                                         onClick: () => fe(X),
                                         children: [
                                           d.jsx(Ds, { size: 16 }),
-                                          "Edit / Return",
+                                          "Edit",
                                         ],
                                       }),
                                       d.jsxs("button", {
@@ -39631,7 +39615,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 title:
                   v === "new"
                     ? "New delivery"
-                    : "Edit delivery / returns",
+                    : "Edit delivery",
                 onClose: () => x(null),
                 children: d.jsxs("form", {
                   className: "delivery-form",
@@ -39821,7 +39805,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         function w(_) {
           return d.jsxs("div", { className: "checker-row", children: [
             d.jsxs("strong", { children: [_.delivery_date ? cp(_.delivery_date) : "No date", " · ", kgDeliveryOrderTypeText(_.order_type)] }),
-            d.jsxs("div", { className: "muted", children: ["Driver: ", _.delivery_driver || "-", " · Sent: ", _.sent_on ? "Yes" : "No"] }),
+            d.jsxs("div", { className: "muted", children: ["Driver: ", _.delivery_driver || "-", " · Sent: Yes"] }),
             _.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Delivery remark: ", _.remark] }),
             _.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Delivery note: ", _.notes] }),
           ] }, _.id);
