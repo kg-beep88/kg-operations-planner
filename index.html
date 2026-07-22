@@ -39780,21 +39780,23 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           x();
         }, []);
         const p = q.useMemo(() => {
-          const S = r.trim().toLowerCase();
+          const S = r.trim().toLowerCase().replace(/\s+/g, " ");
           if (!S) return [];
-          return (l.sites || []).filter((E) =>
-            [
-              E.address,
-              E.status,
-              E.pic,
-              E.foreman_in_charge,
-              E.foreman_detail,
-              E.id_name_tel,
-              E.lock_info,
-              E.site_info,
-              E.remark,
-              E.notes,
-            ].join(" ").toLowerCase().includes(S),
+          function E(_) {
+            return String(_ || "").toLowerCase().replace(/\s+/g, " ").trim();
+          }
+          function w(_) {
+            const T = E(_.address);
+            if (!T.includes(S)) return null;
+            const D = T.indexOf(S),
+              I = T === S ? 0 : T.startsWith(S) ? 1 : T.split(/[^a-z0-9]+/).some((L) => L.startsWith(S)) ? 2 : 3;
+            return { ..._, __checkerRank: I, __checkerIndex: D, __checkerLength: T.length };
+          }
+          return (l.sites || []).map(w).filter(Boolean).sort((_, T) =>
+            _.__checkerRank - T.__checkerRank ||
+            _.__checkerIndex - T.__checkerIndex ||
+            _.__checkerLength - T.__checkerLength ||
+            String(_.address || "").localeCompare(String(T.address || "")),
           ).slice(0, 50);
         }, [l.sites, r]);
         function g(S) {
