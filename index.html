@@ -16199,17 +16199,17 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         mE = [
           { to: "/", label: "Summary", icon: aE },
           { to: "/calendar", label: "Calendar", icon: fl },
-          { to: "/planner", label: "Planner", icon: eE },
           { to: "/phone-view", label: "1 Page View", icon: aE },
+          { to: "/planner", label: "Planner", icon: eE },
           { to: "/logistics", label: "Logistics", icon: b0 },
-          { to: "/manpower-search", label: "Name Search", icon: fE },
-          { to: "/deliveries", label: "Delivery", icon: Q0 },
-          { to: "/checker", label: "Checker", icon: fE },
-          { to: "/billing", label: "Billing", icon: ap },
-          { to: "/sites", label: "Sites", icon: $S },
+          { to: "/manpower-search", label: "Name Search", icon: fE, hot: !0 },
+          { to: "/sites", label: "Site", icon: $S, hot: !0 },
+          { to: "/checker", label: "Checker", icon: fE, hot: !0 },
+          { to: "/deliveries", label: "Delivery", icon: Q0, hot: !0 },
+          { to: "/billing", label: "Billing", icon: ap, hot: !0 },
           { to: "/workers", label: "Workers", icon: Rs },
-          { to: "/lorries", label: "Lorries", icon: b0 },
           { to: "/foremen", label: "Foremen", icon: ei },
+          { to: "/lorries", label: "Lorries", icon: b0 },
           { to: "/catalog", label: "Items", icon: QS },
           { to: "/account", label: "My Login", icon: ip },
         ];
@@ -16241,14 +16241,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 }),
                 d.jsxs("nav", {
                   children: [
-                    mE.map(({ to: s, label: f, icon: c }) =>
+                    mE.map(({ to: s, label: f, icon: c, hot: m }) =>
                       d.jsxs(
                         Ho,
                         {
                           to: s,
                           end: s === "/",
-                          className: ({ isActive: m }) =>
-                            m ? "nav-link active" : "nav-link",
+                          className: ({ isActive: v }) =>
+                            `nav-link${m ? " nav-hot" : ""}${v ? " active" : ""}`,
                           children: [
                             d.jsx(c, { size: 19 }),
                             d.jsx("span", { children: f }),
@@ -39701,7 +39701,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         const [r, n] = q.useState(""),
           [l, s] = q.useState({ sites: [], assignments: [], deliveries: [] }),
           [f, c] = q.useState(!0),
-          [m, v] = q.useState("");
+          [m, v] = q.useState(""),
+          [kgCheckerEditing, kgSetCheckerEditing] = q.useState({}),
+          [kgCheckerBusy, kgSetCheckerBusy] = q.useState("");
+        const kgCheckerCanEdit = t.role === "admin" || t.role === "operation";
         async function x() {
           (c(!0), v(""));
           const [p, g, S] = await Promise.all([
@@ -39746,25 +39749,177 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         function S(E) {
           return (l.deliveries || []).filter((w) => String(w.site && w.site.id) === String(E.id));
         }
+        function kgCheckerEditKey(E, w) {
+          return `${E}:${w.id}`;
+        }
+        function kgCheckerEditValue(E, w) {
+          return kgCheckerEditing[kgCheckerEditKey(E, w)] || null;
+        }
+        function kgCheckerSetEdit(E, w, _) {
+          const T = kgCheckerEditKey(E, w);
+          kgSetCheckerEditing((D) => ({ ...D, [T]: { ...(D[T] || {}), ..._ } }));
+        }
+        function kgCheckerCancelEdit(E, w) {
+          const _ = kgCheckerEditKey(E, w);
+          kgSetCheckerEditing((T) => {
+            const D = { ...T };
+            return delete D[_], D;
+          });
+        }
+        function kgCheckerStartDelivery(E) {
+          const w = kgCheckerEditKey("delivery", E);
+          kgSetCheckerEditing((_) => ({
+            ..._,
+            [w]: {
+              delivery_date: E.delivery_date || "",
+              delivery_driver: E.delivery_driver || "",
+              order_type: E.order_type || "site_order",
+              remark: E.remark || "",
+              notes: E.notes || "",
+            },
+          }));
+        }
+        async function kgCheckerSaveDelivery(E) {
+          const w = kgCheckerEditKey("delivery", E),
+            _ = kgCheckerEditing[w] || {};
+          (kgSetCheckerBusy(w), v(""));
+          const { error: T } = await qe
+            .from("delivery_orders")
+            .update({
+              delivery_date: _.delivery_date || E.delivery_date,
+              delivery_driver: String(_.delivery_driver || "").trim() || null,
+              order_type: _.order_type || "site_order",
+              remark: String(_.remark || "").trim() || null,
+              notes: String(_.notes || "").trim() || null,
+            })
+            .eq("id", E.id);
+          if (T) return (v(T.message), kgSetCheckerBusy(""));
+          kgCheckerCancelEdit("delivery", E);
+          await x();
+          kgSetCheckerBusy("");
+        }
+        async function kgCheckerDeleteDelivery(E) {
+          var w;
+          if (!window.confirm(`Delete delivery for ${(w = E.site) == null ? void 0 : w.address}?`)) return;
+          const _ = kgCheckerEditKey("delivery", E);
+          (kgSetCheckerBusy(_), v(""));
+          const { error: T } = await qe.from("delivery_orders").delete().eq("id", E.id);
+          if (T) return (v(T.message), kgSetCheckerBusy(""));
+          await x();
+          kgSetCheckerBusy("");
+        }
+        function kgCheckerStartPlanner(E) {
+          const w = kgCheckerEditKey("planner", E);
+          kgSetCheckerEditing((_) => ({
+            ..._,
+            [w]: {
+              plan_date: E.plan_date || "",
+              shift: E.shift || "day",
+              job_status: E.job_status || "CONTINUE JOB",
+              pic: E.pic || kgSitePicText(E.site) || "",
+              remark: E.remark || "",
+              notes: E.notes || "",
+            },
+          }));
+        }
+        async function kgCheckerSavePlanner(E) {
+          const w = kgCheckerEditKey("planner", E),
+            _ = kgCheckerEditing[w] || {};
+          (kgSetCheckerBusy(w), v(""));
+          const { error: T } = await qe
+            .from("site_assignments")
+            .update({
+              plan_date: _.plan_date || E.plan_date,
+              shift: _.shift || E.shift || "day",
+              job_status: _.job_status || E.job_status || "CONTINUE JOB",
+              pic: String(_.pic || "").trim() || null,
+              remark: String(_.remark || "").trim() || null,
+              notes: String(_.notes || "").trim() || null,
+            })
+            .eq("id", E.id);
+          if (T) return (v(T.message), kgSetCheckerBusy(""));
+          kgCheckerCancelEdit("planner", E);
+          await x();
+          kgSetCheckerBusy("");
+        }
+        async function kgCheckerDeletePlanner(E) {
+          var w;
+          if (!window.confirm(`Delete planner assignment for ${(w = E.site) == null ? void 0 : w.address}?`)) return;
+          const _ = kgCheckerEditKey("planner", E);
+          (kgSetCheckerBusy(_), v(""));
+          const { error: T } = await qe.from("site_assignments").delete().eq("id", E.id);
+          if (T) return (v(T.message), kgSetCheckerBusy(""));
+          await x();
+          kgSetCheckerBusy("");
+        }
         function E(w) {
-          const _ = kgAssignmentLorryRows(w).map((T) => T.lorry ? kgLorryText(T.lorry) : "No lorry").filter(Boolean).join(" + ") || "No lorry",
+          const _ = kgAssignmentLorryRows(w).map((F) => F.lorry ? kgLorryText(F.lorry) : "No lorry").filter(Boolean).join(" + ") || "No lorry",
             T = ar(w).map(kgForemanCopy2Person).filter(Boolean).join(" + ") || "-",
-            D = (w.assignment_workers || []).map((I) => kgCopyPersonName(I.worker)).filter(Boolean).join(" + ") || "-";
+            D = (w.assignment_workers || []).map((F) => kgCopyPersonName(F.worker)).filter(Boolean).join(" + ") || "-",
+            I = kgCheckerEditValue("planner", w),
+            L = kgCheckerEditKey("planner", w),
+            W = kgCheckerBusy === L;
           return d.jsxs("div", { className: "checker-row", children: [
-            d.jsxs("strong", { children: [w.plan_date ? cp(w.plan_date) : "No date", " · ", String(w.job_status || "new").toUpperCase()] }),
-            d.jsxs("div", { className: "muted", children: ["P.I.C.: ", w.pic || kgSitePicText(w.site), " · Lorry: ", _] }),
-            d.jsxs("div", { children: [d.jsx("b", { children: "Foreman: " }), T] }),
-            d.jsxs("div", { children: [d.jsx("b", { children: "Worker: " }), D] }),
-            w.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Planner remark: ", w.remark] }),
-            w.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Planner note: ", w.notes] }),
+            I ? d.jsxs("div", { className: "checker-edit-grid", children: [
+              d.jsxs("label", { children: ["Planner date", d.jsx("input", { type: "date", value: I.plan_date || "", onChange: (F) => kgCheckerSetEdit("planner", w, { plan_date: F.target.value }) })] }),
+              d.jsxs("label", { children: ["Shift", d.jsxs("select", { value: I.shift || "day", onChange: (F) => kgCheckerSetEdit("planner", w, { shift: F.target.value }), children: [
+                d.jsx("option", { value: "day", children: "Day" }),
+                d.jsx("option", { value: "night", children: "Night" }),
+                d.jsx("option", { value: "am", children: "AM" }),
+                d.jsx("option", { value: "pm", children: "PM" }),
+              ] })] }),
+              d.jsxs("label", { children: ["Job status", d.jsxs("select", { value: I.job_status || "CONTINUE JOB", onChange: (F) => kgCheckerSetEdit("planner", w, { job_status: F.target.value }), children: [
+                d.jsx("option", { value: "NEW", children: "NEW" }),
+                d.jsx("option", { value: "CONTINUE JOB", children: "CONTINUE JOB" }),
+                d.jsx("option", { value: "PAUSE", children: "PAUSE" }),
+                d.jsx("option", { value: "DONE", children: "DONE" }),
+              ] })] }),
+              d.jsxs("label", { children: ["P.I.C.", d.jsx("input", { value: I.pic || "", onChange: (F) => kgCheckerSetEdit("planner", w, { pic: F.target.value }) })] }),
+              d.jsxs("label", { className: "wide", children: ["Remark", d.jsx("textarea", { rows: "2", value: I.remark || "", onChange: (F) => kgCheckerSetEdit("planner", w, { remark: F.target.value }) })] }),
+              d.jsxs("label", { className: "wide", children: ["Notes", d.jsx("textarea", { rows: "2", value: I.notes || "", onChange: (F) => kgCheckerSetEdit("planner", w, { notes: F.target.value }) })] }),
+              d.jsxs("div", { className: "checker-edit-actions wide", children: [
+                d.jsx("button", { type: "button", className: "primary-button small-button", disabled: W, onClick: () => kgCheckerSavePlanner(w), children: W ? "Saving…" : "Save planner" }),
+                d.jsx("button", { type: "button", className: "secondary-button small-button", onClick: () => kgCheckerCancelEdit("planner", w), children: "Cancel" }),
+              ] }),
+            ] }) : d.jsxs(q.Fragment, { children: [
+              d.jsxs("strong", { children: [w.plan_date ? cp(w.plan_date) : "No date", " · ", String(w.job_status || "new").toUpperCase()] }),
+              d.jsxs("div", { className: "muted", children: ["P.I.C.: ", w.pic || kgSitePicText(w.site), " · Lorry: ", _] }),
+              d.jsxs("div", { children: [d.jsx("b", { children: "Foreman: " }), T] }),
+              d.jsxs("div", { children: [d.jsx("b", { children: "Worker: " }), D] }),
+              w.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Planner remark: ", w.remark] }),
+              w.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Planner note: ", w.notes] }),
+              kgCheckerCanEdit && d.jsxs("div", { className: "checker-row-actions", children: [
+                d.jsx("button", { type: "button", className: "secondary-button small-button", onClick: () => kgCheckerStartPlanner(w), children: "Edit date/detail" }),
+                d.jsx("button", { type: "button", className: "secondary-button small-button danger-text", disabled: W, onClick: () => kgCheckerDeletePlanner(w), children: W ? "Deleting…" : "Delete" }),
+              ] }),
+            ] }),
           ] }, w.id);
         }
         function w(_) {
+          const T = kgCheckerEditValue("delivery", _),
+            D = kgCheckerEditKey("delivery", _),
+            I = kgCheckerBusy === D;
           return d.jsxs("div", { className: "checker-row", children: [
-            d.jsxs("strong", { children: [_.delivery_date ? cp(_.delivery_date) : "No date", " · ", kgDeliveryOrderTypeText(_.order_type)] }),
-            d.jsxs("div", { className: "muted", children: ["Driver: ", _.delivery_driver || "-", " · Sent: Yes"] }),
-            _.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Delivery remark: ", _.remark] }),
-            _.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Delivery note: ", _.notes] }),
+            T ? d.jsxs("div", { className: "checker-edit-grid", children: [
+              d.jsxs("label", { children: ["Delivery date", d.jsx("input", { type: "date", value: T.delivery_date || "", onChange: (L) => kgCheckerSetEdit("delivery", _, { delivery_date: L.target.value }) })] }),
+              d.jsxs("label", { children: ["Delivery type", d.jsx("select", { value: T.order_type || "site_order", onChange: (L) => kgCheckerSetEdit("delivery", _, { order_type: L.target.value }), children: kgDeliveryOrderTypeOptions.map((L) => d.jsx("option", { value: L[0], children: L[1] }, L[0])) })] }),
+              d.jsxs("label", { children: ["Driver", d.jsx("input", { value: T.delivery_driver || "", onChange: (L) => kgCheckerSetEdit("delivery", _, { delivery_driver: L.target.value }) })] }),
+              d.jsxs("label", { className: "wide", children: ["Remark", d.jsx("textarea", { rows: "2", value: T.remark || "", onChange: (L) => kgCheckerSetEdit("delivery", _, { remark: L.target.value }) })] }),
+              d.jsxs("label", { className: "wide", children: ["Notes", d.jsx("textarea", { rows: "2", value: T.notes || "", onChange: (L) => kgCheckerSetEdit("delivery", _, { notes: L.target.value }) })] }),
+              d.jsxs("div", { className: "checker-edit-actions wide", children: [
+                d.jsx("button", { type: "button", className: "primary-button small-button", disabled: I, onClick: () => kgCheckerSaveDelivery(_), children: I ? "Saving…" : "Save delivery" }),
+                d.jsx("button", { type: "button", className: "secondary-button small-button", onClick: () => kgCheckerCancelEdit("delivery", _), children: "Cancel" }),
+              ] }),
+            ] }) : d.jsxs(q.Fragment, { children: [
+              d.jsxs("strong", { children: [_.delivery_date ? cp(_.delivery_date) : "No date", " · ", kgDeliveryOrderTypeText(_.order_type)] }),
+              d.jsxs("div", { className: "muted", children: ["Driver: ", _.delivery_driver || "-", " · Sent: Yes"] }),
+              _.remark && d.jsxs("div", { className: "assignment-note remark-blue", children: ["Delivery remark: ", _.remark] }),
+              _.notes && d.jsxs("div", { className: "assignment-note site-note-red", children: ["Delivery note: ", _.notes] }),
+              kgCheckerCanEdit && d.jsxs("div", { className: "checker-row-actions", children: [
+                d.jsx("button", { type: "button", className: "secondary-button small-button", onClick: () => kgCheckerStartDelivery(_), children: "Edit date/detail" }),
+                d.jsx("button", { type: "button", className: "secondary-button small-button danger-text", disabled: I, onClick: () => kgCheckerDeleteDelivery(_), children: I ? "Deleting…" : "Delete" }),
+              ] }),
+            ] }),
           ] }, _.id);
         }
         return d.jsxs("div", { className: "page checker-page", children: [
@@ -41775,6 +41930,31 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .nav-link.active {
         background: #ffffff1a;
         color: #fff;
+      }
+      .nav-link.nav-hot,
+      .nav-link.nav-hot span,
+      .nav-link.nav-hot svg {
+        color: #ff4d4f;
+        font-weight: 800;
+      }
+      .nav-link.nav-hot.active,
+      .nav-link.nav-hot:hover {
+        color: #ff7875;
+      }
+      .checker-row-actions,
+      .checker-edit-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .checker-edit-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 10px;
+      }
+      .checker-edit-grid .wide {
+        grid-column: 1 / -1;
       }
       .sidebar-footer {
         margin-top: auto;
