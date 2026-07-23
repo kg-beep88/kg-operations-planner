@@ -35908,6 +35908,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           ["Site type", kgSiteTypeText(t)],
           ["P.I.C", kgSitePicText(t)],
           ["Site info", Ca((t == null ? void 0 : t.site_info), "-")],
+          ["SIC worker access", kgSiteSicText(t)],
           ["Foreman in charge", Ca((t == null ? void 0 : t.foreman_in_charge), "-")],
           ["ID Firm detail", Ca((t == null ? void 0 : t.foreman_detail), "-")],
           ["ID Name & Tel", Ca((t == null ? void 0 : t.id_name_tel), "-")],
@@ -36223,6 +36224,30 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       function kgSiteIsPause(t) {
         return String((t == null ? void 0 : t.status) || "").toLowerCase() === "pause";
+      }
+      function kgSiteSicRestricted(t) {
+        return !!(t && t.sic_restricted);
+      }
+      function kgSiteSicWorkerIds(t) {
+        const r = t == null ? void 0 : t.sic_worker_ids;
+        if (Array.isArray(r)) return r.map((n) => String(n));
+        if (typeof r === "string" && r.trim()) {
+          try {
+            const n = JSON.parse(r);
+            return Array.isArray(n) ? n.map((l) => String(l)) : [];
+          } catch (n) {
+            return [];
+          }
+        }
+        return [];
+      }
+      function kgWorkerAllowedForSite(t, r) {
+        return !kgSiteSicRestricted(r) || kgSiteSicWorkerIds(r).includes(String(t));
+      }
+      function kgSiteSicText(t) {
+        return kgSiteSicRestricted(t)
+          ? `Selected workers only (${kgSiteSicWorkerIds(t).length})`
+          : "All workers allowed";
       }
       const kgBossPicChoices = ["DARREN", "C.MARK"],
         kgProjectPicChoices = ["CHESTER", "YOLANDA", "SHAYNE", "WEI YEE", "RYAN"];
@@ -36882,6 +36907,15 @@ Worker : ${c}`;
               }),
             [kgRows, kgRankMap, n],
           );
+        const kgSelectedSiteSicRestricted = kgSiteSicRestricted(kgSelectedSite),
+          kgSelectedSiteSicApproved = new Set(kgSiteSicWorkerIds(kgSelectedSite)),
+          kgSelectedWorkerIds = new Set((w.worker_ids || []).map((V) => String(V))),
+          kgPlannerWorkerPool = p.workers.filter(
+            (V) =>
+              !kgSelectedSiteSicRestricted ||
+              kgSelectedSiteSicApproved.has(String(V.id)) ||
+              kgSelectedWorkerIds.has(String(V.id)),
+          );
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
@@ -36965,9 +36999,15 @@ Worker : ${c}`;
           const xe = ar(V).map((ke) => Number(ke.id)).filter(Boolean),
             ke = (V.assignment_workers || [])
               .map((Le) => Number(Le.worker_id || (Le.worker && Le.worker.id)))
-              .filter(Boolean);
-          _((Le) => ({ ...Le, foreman_ids: xe, worker_ids: ke, worker_ot: {}, site_ot_time: "" }));
-          He(`Copied same foreman + workers from ${kgHistoryDate(V.plan_date)}.`);
+              .filter(Boolean),
+            Le = ke.filter((Qe) => kgWorkerAllowedForSite(Qe, kgSelectedSite)),
+            Qe = ke.length - Le.length;
+          _((Ve) => ({ ...Ve, foreman_ids: xe, worker_ids: Le, worker_ot: {}, site_ot_time: "" }));
+          He(
+            Qe
+              ? `Copied ${Le.length} SIC-approved worker${Le.length === 1 ? "" : "s"}; skipped ${Qe} without SIC access.`
+              : `Copied same foreman + workers from ${kgHistoryDate(V.plan_date)}.`,
+          );
         }
         function kgToggleLorry(V) {
           const xe = Number(V);
@@ -37016,11 +37056,12 @@ Worker : ${c}`;
             ),
             ke = w.worker_ids.includes(Number(V.id)),
             Le = ((w.worker_ot || {})[String(V.id)] || "").trim(),
-            Qe = kgFormatOtHours(kgOtHoursFromEndTime(Le));
+            Qe = kgFormatOtHours(kgOtHoursFromEndTime(Le)),
+            Ve = kgWorkerAllowedForSite(V.id, kgSelectedSite);
           return d.jsxs(
             "label",
             {
-              className: `check-card ${xe.length ? "duplicate-worker" : ""}`,
+              className: `check-card ${xe.length ? "duplicate-worker" : ""} ${!Ve ? "sic-worker-blocked" : ""}`,
               children: [
                 d.jsx("input", {
                   type: "checkbox",
@@ -37031,6 +37072,11 @@ Worker : ${c}`;
                   children: [
                     kgNameNick(V),
                     d.jsxs("small", { children: [" ", kgWorkerTypeText(V)] }),
+                    !Ve &&
+                      d.jsx("small", {
+                        className: "sic-worker-warning-text",
+                        children: "Previously assigned — not currently SIC approved",
+                      }),
                     xe.length > 0 &&
                       d.jsxs("small", {
                         children: [
@@ -37981,7 +38027,21 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           onChange: (V) => {
                             const xe = p.sites.find((ke) => Number(ke.id) === Number(V.target.value));
                             kgWarnPauseSite(xe);
-                            _({ ...w, site_id: V.target.value, pic: w.pic || (xe && xe.pic ? xe.pic : "") });
+                            _((ke) => {
+                              const Le = (ke.worker_ids || []).filter((Qe) => kgWorkerAllowedForSite(Qe, xe)),
+                                Qe = { ...(ke.worker_ot || {}) };
+                              Object.keys(Qe).forEach((Ve) => {
+                                Le.map(String).includes(String(Ve)) || delete Qe[Ve];
+                              });
+                              return {
+                                ...ke,
+                                site_id: V.target.value,
+                                pic: ke.pic || (xe && xe.pic ? xe.pic : ""),
+                                worker_ids: Le,
+                                worker_ot: Qe,
+                                site_ot_time: kgCommonWorkerOtTime(Qe, Le),
+                              };
+                            });
                           },
                           required: !0,
                           children: [
@@ -38009,6 +38069,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         children: [
                           d.jsx("strong", { children: "Site detail" }),
                           kgSiteIsPause(kgSelectedSite) && d.jsx("div", { className: "site-history-line", style: { color: "#b45309", fontWeight: 800 }, children: "⚠ Site is PAUSE. Please check before assigning manpower." }),
+                          kgSelectedSiteSicRestricted &&
+                            d.jsxs("div", {
+                              className: "site-history-line sic-planner-warning",
+                              children: ["🔒 SIC SITE — Only ", kgSelectedSiteSicApproved.size, " approved worker", kgSelectedSiteSicApproved.size === 1 ? " is" : "s are", " shown below."],
+                            }),
                           d.jsxs("div", { className: "site-history-line", children: ["Site status: ", kgSelectedSite.status || "active"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["Foreman in charge: ", kgSelectedSite.foreman_in_charge || "-"] }),
                           d.jsxs("div", { className: "site-history-line", children: ["ID Firm detail: ", kgSelectedSite.foreman_detail || "-"] }),
@@ -38284,11 +38349,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             "Skilled workers ",
                             d.jsx("span", {
                               className: "field-help",
-                              children: "Tick skilled workers. Change skilled/general type in Workers page.",
+                              children: kgSelectedSiteSicRestricted
+                                ? "Only SIC-approved skilled workers for this site are shown."
+                                : "Tick skilled workers. Change skilled/general type in Workers page.",
                             }),
                             d.jsx("div", {
                               className: "check-grid",
-                              children: p.workers
+                              children: kgPlannerWorkerPool
                                 .filter((V) => kgWorkerType(V) === "skilled")
                                 .map((V) => kgWorkerCheckCard(V)),
                             }),
@@ -38300,11 +38367,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             "General workers ",
                             d.jsx("span", {
                               className: "field-help",
-                              children: "Tick general workers. A warning will appear before saving if worker already has another site.",
+                              children: kgSelectedSiteSicRestricted
+                                ? "Only SIC-approved general workers for this site are shown."
+                                : "Tick general workers. A warning will appear before saving if worker already has another site.",
                             }),
                             d.jsx("div", {
                               className: "check-grid",
-                              children: p.workers
+                              children: kgPlannerWorkerPool
                                 .filter((V) => kgWorkerType(V) === "general")
                                 .map((V) => kgWorkerCheckCard(V)),
                             }),
@@ -40086,7 +40155,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           [p, g] = q.useState(l),
           [S, E] = q.useState(!0),
           [w, _] = q.useState(""),
-          [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 });
+          [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 }),
+          [kgSiteWorkers, kgSetSiteWorkers] = q.useState([]),
+          [kgSiteSicSearch, kgSetSiteSicSearch] = q.useState("");
         async function T() {
           (E(!0), _(""));
           let kgQ = qe.from(r.table).select("*");
@@ -40103,7 +40174,32 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         q.useEffect(() => {
           T();
         }, [r.table]);
-        const D = q.useMemo(() => {
+        q.useEffect(() => {
+          if (r.table !== "sites") return;
+          let J = !1;
+          async function j() {
+            const { data: fe, error: G } = await qe
+              .from("workers")
+              .select("*")
+              .order("sort_order", { nullsFirst: !1 })
+              .order("nickname", { nullsFirst: !1 })
+              .order("name");
+            if (J) return;
+            G ? _(G.message) : kgSetSiteWorkers(kgSortNick(fe || []));
+          }
+          j();
+          return () => {
+            J = !0;
+          };
+        }, [r.table]);
+        const kgFilteredSiteWorkers = q.useMemo(() => {
+            const J = kgSiteSicSearch.trim().toLowerCase();
+            return kgSiteWorkers.filter((j) => {
+              if (!J) return !0;
+              return `${kgNameNick(j)} ${j.name || ""} ${j.nickname || ""}`.toLowerCase().includes(J);
+            });
+          }, [kgSiteWorkers, kgSiteSicSearch]),
+          D = q.useMemo(() => {
           const J = c.trim().toLowerCase(),
             j = r.table === "workers" || r.table === "foremen";
           return s.filter((fe) => {
@@ -40136,10 +40232,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           });
         }, [s, c, r.table, kgSiteTypeFilter]);
         function I() {
-          (x("new"), g({ ...l }));
+          (kgSetSiteSicSearch(""), x("new"), g({ ...l, sic_restricted: !1, sic_worker_ids: [] }));
         }
         function L(J) {
-          (x(J.id),
+          (kgSetSiteSicSearch(""),
+            x(J.id),
             g({
               ...l,
               ...J,
@@ -40151,6 +40248,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     site_type: kgSiteTypeValue(J),
                     is_boss_site: kgSiteTypeValue(J) === "boss",
                     is_project_site: kgSiteTypeValue(J) === "project",
+                    sic_restricted: !!J.sic_restricted,
+                    sic_worker_ids: kgSiteSicWorkerIds(J),
                   }
                 : {}),
             }));
@@ -40171,6 +40270,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             const de = p.site_type === "project" ? "project" : "boss";
             j.is_boss_site = de === "boss";
             j.is_project_site = de === "project";
+            j.sic_restricted = !!p.sic_restricted;
+            j.sic_worker_ids = j.sic_restricted ? kgSiteSicWorkerIds(p) : [];
             delete j.site_type;
           }
           j.status = p.status || "active";
@@ -40179,7 +40280,12 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 ? qe.from(r.table).insert(j)
                 : qe.from(r.table).update(j).eq("id", v),
             { error: G } = await fe;
-          if (G) return _(G.message);
+          if (G)
+            return _(
+              r.table === "sites" && /sic_restricted|sic_worker_ids|schema cache|column/i.test(String(G.message || G.details || ""))
+                ? "SIC database fields are not ready. Run kg_site_sic_worker_access_SAFE_v51.sql in Supabase, then save again."
+                : G.message,
+            );
           (x(null), await T());
         }
         async function kgDeleteMaster(J) {
@@ -40242,6 +40348,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               ? kgWorkerTypeText(J)
             : j.key === "site_type"
               ? kgSiteTypeText(J)
+              : j.key === "sic_restricted"
+                ? kgSiteSicText(J)
               : j.format === "boolean"
               ? J[j.key] ? "Yes" : "No"
               : j.format === "money"
@@ -40516,6 +40624,109 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         J.name,
                       ),
                     ),
+                    r.table === "sites" &&
+                      d.jsxs("div", {
+                        className: "wide sic-site-box",
+                        children: [
+                          d.jsx("strong", { children: "SIC worker access" }),
+                          d.jsx("span", {
+                            className: "field-help",
+                            children: "Default is all workers. Choose selected workers only when this site requires SIC approval.",
+                          }),
+                          d.jsxs("label", {
+                            children: [
+                              "Who can enter this site?",
+                              d.jsxs("select", {
+                                value: p.sic_restricted ? "selected" : "all",
+                                onChange: (J) =>
+                                  g({
+                                    ...p,
+                                    sic_restricted: J.target.value === "selected",
+                                    sic_worker_ids:
+                                      J.target.value === "selected" ? kgSiteSicWorkerIds(p) : [],
+                                  }),
+                                children: [
+                                  d.jsx("option", { value: "all", children: "All workers allowed (default)" }),
+                                  d.jsx("option", { value: "selected", children: "Only selected SIC workers allowed" }),
+                                ],
+                              }),
+                            ],
+                          }),
+                          p.sic_restricted &&
+                            d.jsxs("div", {
+                              className: "sic-worker-picker",
+                              children: [
+                                d.jsxs("div", {
+                                  className: "sic-worker-toolbar",
+                                  children: [
+                                    d.jsx("input", {
+                                      type: "search",
+                                      value: kgSiteSicSearch,
+                                      onChange: (J) => kgSetSiteSicSearch(J.target.value),
+                                      placeholder: "Search worker name…",
+                                    }),
+                                    d.jsx("button", {
+                                      type: "button",
+                                      className: "secondary-button small-button",
+                                      onClick: () =>
+                                        g({
+                                          ...p,
+                                          sic_worker_ids: kgSiteWorkers
+                                            .filter((J) => String(J.status || "active").toLowerCase() === "active")
+                                            .map((J) => String(J.id)),
+                                        }),
+                                      children: "Select active workers",
+                                    }),
+                                    d.jsx("button", {
+                                      type: "button",
+                                      className: "secondary-button small-button",
+                                      onClick: () => g({ ...p, sic_worker_ids: [] }),
+                                      children: "Clear all",
+                                    }),
+                                  ],
+                                }),
+                                d.jsxs("div", {
+                                  className: "sic-selected-count",
+                                  children: [kgSiteSicWorkerIds(p).length, " worker", kgSiteSicWorkerIds(p).length === 1 ? "" : "s", " approved"],
+                                }),
+                                d.jsx("div", {
+                                  className: "check-grid sic-worker-grid",
+                                  children: kgFilteredSiteWorkers.map((J) => {
+                                    const j = kgSiteSicWorkerIds(p),
+                                      fe = String(J.id),
+                                      G = j.includes(fe);
+                                    return d.jsxs(
+                                      "label",
+                                      {
+                                        className: `check-card ${String(J.status || "active").toLowerCase() !== "active" ? "sic-worker-inactive" : ""}`,
+                                        children: [
+                                          d.jsx("input", {
+                                            type: "checkbox",
+                                            checked: G,
+                                            onChange: () =>
+                                              g({
+                                                ...p,
+                                                sic_worker_ids: G ? j.filter((de) => de !== fe) : [...j, fe],
+                                              }),
+                                          }),
+                                          d.jsxs("span", {
+                                            children: [
+                                              kgNameNick(J),
+                                              String(J.status || "active").toLowerCase() !== "active" && d.jsx("small", { children: ` ${J.status}` }),
+                                            ],
+                                          }),
+                                        ],
+                                      },
+                                      J.id,
+                                    );
+                                  }),
+                                }),
+                                kgFilteredSiteWorkers.length === 0 &&
+                                  d.jsx("div", { className: "empty-state small", children: "No worker found." }),
+                              ],
+                            }),
+                        ],
+                      }),
                     d.jsxs("label", {
                       children: [
                         "Status",
@@ -41128,6 +41339,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "address", label: "Address" },
             { key: "site_type", label: "Site type" },
             { key: "site_info", label: "Site info" },
+            { key: "sic_restricted", label: "SIC access" },
             { key: "foreman_in_charge", label: "Foreman in charge" },
             { key: "id_name_tel", label: "ID Name & Tel" },
             { key: "lock_info", label: "Lock info" },
@@ -41173,7 +41385,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "remark", label: "Remark", type: "textarea", wide: !0 },
             { name: "notes", label: "Notes", type: "textarea", wide: !0 },
           ],
-          defaults: { site_type: "boss", is_boss_site: !0, is_project_site: !1, pic: "", site_info: "", remark: "" },
+          defaults: { site_type: "boss", is_boss_site: !0, is_project_site: !1, pic: "", site_info: "", remark: "", sic_restricted: !1, sic_worker_ids: [] },
         },
         workers: {
           title: "Workers",
@@ -44493,6 +44705,39 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       .worker-ot-time { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
       .worker-ot-time small { color: #b45309; font-weight: 800; }
       .worker-ot-check { font-size: 12px; font-weight: 800; }
+
+      .sic-site-box {
+        border: 2px solid #dc2626;
+        background: #fff7f7;
+        border-radius: 14px;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+      .sic-site-box > strong { color: #b91c1c; font-size: 16px; }
+      .sic-worker-picker { display: grid; gap: 10px; }
+      .sic-worker-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .sic-worker-toolbar input[type="search"] { flex: 1 1 240px; min-height: 42px; }
+      .sic-selected-count { font-weight: 800; color: #991b1b; }
+      .sic-worker-grid { max-height: 360px; overflow: auto; padding-right: 4px; }
+      .sic-worker-inactive { opacity: 0.65; }
+      .sic-planner-warning {
+        color: #b91c1c;
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        border-radius: 9px;
+        padding: 8px 10px;
+        font-weight: 900;
+      }
+      .sic-worker-blocked { border-color: #ef4444 !important; background: #fef2f2 !important; }
+      .sic-worker-warning-text { display: block; color: #b91c1c; font-weight: 900; }
+      @media (max-width: 720px) {
+        .sic-site-box { padding: 11px; }
+        .sic-worker-toolbar { align-items: stretch; }
+        .sic-worker-toolbar input[type="search"],
+        .sic-worker-toolbar button { width: 100%; }
+        .sic-worker-grid { max-height: 300px; grid-template-columns: 1fr; }
+      }
 
       .delivery-items-table, .items-editor, .items-editor-heading, .order-total-bar { display: none !important; }
 </style>
