@@ -16415,7 +16415,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 children: [
                   "Connected: ",
                   GS || "Not configured",
-                  " · Build V5.5 date range + worker off + Google sync",
+                  " · Build V5.6 general OFF + worker/foreman long-term off + Google sync",
                 ],
               }),
             ],
@@ -16438,25 +16438,36 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const n = new Date(`${t}T12:00:00+08:00`);
         return (n.setUTCDate(n.getUTCDate() + r), n.toISOString().slice(0, 10));
       }
-      function kgWorkerOffPeriods(t) {
+      function kgOffPeriods(t) {
         const r = t && Array.isArray(t.off_periods) ? t.off_periods : [];
         return r
-          .filter((n) => n && n.start_date && n.end_date)
-          .map((n) => ({
-            id: String(n.id || `${n.start_date}-${n.end_date}-${n.reason || "OFF"}`),
-            start_date: String(n.start_date),
-            end_date: String(n.end_date),
-            reason: String(n.reason || "OFF"),
-          }))
+          .filter((n) => n && n.start_date)
+          .map((n) => {
+            const l = n.end_date ? String(n.end_date) : "";
+            const s = !!n.open_ended || !l;
+            return {
+              id: String(n.id || `${n.start_date}-${l || "OPEN"}-${n.reason || "OFF"}`),
+              start_date: String(n.start_date),
+              end_date: l,
+              open_ended: s,
+              reason: String(n.reason || "OFF"),
+            };
+          })
           .sort((n, l) => String(n.start_date).localeCompare(String(l.start_date)));
       }
-      function kgWorkerOffOnDate(t, r) {
-        return kgWorkerOffPeriods(t).find((n) => String(n.start_date) <= String(r) && String(n.end_date) >= String(r)) || null;
+      function kgOffOnDate(t, r) {
+        return kgOffPeriods(t).find((n) => String(n.start_date) <= String(r) && (n.open_ended || !n.end_date || String(n.end_date) >= String(r))) || null;
       }
-      function kgWorkerOffText(t, r = "") {
-        const n = r ? kgWorkerOffOnDate(t, r) : kgWorkerOffPeriods(t)[0];
-        return n ? `${n.reason || "OFF"}: ${n.start_date} → ${n.end_date}` : "Available";
+      function kgOffEndText(t) {
+        return t && (t.open_ended || !t.end_date) ? "No end date" : String((t && t.end_date) || "");
       }
+      function kgOffText(t, r = "") {
+        const n = r ? kgOffOnDate(t, r) : kgOffPeriods(t)[0];
+        return n ? `${n.reason || "OFF"}: ${n.start_date} → ${kgOffEndText(n)}` : "Available";
+      }
+      function kgWorkerOffPeriods(t) { return kgOffPeriods(t); }
+      function kgWorkerOffOnDate(t, r) { return kgOffOnDate(t, r); }
+      function kgWorkerOffText(t, r = "") { return kgOffText(t, r); }
       function kgDateRange(t, r) {
         const n = [], l = String(t || ""), s = String(r || "");
         if (!l || !s || s < l) return n;
@@ -37023,7 +37034,7 @@ Worker : ${c}`;
           [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
           [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1),
           [kgOffModal, kgSetOffModal] = q.useState(!1),
-          [kgOffForm, kgSetOffForm] = q.useState({ worker_id: "", start_date: n, end_date: n, reason: "OFF" }),
+          [kgOffForm, kgSetOffForm] = q.useState({ person_type: "worker", person_id: "", start_date: n, end_date: n, no_end_date: !1, reason: "OFF" }),
           [kgOffSaving, kgSetOffSaving] = q.useState(!1);
         async function de() {
           const V = await sh();
@@ -37066,7 +37077,7 @@ Worker : ${c}`;
             oe();
           }, [n]),
           q.useEffect(() => {
-            kgSetOffForm((V) => ({ ...V, start_date: n, end_date: n }));
+            kgSetOffForm((V) => ({ ...V, start_date: n, end_date: V.no_end_date ? "" : n }));
           }, [n]),
           q.useEffect(() => {
             let V = !1;
@@ -37128,7 +37139,7 @@ Worker : ${c}`;
           re = p.workers.filter((V) => !kgAllAssignedWorkers.has(Number(V.id)) && !kgWorkerOffOnDate(V, n)),
           kgSkilledWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "skilled"),
           kgGeneralWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "general"),
-          X = p.foremen.filter((V) => !kgAllAssignedForemen.has(Number(V.id))),
+          X = p.foremen.filter((V) => !kgAllAssignedForemen.has(Number(V.id)) && !kgOffOnDate(V, n)),
           kgProjectForemenWithoutSite = X.filter((V) => kgForemanType(V) === "project"),
           kgBossForemenWithoutSite = X.filter((V) => kgForemanType(V) === "boss"),
           Te = new Set(
@@ -37191,13 +37202,17 @@ Worker : ${c}`;
         const kgSelectedSiteSicRestricted = kgSiteSicRestricted(kgSelectedSite),
           kgSelectedSiteSicApproved = new Set(kgSiteSicWorkerIds(kgSelectedSite)),
           kgSelectedWorkerIds = new Set((w.worker_ids || []).map((V) => String(V))),
+          kgSelectedForemanIds = new Set((w.foreman_ids || []).map((V) => String(V))),
           kgPlannerWorkerPool = p.workers.filter((V) => {
-            const xe = kgWorkerOffOnDate(V, n);
+            const xe = kgOffOnDate(V, n);
             const ke = !kgSelectedSiteSicRestricted || kgSelectedSiteSicApproved.has(String(V.id)) || kgSelectedWorkerIds.has(String(V.id));
             const Le = !xe || kgSelectedWorkerIds.has(String(V.id));
             return ke && Le;
           }),
-          kgWorkersOffToday = p.workers.filter((V) => !!kgWorkerOffOnDate(V, n));
+          kgPlannerForemanPool = p.foremen.filter((V) => !kgOffOnDate(V, n) || kgSelectedForemanIds.has(String(V.id))),
+          kgWorkersOffToday = p.workers.filter((V) => !!kgOffOnDate(V, n)),
+          kgForemenOffToday = p.foremen.filter((V) => !!kgOffOnDate(V, n)),
+          kgPeopleOffToday = [...kgWorkersOffToday, ...kgForemenOffToday];
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
@@ -37365,7 +37380,7 @@ Worker : ${c}`;
                     kgOff &&
                       d.jsx("small", {
                         className: "worker-off-warning-text",
-                        children: `OFF ${kgOff.start_date} → ${kgOff.end_date}${kgOff.reason ? ` · ${kgOff.reason}` : ""}`,
+                        children: `OFF ${kgOff.start_date} → ${kgOffEndText(kgOff)}${kgOff.reason ? ` · ${kgOff.reason}` : ""}`,
                       }),
                     xe.length > 0 &&
                       d.jsxs("small", {
@@ -37420,34 +37435,39 @@ Worker : ${c}`;
         }
         async function kgSaveWorkerOff(V) {
           V.preventDefault();
-          const xe = Number(kgOffForm.worker_id), ke = p.workers.find((Le) => Number(Le.id) === xe);
-          if (!ke) return j("Choose a worker first.");
-          if (!kgOffForm.start_date || !kgOffForm.end_date || kgOffForm.end_date < kgOffForm.start_date)
-            return j("Worker off End date must be the same as or after Start date.");
+          const xe = kgOffForm.person_type === "foreman" ? "foreman" : "worker",
+            ke = xe === "foreman" ? p.foremen : p.workers,
+            Le = ke.find((Qe) => Number(Qe.id) === Number(kgOffForm.person_id));
+          if (!Le) return j(`Choose a ${xe} first.`);
+          if (!kgOffForm.start_date) return j("Choose an Off from date.");
+          if (!kgOffForm.no_end_date && (!kgOffForm.end_date || kgOffForm.end_date < kgOffForm.start_date))
+            return j("Off until must be the same as or after Off from, or tick No end date.");
           kgSetOffSaving(!0);
-          const Le = kgWorkerOffPeriods(ke), Qe = {
+          const Qe = kgOffPeriods(Le), Ve = {
             id: `off-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             start_date: kgOffForm.start_date,
-            end_date: kgOffForm.end_date,
+            end_date: kgOffForm.no_end_date ? null : kgOffForm.end_date,
+            open_ended: !!kgOffForm.no_end_date,
             reason: String(kgOffForm.reason || "OFF").trim() || "OFF",
-          };
-          const { error: Ve } = await qe.from("workers").update({ off_periods: [...Le, Qe] }).eq("id", xe);
+          }, Re = xe === "foreman" ? "foremen" : "workers";
+          const { error: At } = await qe.from(Re).update({ off_periods: [...Qe, Ve] }).eq("id", Le.id);
           kgSetOffSaving(!1);
-          if (Ve) return j(/off_periods|schema cache|column/i.test(String(Ve.message || Ve.details || ""))
-            ? "Worker Off database field is not ready. Run the v52 SAFE SQL first."
-            : Ve.message);
+          if (At) return j(/off_periods|schema cache|column/i.test(String(At.message || At.details || ""))
+            ? `${xe === "foreman" ? "Foreman" : "Worker"} OFF database field is not ready. Run the v53 SAFE SQL first.`
+            : At.message);
           await de();
-          kgSetOffForm({ worker_id: "", start_date: n, end_date: n, reason: "OFF" });
-          He(`${kgNameNick(ke)} marked OFF from ${Qe.start_date} to ${Qe.end_date}.`);
+          kgSetOffForm({ person_type: xe, person_id: "", start_date: n, end_date: n, no_end_date: !1, reason: "OFF" });
+          He(`${kgNameNick(Le)} marked OFF from ${Ve.start_date} to ${Ve.open_ended ? "no end date" : Ve.end_date}.`);
         }
-        async function kgDeleteWorkerOff(V, xe) {
-          const ke = p.workers.find((Le) => Number(Le.id) === Number(V));
-          if (!ke || !window.confirm(`Remove this OFF period for ${kgNameNick(ke)}?`)) return;
-          const Le = kgWorkerOffPeriods(ke).filter((Qe) => String(Qe.id) !== String(xe));
-          const { error: Qe } = await qe.from("workers").update({ off_periods: Le }).eq("id", V);
-          if (Qe) return j(Qe.message);
+        async function kgDeleteWorkerOff(V, xe, ke) {
+          const Le = V === "foreman" ? "foreman" : "worker", Qe = Le === "foreman" ? p.foremen : p.workers,
+            Ve = Qe.find((Re) => Number(Re.id) === Number(xe));
+          if (!Ve || !window.confirm(`Remove this OFF period for ${kgNameNick(Ve)}?`)) return;
+          const Re = kgOffPeriods(Ve).filter((At) => String(At.id) !== String(ke)), At = Le === "foreman" ? "foremen" : "workers";
+          const { error: Tt } = await qe.from(At).update({ off_periods: Re }).eq("id", xe);
+          if (Tt) return j(Tt.message);
           await de();
-          He("Worker OFF period removed.");
+          He("OFF period removed.");
         }
         async function kgInsertAssignmentCopy(V, xe, ke, Le, Qe) {
           const { data: Ve, error: Re } = await qe.from("site_assignments").insert(V).select("id").single();
@@ -37488,9 +37508,10 @@ Worker : ${c}`;
             for (const It of ke) {
               const qt = `${It}|${w.shift || "day"}`;
               if (Ve.has(qt)) { Dt += 1; continue; }
-              const Vt = p.workers.filter((Xt) => (w.worker_ids || []).includes(Number(Xt.id)) && !kgWorkerOffOnDate(Xt, It) && kgWorkerAllowedForSite(Xt.id, kgSelectedSite)).map((Xt) => Number(Xt.id));
-              const Xt = { plan_date: It, site_id: Number(w.site_id), lorry_id: Re.length ? Re[0] : null, foreman_id: At.length ? At[0] : null, shift: w.shift, job_status: w.job_status || "CONTINUE JOB", pic: w.pic || null, is_confirmed: !!w.is_confirmed, remark: w.remark || null, notes: w.notes || null };
-              await kgInsertAssignmentCopy(Xt, Re, At, Vt, w.worker_ot || {});
+              const Vt = p.workers.filter((Xt) => (w.worker_ids || []).includes(Number(Xt.id)) && !kgOffOnDate(Xt, It) && kgWorkerAllowedForSite(Xt.id, kgSelectedSite)).map((Xt) => Number(Xt.id)),
+                Yt = p.foremen.filter((Xt) => At.includes(Number(Xt.id)) && !kgOffOnDate(Xt, It)).map((Xt) => Number(Xt.id));
+              const Xt = { plan_date: It, site_id: Number(w.site_id), lorry_id: Re.length ? Re[0] : null, foreman_id: Yt.length ? Yt[0] : null, shift: w.shift, job_status: w.job_status || "CONTINUE JOB", pic: w.pic || null, is_confirmed: !!w.is_confirmed, remark: w.remark || null, notes: w.notes || null };
+              await kgInsertAssignmentCopy(Xt, Re, Yt, Vt, w.worker_ot || {});
               Tt += 1;
             }
           } catch (It) { return j(`Range save stopped: ${It.message || It}. ${Tt} day(s) were already saved and were not removed.`); }
@@ -37499,7 +37520,7 @@ Worker : ${c}`;
         }
         async function kgCopyYesterday() {
           const V = wr(n, -1);
-          if (!window.confirm(`Copy all Planner work from ${D0(V)} to ${D0(n)}?\n\nExisting site + shift records today will be kept and skipped. Worker OFF and SIC restrictions for today will be respected.`)) return;
+          if (!window.confirm(`Copy all Planner work from ${D0(V)} to ${D0(n)}?\n\nExisting site + shift records today will be kept and skipped. Worker/foreman OFF and worker SIC restrictions for today will be respected.`)) return;
           j("");
           const [xe, ke] = await Promise.all([
             qe.from("site_assignments").select(_s).eq("plan_date", V).order("sort_order").order("shift"),
@@ -37513,10 +37534,12 @@ Worker : ${c}`;
             for (const At of xe.data || []) {
               const Tt = `${Number((At.site || {}).id)}|${At.shift || "day"}`;
               if (Le.has(Tt)) { Ve += 1; continue; }
-              const Dt = kgAssignmentLorries(At).map((qt) => Number(qt.id)).filter(Boolean), It = ar(At).map((qt) => Number(qt.id)).filter(Boolean), qt = {};
+              const Dt = kgAssignmentLorries(At).map((qt) => Number(qt.id)).filter(Boolean),
+                ItRaw = ar(At).map((qt) => Number(qt.id)).filter(Boolean),
+                It = ItRaw.filter((qt) => { const Zt = p.foremen.find((er) => Number(er.id) === Number(qt)); if (!Zt || kgOffOnDate(Zt, n)) { Re += 1; return !1; } return !0; }), qt = {};
               const Vt = (At.assignment_workers || []).map((Zt) => {
                 const er = Zt.worker || p.workers.find((tr) => Number(tr.id) === Number(Zt.worker_id));
-                if (!er || kgWorkerOffOnDate(er, n) || !kgWorkerAllowedForSite(er.id, At.site)) { Re += 1; return null; }
+                if (!er || kgOffOnDate(er, n) || !kgWorkerAllowedForSite(er.id, At.site)) { Re += 1; return null; }
                 if (Zt.ot_end_time) qt[String(Zt.worker_id)] = Zt.ot_end_time;
                 return Number(Zt.worker_id);
               }).filter(Boolean);
@@ -37533,7 +37556,7 @@ Worker : ${c}`;
             }
           } catch (At) { return j(`Copy Yesterday stopped: ${At.message || At}. Existing data was not deleted.`); }
           await oe();
-          He(`Copied ${Qe} site assignment${Qe === 1 ? "" : "s"}${Ve ? `; ${Ve} existing skipped` : ""}${Re ? `; ${Re} unavailable/SIC worker${Re === 1 ? "" : "s"} skipped` : ""}.`);
+          He(`Copied ${Qe} site assignment${Qe === 1 ? "" : "s"}${Ve ? `; ${Ve} existing skipped` : ""}${Re ? `; ${Re} unavailable/SIC worker or foreman record${Re === 1 ? "" : "s"} skipped` : ""}.`);
         }
         async function se(V) {
           (V.preventDefault(), j(""));
@@ -37553,11 +37576,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (S === "new") {
             const kgAvailableWorkerIds = (w.worker_ids || []).filter((Qe) => {
               const Ve = p.workers.find((Re) => Number(Re.id) === Number(Qe));
-              return Ve && !kgWorkerOffOnDate(Ve, n) && kgWorkerAllowedForSite(Ve.id, kgSelectedSite);
+              return Ve && !kgOffOnDate(Ve, n) && kgWorkerAllowedForSite(Ve.id, kgSelectedSite);
+            }), kgAvailableForemanIds = (w.foreman_ids || []).filter((Qe) => {
+              const Ve = p.foremen.find((Re) => Number(Re.id) === Number(Qe));
+              return Ve && !kgOffOnDate(Ve, n);
             });
-            if (kgAvailableWorkerIds.length !== (w.worker_ids || []).length) {
-              _((Qe) => ({ ...Qe, worker_ids: kgAvailableWorkerIds }));
-              He("Unavailable worker was skipped. Please press Save assignment again.");
+            if (kgAvailableWorkerIds.length !== (w.worker_ids || []).length || kgAvailableForemanIds.length !== (w.foreman_ids || []).length) {
+              _((Qe) => ({ ...Qe, worker_ids: kgAvailableWorkerIds, foreman_ids: kgAvailableForemanIds }));
+              He("Person marked OFF was skipped. Please press Save assignment again.");
               return;
             }
           }
@@ -38193,7 +38219,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             className: "button-row",
                             children: [
                               d.jsx("button", { type: "button", className: "secondary-button", onClick: kgCopyYesterday, children: "Copy Previous Day → Selected Day" }),
-                              d.jsxs("button", { type: "button", className: "secondary-button", onClick: () => kgSetOffModal(!0), children: [d.jsx(Rs, { size: 16 }), ` Worker Off${kgWorkersOffToday.length ? ` (${kgWorkersOffToday.length})` : ""}`] }),
+                              d.jsxs("button", { type: "button", className: "secondary-button", onClick: () => kgSetOffModal(!0), children: [d.jsx(Rs, { size: 16 }), ` Off${kgPeopleOffToday.length ? ` (${kgPeopleOffToday.length})` : ""}`] }),
                               d.jsxs("button", { className: "primary-button", onClick: () => P(), children: [d.jsx(ti, { size: 17 }), "Add site"] }),
                             ],
                           }),
@@ -38634,14 +38660,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             }),
                             d.jsx("div", {
                               className: "check-grid",
-                              children: p.foremen
+                              children: kgPlannerForemanPool
                                 .filter((V) => kgForemanType(V) === "boss")
                                 .map((V) => {
-                                  const xe = s.filter((ke) => ke.id !== S && ar(ke).some((Le) => Number(Le.id) === Number(V.id)));
+                                  const xe = s.filter((ke) => ke.id !== S && ar(ke).some((Le) => Number(Le.id) === Number(V.id))), kgForemanOff = kgOffOnDate(V, n);
                                   return d.jsxs(
                                     "label",
                                     {
-                                      className: `check-card ${xe.length ? "duplicate-worker" : ""}`,
+                                      className: `check-card ${xe.length ? "duplicate-worker" : ""} ${kgForemanOff ? "worker-off-card" : ""}`,
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -38653,6 +38679,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                         d.jsxs("span", {
                                           children: [
                                             kgNameNick(V),
+                                            kgForemanOff && d.jsx("small", { className: "worker-off-warning-text", children: `OFF ${kgForemanOff.start_date} → ${kgOffEndText(kgForemanOff)}${kgForemanOff.reason ? ` · ${kgForemanOff.reason}` : ""}` }),
                                             xe.length > 0 &&
                                               d.jsxs("small", {
                                                 children: [
@@ -38685,14 +38712,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             }),
                             d.jsx("div", {
                               className: "check-grid",
-                              children: p.foremen
+                              children: kgPlannerForemanPool
                                 .filter((V) => kgForemanType(V) === "project")
                                 .map((V) => {
-                                  const xe = s.filter((ke) => ke.id !== S && ar(ke).some((Le) => Number(Le.id) === Number(V.id)));
+                                  const xe = s.filter((ke) => ke.id !== S && ar(ke).some((Le) => Number(Le.id) === Number(V.id))), kgForemanOff = kgOffOnDate(V, n);
                                   return d.jsxs(
                                     "label",
                                     {
-                                      className: `check-card ${xe.length ? "duplicate-worker" : ""}`,
+                                      className: `check-card ${xe.length ? "duplicate-worker" : ""} ${kgForemanOff ? "worker-off-card" : ""}`,
                                       children: [
                                         d.jsx("input", {
                                           type: "checkbox",
@@ -38704,6 +38731,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                         d.jsxs("span", {
                                           children: [
                                             kgNameNick(V),
+                                            kgForemanOff && d.jsx("small", { className: "worker-off-warning-text", children: `OFF ${kgForemanOff.start_date} → ${kgOffEndText(kgForemanOff)}${kgForemanOff.reason ? ` · ${kgForemanOff.reason}` : ""}` }),
                                             xe.length > 0 &&
                                               d.jsxs("small", {
                                                 children: [
@@ -38876,18 +38904,23 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               }),
             kgOffModal &&
               d.jsx(hl, {
-                title: "Worker Off / Leave date range",
+                title: "Off — Worker / Foreman",
                 onClose: () => kgSetOffModal(!1),
                 children: d.jsxs("div", { className: "worker-off-modal", children: [
-                  d.jsx("div", { className: "important-box", children: "Workers marked OFF are hidden from new Planner assignments during that date range. Old history is never removed." }),
+                  d.jsx("div", { className: "important-box", children: "Mark a worker or foreman OFF for a date range, or choose No end date for long-term off. They are hidden from new Planner assignments while OFF. Old history is never removed." }),
                   d.jsxs("form", { className: "form-grid", onSubmit: kgSaveWorkerOff, children: [
-                    d.jsxs("label", { className: "wide", children: ["Worker", d.jsxs("select", { value: kgOffForm.worker_id, onChange: (V) => kgSetOffForm({ ...kgOffForm, worker_id: V.target.value }), required: !0, children: [d.jsx("option", { value: "", children: "Choose worker" }), ...p.workers.map((V) => d.jsx("option", { value: V.id, children: kgNameNick(V) }, V.id))] })] }),
-                    d.jsxs("label", { children: ["Off from", d.jsx("input", { type: "date", value: kgOffForm.start_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, start_date: V.target.value, end_date: kgOffForm.end_date < V.target.value ? V.target.value : kgOffForm.end_date }), required: !0 })] }),
-                    d.jsxs("label", { children: ["Off until", d.jsx("input", { type: "date", min: kgOffForm.start_date, value: kgOffForm.end_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, end_date: V.target.value }), required: !0 })] }),
-                    d.jsxs("label", { className: "wide", children: ["Reason", d.jsx("input", { value: kgOffForm.reason, onChange: (V) => kgSetOffForm({ ...kgOffForm, reason: V.target.value }), placeholder: "OFF / Leave / Home leave / MC" })] }),
-                    d.jsx("div", { className: "form-actions wide", children: d.jsx("button", { className: "primary-button", disabled: kgOffSaving, children: kgOffSaving ? "Saving…" : "Save worker off period" }) }),
+                    d.jsxs("label", { children: ["Type", d.jsxs("select", { value: kgOffForm.person_type, onChange: (V) => kgSetOffForm({ ...kgOffForm, person_type: V.target.value, person_id: "" }), children: [d.jsx("option", { value: "worker", children: "Worker" }), d.jsx("option", { value: "foreman", children: "Foreman" })] })] }),
+                    d.jsxs("label", { children: [kgOffForm.person_type === "foreman" ? "Foreman" : "Worker", d.jsxs("select", { value: kgOffForm.person_id, onChange: (V) => kgSetOffForm({ ...kgOffForm, person_id: V.target.value }), required: !0, children: [d.jsx("option", { value: "", children: kgOffForm.person_type === "foreman" ? "Choose foreman" : "Choose worker" }), ...(kgOffForm.person_type === "foreman" ? p.foremen : p.workers).map((V) => d.jsx("option", { value: V.id, children: kgNameNick(V) }, V.id))] })] }),
+                    d.jsxs("label", { children: ["Off from", d.jsx("input", { type: "date", value: kgOffForm.start_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, start_date: V.target.value, end_date: !kgOffForm.no_end_date && kgOffForm.end_date < V.target.value ? V.target.value : kgOffForm.end_date }), required: !0 })] }),
+                    d.jsxs("label", { children: ["Off until", d.jsx("input", { type: "date", min: kgOffForm.start_date, value: kgOffForm.end_date, disabled: !!kgOffForm.no_end_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, end_date: V.target.value }) })] }),
+                    d.jsxs("label", { className: "wide confirm-check", children: ["Long-term off", d.jsxs("span", { className: "inline-check", children: [d.jsx("input", { type: "checkbox", checked: !!kgOffForm.no_end_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, no_end_date: V.target.checked, end_date: V.target.checked ? "" : (kgOffForm.end_date || kgOffForm.start_date || n) }) }), " No end date — stays OFF until I remove it"] })] }),
+                    d.jsxs("label", { className: "wide", children: ["Reason", d.jsx("input", { value: kgOffForm.reason, onChange: (V) => kgSetOffForm({ ...kgOffForm, reason: V.target.value }), placeholder: "OFF / Leave / Home leave / MC / Long leave" })] }),
+                    d.jsx("div", { className: "form-actions wide", children: d.jsx("button", { className: "primary-button", disabled: kgOffSaving, children: kgOffSaving ? "Saving…" : "Save OFF" }) }),
                   ] }),
-                  d.jsx("div", { className: "worker-off-list", children: p.workers.flatMap((V) => kgWorkerOffPeriods(V).map((xe) => ({ worker: V, off: xe }))).filter((V) => V.off.end_date >= wr(n, -30)).sort((V, xe) => V.off.start_date.localeCompare(xe.off.start_date)).map((V) => d.jsxs("div", { className: `worker-off-row ${V.off.start_date <= n && V.off.end_date >= n ? "active" : ""}`, children: [d.jsxs("div", { children: [d.jsx("strong", { children: kgNameNick(V.worker) }), d.jsxs("span", { children: [V.off.start_date, " → ", V.off.end_date, " · ", V.off.reason || "OFF"] })] }), d.jsx("button", { type: "button", className: "secondary-button small-button danger-text", onClick: () => kgDeleteWorkerOff(V.worker.id, V.off.id), children: "Remove" })] }, `${V.worker.id}-${V.off.id}`)) }),
+                  d.jsx("div", { className: "worker-off-list", children: [
+                    ...p.workers.flatMap((V) => kgOffPeriods(V).map((xe) => ({ type: "worker", person: V, off: xe }))),
+                    ...p.foremen.flatMap((V) => kgOffPeriods(V).map((xe) => ({ type: "foreman", person: V, off: xe }))),
+                  ].filter((V) => V.off.open_ended || !V.off.end_date || V.off.end_date >= wr(n, -30)).sort((V, xe) => V.off.start_date.localeCompare(xe.off.start_date)).map((V) => d.jsxs("div", { className: `worker-off-row ${V.off.start_date <= n && (V.off.open_ended || !V.off.end_date || V.off.end_date >= n) ? "active" : ""}`, children: [d.jsxs("div", { children: [d.jsxs("strong", { children: [kgNameNick(V.person), " · ", V.type === "foreman" ? "Foreman" : "Worker"] }), d.jsxs("span", { children: [V.off.start_date, " → ", kgOffEndText(V.off), " · ", V.off.reason || "OFF"] })] }), d.jsx("button", { type: "button", className: "secondary-button small-button danger-text", onClick: () => kgDeleteWorkerOff(V.type, V.person.id, V.off.id), children: "Remove" })] }, `${V.type}-${V.person.id}-${V.off.id}`)) }),
                 ] }),
               }),
             T &&
