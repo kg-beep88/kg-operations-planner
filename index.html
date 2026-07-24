@@ -7,6 +7,7 @@
     <meta name="description" content="KG Operations daily deployment planner" />
     <title>KG Operations Planner</title>
     <script src="./config.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script type="module">
       (function () {
         const r = document.createElement("link").relList;
@@ -16414,7 +16415,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 children: [
                   "Connected: ",
                   GS || "Not configured",
-                  " · Build V5.4 copy date",
+                  " · Build V5.5 date range + worker off + Google sync",
                 ],
               }),
             ],
@@ -16436,6 +16437,36 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function wr(t, r) {
         const n = new Date(`${t}T12:00:00+08:00`);
         return (n.setUTCDate(n.getUTCDate() + r), n.toISOString().slice(0, 10));
+      }
+      function kgWorkerOffPeriods(t) {
+        const r = t && Array.isArray(t.off_periods) ? t.off_periods : [];
+        return r
+          .filter((n) => n && n.start_date && n.end_date)
+          .map((n) => ({
+            id: String(n.id || `${n.start_date}-${n.end_date}-${n.reason || "OFF"}`),
+            start_date: String(n.start_date),
+            end_date: String(n.end_date),
+            reason: String(n.reason || "OFF"),
+          }))
+          .sort((n, l) => String(n.start_date).localeCompare(String(l.start_date)));
+      }
+      function kgWorkerOffOnDate(t, r) {
+        return kgWorkerOffPeriods(t).find((n) => String(n.start_date) <= String(r) && String(n.end_date) >= String(r)) || null;
+      }
+      function kgWorkerOffText(t, r = "") {
+        const n = r ? kgWorkerOffOnDate(t, r) : kgWorkerOffPeriods(t)[0];
+        return n ? `${n.reason || "OFF"}: ${n.start_date} → ${n.end_date}` : "Available";
+      }
+      function kgDateRange(t, r) {
+        const n = [], l = String(t || ""), s = String(r || "");
+        if (!l || !s || s < l) return n;
+        let f = l, c = 0;
+        while (f <= s && c < 370) {
+          n.push(f);
+          f = wr(f, 1);
+          c += 1;
+        }
+        return n;
       }
       function O0(t, r) {
         const [n, l] = t.split("-").map(Number);
@@ -16493,15 +16524,15 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         }).format(Number(t || 0));
       }
       const _s = `
-  id, plan_date, shift, notes, remark, sort_order, job_status, pic, is_confirmed, lorry_id,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,remark,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
+  id, plan_date, shift, notes, remark, sort_order, job_status, pic, is_confirmed, lorry_id, google_event_id, google_event_updated_at,
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,remark,id_name_tel,lock_info,site_info,is_boss_site,is_project_site,sic_restricted,sic_worker_ids),
   assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
   assignment_workers(*, worker:workers(id,name,nickname,status,worker_type))
 `,
         w0 = `
   id, delivery_date, delivery_driver, order_type, billing_date, billing_no, billing_status, billing_remark, sent_on, notes, remark, created_at, updated_at,
-  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,remark,id_name_tel,lock_info,site_info,is_boss_site,is_project_site),
+  site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,remark,id_name_tel,lock_info,site_info,is_boss_site,is_project_site,sic_restricted,sic_worker_ids),
   delivery_order_items(
     id, catalog_item_id, category, item_name, size,
     quantity_delivered, quantity_returned, unit_cost, sort_order
@@ -35470,6 +35501,183 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           ],
         });
       }
+      const kgGoogleSyncState = { accessToken: "", expiresAt: 0 };
+      function kgGoogleClientId() {
+        return String($v.googleClientId || window.localStorage.getItem("kg_google_client_id") || "").trim();
+      }
+      function kgGoogleCalendarId() {
+        return String($v.googleCalendarId || window.localStorage.getItem("kg_google_calendar_id") || "").trim();
+      }
+      function kgGoogleSaveLocalSettings(t, r) {
+        window.localStorage.setItem("kg_google_client_id", String(t || "").trim());
+        window.localStorage.setItem("kg_google_calendar_id", String(r || "").trim());
+      }
+      function kgGoogleHasToken() {
+        return !!kgGoogleSyncState.accessToken && Date.now() < Number(kgGoogleSyncState.expiresAt || 0);
+      }
+      async function kgGoogleConnect() {
+        const t = kgGoogleClientId();
+        if (!t) throw new Error("Add Google OAuth Client ID first.");
+        if (!(window.google && window.google.accounts && window.google.accounts.oauth2))
+          throw new Error("Google sign-in library is still loading. Refresh once and try again.");
+        if (kgGoogleHasToken()) return kgGoogleSyncState.accessToken;
+        return new Promise((r, n) => {
+          const l = window.google.accounts.oauth2.initTokenClient({
+            client_id: t,
+            scope: "https://www.googleapis.com/auth/calendar.events",
+            callback: (s) => {
+              if (!s || s.error || !s.access_token) return n(new Error((s && (s.error_description || s.error)) || "Google authorization failed."));
+              kgGoogleSyncState.accessToken = s.access_token;
+              kgGoogleSyncState.expiresAt = Date.now() + Math.max(60, Number(s.expires_in || 3600) - 60) * 1000;
+              r(s.access_token);
+            },
+            error_callback: (s) => n(new Error((s && (s.message || s.type)) || "Google authorization was closed.")),
+          });
+          l.requestAccessToken({ prompt: "consent" });
+        });
+      }
+      async function kgGoogleApi(t, r, n = null, l = null) {
+        const s = await kgGoogleConnect(), f = kgGoogleCalendarId();
+        if (!f) throw new Error("Add Shared Google Calendar ID first.");
+        const c = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(f)}${r}`);
+        if (l) Object.entries(l).forEach(([m, v]) => v != null && c.searchParams.append(m, String(v)));
+        const m = await fetch(c.toString(), {
+          method: t,
+          headers: { Authorization: `Bearer ${s}`, "Content-Type": "application/json" },
+          body: n == null ? void 0 : JSON.stringify(n),
+        });
+        const v = await m.text();
+        let x = null;
+        if (v) try { x = JSON.parse(v); } catch { x = v; }
+        if (!m.ok) {
+          const p = new Error((x && x.error && x.error.message) || (x && x.message) || m.statusText || `Google Calendar error ${m.status}`);
+          p.status = m.status;
+          throw p;
+        }
+        return x;
+      }
+      function kgGoogleDescriptionFields(t) {
+        const r = {};
+        String(t || "").split(/\r?\n/).forEach((n) => {
+          const l = n.indexOf(":");
+          if (l < 1) return;
+          const s = n.slice(0, l).trim().toLowerCase(), f = n.slice(l + 1).trim();
+          r[s] = f;
+        });
+        return r;
+      }
+      function kgGoogleAssignmentDescription(t) {
+        return [
+          "KG Operations Planner",
+          `P.I.C.: ${t.pic || ((t.site || {}).pic) || ""}`,
+          `Shift: ${t.shift || "day"}`,
+          `Job Status: ${t.job_status || "CONTINUE JOB"}`,
+          `Workers: ${kgWorkerNames(t) || "-"}`,
+          `Foremen: ${kgForemanNames(t) || "-"}`,
+          `Lorries: ${kgLorryExcelList(t) || "-"}`,
+          `Remark: ${t.remark || ""}`,
+          `Notes: ${t.notes || ""}`,
+          `KG Assignment ID: ${t.id}`,
+          "",
+          "Safe sync rule: deleting this Google event does NOT delete the app record.",
+        ].join("\n");
+      }
+      function kgGoogleAssignmentEvent(t) {
+        const r = Ca((t.site || {}).address, "Unknown site");
+        return {
+          summary: `KG: ${r}`,
+          location: r,
+          description: kgGoogleAssignmentDescription(t),
+          start: { date: t.plan_date },
+          end: { date: wr(t.plan_date, 1) },
+          transparency: "transparent",
+          extendedProperties: { shared: { kgSource: "kg-operations-planner", kgAssignmentId: String(t.id), kgSiteId: String((t.site || {}).id || "") } },
+        };
+      }
+      async function kgGooglePushOne(t) {
+        const r = kgGoogleAssignmentEvent(t);
+        let n = t.google_event_id ? String(t.google_event_id) : "", l;
+        if (n) {
+          try { l = await kgGoogleApi("PATCH", `/events/${encodeURIComponent(n)}`, r); }
+          catch (s) { if (Number(s.status) !== 404 && Number(s.status) !== 410) throw s; n = ""; }
+        }
+        if (!n) {
+          l = await kgGoogleApi("POST", "/events", r);
+          n = l.id;
+        }
+        const { error: s } = await qe.from("site_assignments").update({ google_event_id: n, google_event_updated_at: l.updated || new Date().toISOString() }).eq("id", t.id);
+        if (s && !/google_event_id|google_event_updated_at|schema cache|column/i.test(String(s.message || s.details || ""))) throw new Error(s.message);
+        return l;
+      }
+      async function kgGooglePushAssignments(t, r) {
+        let n = 0;
+        for (const l of t || []) {
+          await kgGooglePushOne(l);
+          n += 1;
+          r && r(n, (t || []).length, l);
+        }
+        return n;
+      }
+      async function kgGoogleListEvents(t, r) {
+        let n = "", l = [];
+        do {
+          const s = await kgGoogleApi("GET", "/events", null, {
+            timeMin: `${t}T00:00:00+08:00`,
+            timeMax: `${r}T00:00:00+08:00`,
+            singleEvents: "true",
+            showDeleted: "false",
+            maxResults: 2500,
+            pageToken: n || null,
+            sharedExtendedProperty: "kgSource=kg-operations-planner",
+          });
+          l.push(...(s.items || []));
+          n = s.nextPageToken || "";
+        } while (n);
+        return l;
+      }
+      function kgGoogleEventDate(t) {
+        return String(((t || {}).start || {}).date || (((t || {}).start || {}).dateTime || "").slice(0, 10) || "");
+      }
+      async function kgGooglePullToApp(t, r, n) {
+        const l = await kgGoogleListEvents(t, r), s = await sh(), f = s.data || { sites: [], workers: [], foremen: [], lorries: [] };
+        let c = 0, m = 0;
+        for (const v of l) {
+          const x = (((v || {}).extendedProperties || {}).shared || {}), p = String(x.kgAssignmentId || "").trim(), g = kgGoogleEventDate(v);
+          if (!g) continue;
+          if (p) {
+            const { data: S, error: E } = await qe.from("site_assignments").select(_s).eq("id", p).limit(1);
+            if (E || !(S || []).length) continue;
+            const w = S[0], _ = String(w.google_event_updated_at || ""), T = String(v.updated || "");
+            if (_ && T && T <= _) continue;
+            const D = kgGoogleDescriptionFields(v.description), I = String(D["shift"] || w.shift || "day").toLowerCase(), L = ["day", "night", "am", "pm"].includes(I) ? I : (w.shift || "day"), W = String(D["job status"] || w.job_status || "CONTINUE JOB").toUpperCase(), he = ["NEW", "CONTINUE JOB", "PAUSE", "DONE"].includes(W) ? W : (w.job_status || "CONTINUE JOB");
+            const { error: J } = await qe.from("site_assignments").update({
+              plan_date: g,
+              shift: L,
+              job_status: he,
+              pic: D["p.i.c."] || D["p.i.c"] || w.pic || null,
+              remark: D["remark"] != null ? D["remark"] || null : w.remark,
+              notes: D["notes"] != null ? D["notes"] || null : w.notes,
+              google_event_id: v.id,
+              google_event_updated_at: v.updated || new Date().toISOString(),
+            }).eq("id", w.id);
+            if (J) throw new Error(J.message);
+            c += 1;
+            continue;
+          }
+          const S = String(v.summary || "").trim();
+          if (!/^KG\s*:/i.test(S)) continue;
+          const E = S.replace(/^KG\s*:/i, "").trim(), w = (f.sites || []).find((D) => String(D.address || "").trim().toLowerCase() === E.toLowerCase());
+          if (!w) continue;
+          const _ = kgGoogleDescriptionFields(v.description), T = String(_["shift"] || "day").toLowerCase(), D = ["day", "night", "am", "pm"].includes(T) ? T : "day", I = String(_["job status"] || "CONTINUE JOB").toUpperCase(), L = ["NEW", "CONTINUE JOB", "PAUSE", "DONE"].includes(I) ? I : "CONTINUE JOB";
+          const { data: W, error: he } = await qe.from("site_assignments").insert({ plan_date: g, site_id: String(w.id), shift: D, job_status: L, pic: _["p.i.c."] || _["p.i.c"] || w.pic || null, remark: _["remark"] || null, notes: _["notes"] || null, is_confirmed: !1, google_event_id: v.id, google_event_updated_at: v.updated || new Date().toISOString() }).select("id").single();
+          if (he) throw new Error(he.message);
+          const body = { extendedProperties: { shared: { ...(x || {}), kgSource: "kg-operations-planner", kgAssignmentId: String(W.id), kgSiteId: String(w.id) } } };
+          await kgGoogleApi("PATCH", `/events/${encodeURIComponent(v.id)}`, body);
+          m += 1;
+        }
+        n && n({ updated: c, created: m, total: l.length });
+        return { updated: c, created: m, total: l.length };
+      }
       const hC = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       function dC() {
         const t = Jo(),
@@ -35478,7 +35686,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [f, c] = q.useState([]),
           [m, v] = q.useState(!0),
           [x, p] = q.useState(""),
-          [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 });
+          [kgSiteTypeFilter, kgSetSiteTypeFilter] = q.useState({ boss: !0, project: !0 }),
+          [kgGoogleClient, kgSetGoogleClient] = q.useState(kgGoogleClientId()),
+          [kgGoogleCal, kgSetGoogleCal] = q.useState(kgGoogleCalendarId()),
+          [kgGoogleBusy, kgSetGoogleBusy] = q.useState(!1),
+          [kgGoogleMessage, kgSetGoogleMessage] = q.useState("");
         async function g() {
           (v(!0), p(""));
           const { start: T, endExclusive: D } = lh(r),
@@ -35548,6 +35760,46 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           w = ri(0);
         function _(T) {
           (window.sessionStorage.setItem("kg_selected_date", T), t("/"));
+        }
+        function kgSaveGoogleSettings() {
+          kgGoogleSaveLocalSettings(kgGoogleClient, kgGoogleCal);
+          kgSetGoogleMessage("Google Calendar settings saved on this device. Put the same values in config.js to apply automatically for every user/device.");
+        }
+        async function kgConnectGoogleUi() {
+          try {
+            kgGoogleSaveLocalSettings(kgGoogleClient, kgGoogleCal);
+            await kgGoogleConnect();
+            kgSetGoogleMessage("Google Calendar connected for this browser session.");
+          } catch (T) { kgSetGoogleMessage(T.message || String(T)); }
+        }
+        async function kgSyncGoogleMonth() {
+          kgSetGoogleBusy(!0); kgSetGoogleMessage("Syncing selected month…"); p("");
+          try {
+            kgGoogleSaveLocalSettings(kgGoogleClient, kgGoogleCal);
+            await kgGoogleConnect();
+            const { start: T, endExclusive: D } = lh(r);
+            const I = await kgGooglePullToApp(T, D);
+            const { data: L, error: W } = await qe.from("site_assignments").select(_s).gte("plan_date", T).lt("plan_date", D).order("plan_date").limit(10000);
+            if (W) throw new Error(W.message);
+            await kgGooglePushAssignments(L || [], (he, J) => kgSetGoogleMessage(`Syncing selected month… ${he}/${J}`));
+            await g();
+            kgSetGoogleMessage(`2-way sync complete. Calendar changes applied: ${I.updated}; new KG calendar events imported: ${I.created}; app assignments backed up: ${(L || []).length}. No app records were deleted.`);
+          } catch (T) { p(T.message || String(T)); kgSetGoogleMessage("Sync stopped safely. Supabase data was not deleted."); }
+          kgSetGoogleBusy(!1);
+        }
+        async function kgBackupAllGoogle() {
+          if (!window.confirm("Backup ALL Planner assignments to the shared Google Calendar? Existing app records will not be deleted.")) return;
+          kgSetGoogleBusy(!0); kgSetGoogleMessage("Loading all Planner records…"); p("");
+          try {
+            kgGoogleSaveLocalSettings(kgGoogleClient, kgGoogleCal);
+            await kgGoogleConnect();
+            const { data: T, error: D } = await qe.from("site_assignments").select(_s).order("plan_date").limit(10000);
+            if (D) throw new Error(D.message);
+            await kgGooglePushAssignments(T || [], (I, L) => kgSetGoogleMessage(`Backing up Planner to Google Calendar… ${I}/${L}`));
+            await g();
+            kgSetGoogleMessage(`Backup complete: ${(T || []).length} Planner assignment(s) mirrored to the shared Google Calendar. Supabase remains the master copy.`);
+          } catch (T) { p(T.message || String(T)); kgSetGoogleMessage("Backup stopped safely. Supabase data was not deleted."); }
+          kgSetGoogleBusy(!1);
         }
         return d.jsxs("div", {
           className: "page calendar-page",
@@ -35623,6 +35875,27 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     " Project site",
                   ],
                 }),
+              ],
+            }),
+            d.jsxs("section", {
+              className: "panel google-calendar-sync-panel",
+              children: [
+                d.jsxs("div", { className: "panel-heading", children: [
+                  d.jsxs("div", { children: [d.jsx("h2", { children: "Shared Google Calendar Sync" }), d.jsx("span", { children: "Supabase stays the master database. Google Calendar is a shared planning mirror/backup; Calendar deletion never deletes app records." })] }),
+                  d.jsx("span", { className: `status ${kgGoogleHasToken() ? "active" : "pause"}`, children: kgGoogleHasToken() ? "Connected" : "Not connected" }),
+                ] }),
+                d.jsxs("div", { className: "google-sync-settings", children: [
+                  d.jsxs("label", { children: ["Google OAuth Client ID", d.jsx("input", { value: kgGoogleClient, onChange: (T) => kgSetGoogleClient(T.target.value), placeholder: "xxxxxxxx.apps.googleusercontent.com" })] }),
+                  d.jsxs("label", { children: ["Shared Calendar ID", d.jsx("input", { value: kgGoogleCal, onChange: (T) => kgSetGoogleCal(T.target.value), placeholder: "Shared calendar ID / email" })] }),
+                ] }),
+                d.jsxs("div", { className: "button-row", children: [
+                  d.jsx("button", { type: "button", className: "secondary-button", onClick: kgSaveGoogleSettings, disabled: kgGoogleBusy, children: "Save settings" }),
+                  d.jsx("button", { type: "button", className: "secondary-button", onClick: kgConnectGoogleUi, disabled: kgGoogleBusy, children: "Connect Google" }),
+                  d.jsx("button", { type: "button", className: "primary-button", onClick: kgSyncGoogleMonth, disabled: kgGoogleBusy, children: kgGoogleBusy ? "Working…" : "2-Way Sync This Month" }),
+                  d.jsx("button", { type: "button", className: "secondary-button", onClick: kgBackupAllGoogle, disabled: kgGoogleBusy, children: "Backup ALL Planner → Google" }),
+                ] }),
+                d.jsx("div", { className: "field-help", children: "Google → App safely syncs date, P.I.C., Shift, Job Status, Remark and Notes for KG events. Workers/foremen/lorries stay controlled in the app. To create a new app assignment from Google Calendar, create an all-day event named KG: EXACT SITE ADDRESS, then press 2-Way Sync." }),
+                kgGoogleMessage && d.jsx("div", { className: "important-box", children: kgGoogleMessage }),
               ],
             }),
             x && d.jsx("div", { className: "error-box", children: x }),
@@ -36693,6 +36966,8 @@ Worker : ${c}`;
         worker_ids: [],
         worker_ot: {},
         site_ot_time: "",
+        range_start: "",
+        range_end: "",
       };
       function kgPlannerCleanPic(t) {
         return String(t || "").trim();
@@ -36746,7 +37021,10 @@ Worker : ${c}`;
           kgAssignmentPicFilter = kgPlannerPicFilter,
           kgSetAssignmentPicFilter = kgSetPlannerPicFilter,
           [kgSiteHistory, kgSetSiteHistory] = q.useState([]),
-          [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1);
+          [kgSiteHistoryLoading, kgSetSiteHistoryLoading] = q.useState(!1),
+          [kgOffModal, kgSetOffModal] = q.useState(!1),
+          [kgOffForm, kgSetOffForm] = q.useState({ worker_id: "", start_date: n, end_date: n, reason: "OFF" }),
+          [kgOffSaving, kgSetOffSaving] = q.useState(!1);
         async function de() {
           const V = await sh();
           (V.error && j(V.error.message), g(V.data));
@@ -36786,6 +37064,9 @@ Worker : ${c}`;
         }, []),
           q.useEffect(() => {
             oe();
+          }, [n]),
+          q.useEffect(() => {
+            kgSetOffForm((V) => ({ ...V, start_date: n, end_date: n }));
           }, [n]),
           q.useEffect(() => {
             let V = !1;
@@ -36844,7 +37125,7 @@ Worker : ${c}`;
           ]),
           kgActiveSitePicOptions = kgPlannerPicOptions,
           je = kgActiveSiteBase.filter((V) => kgPlannerPicMatch(kgPlannerSitePic(V), kgPlannerPicFilter)),
-          re = p.workers.filter((V) => !kgAllAssignedWorkers.has(Number(V.id))),
+          re = p.workers.filter((V) => !kgAllAssignedWorkers.has(Number(V.id)) && !kgWorkerOffOnDate(V, n)),
           kgSkilledWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "skilled"),
           kgGeneralWorkersWithoutSite = re.filter((V) => kgWorkerType(V) === "general"),
           X = p.foremen.filter((V) => !kgAllAssignedForemen.has(Number(V.id))),
@@ -36910,12 +37191,13 @@ Worker : ${c}`;
         const kgSelectedSiteSicRestricted = kgSiteSicRestricted(kgSelectedSite),
           kgSelectedSiteSicApproved = new Set(kgSiteSicWorkerIds(kgSelectedSite)),
           kgSelectedWorkerIds = new Set((w.worker_ids || []).map((V) => String(V))),
-          kgPlannerWorkerPool = p.workers.filter(
-            (V) =>
-              !kgSelectedSiteSicRestricted ||
-              kgSelectedSiteSicApproved.has(String(V.id)) ||
-              kgSelectedWorkerIds.has(String(V.id)),
-          );
+          kgPlannerWorkerPool = p.workers.filter((V) => {
+            const xe = kgWorkerOffOnDate(V, n);
+            const ke = !kgSelectedSiteSicRestricted || kgSelectedSiteSicApproved.has(String(V.id)) || kgSelectedWorkerIds.has(String(V.id));
+            const Le = !xe || kgSelectedWorkerIds.has(String(V.id));
+            return ke && Le;
+          }),
+          kgWorkersOffToday = p.workers.filter((V) => !!kgWorkerOffOnDate(V, n));
         function He(V) {
           (he(V), window.setTimeout(() => he(""), 2400));
         }
@@ -36930,7 +37212,7 @@ Worker : ${c}`;
         function P(V = "") {
           const xe = V ? p.sites.find((ke) => Number(ke.id) === Number(V)) : null;
           kgWarnPauseSite(xe);
-          (E("new"), _({ ...Bo, site_id: V ? String(V) : "", pic: xe && xe.pic ? xe.pic : "" }));
+          (E("new"), _({ ...Bo, site_id: V ? String(V) : "", pic: xe && xe.pic ? xe.pic : "", range_start: n, range_end: n }));
         }
         function N(V) {
           var xe;
@@ -36952,6 +37234,8 @@ Worker : ${c}`;
               worker_ids: Le,
               worker_ot: Qe,
               site_ot_time: kgCommonWorkerOtTime(Qe, Le),
+              range_start: n,
+              range_end: n,
             }));
         }
         function z(V) {
@@ -37057,11 +37341,12 @@ Worker : ${c}`;
             ke = w.worker_ids.includes(Number(V.id)),
             Le = ((w.worker_ot || {})[String(V.id)] || "").trim(),
             Qe = kgFormatOtHours(kgOtHoursFromEndTime(Le)),
-            Ve = kgWorkerAllowedForSite(V.id, kgSelectedSite);
+            Ve = kgWorkerAllowedForSite(V.id, kgSelectedSite),
+            kgOff = kgWorkerOffOnDate(V, n);
           return d.jsxs(
             "label",
             {
-              className: `check-card ${xe.length ? "duplicate-worker" : ""} ${!Ve ? "sic-worker-blocked" : ""}`,
+              className: `check-card ${xe.length ? "duplicate-worker" : ""} ${!Ve ? "sic-worker-blocked" : ""} ${kgOff ? "worker-off-card" : ""}`,
               children: [
                 d.jsx("input", {
                   type: "checkbox",
@@ -37076,6 +37361,11 @@ Worker : ${c}`;
                       d.jsx("small", {
                         className: "sic-worker-warning-text",
                         children: "Previously assigned — not currently SIC approved",
+                      }),
+                    kgOff &&
+                      d.jsx("small", {
+                        className: "worker-off-warning-text",
+                        children: `OFF ${kgOff.start_date} → ${kgOff.end_date}${kgOff.reason ? ` · ${kgOff.reason}` : ""}`,
                       }),
                     xe.length > 0 &&
                       d.jsxs("small", {
@@ -37128,8 +37418,126 @@ Worker : ${c}`;
             V.id,
           );
         }
+        async function kgSaveWorkerOff(V) {
+          V.preventDefault();
+          const xe = Number(kgOffForm.worker_id), ke = p.workers.find((Le) => Number(Le.id) === xe);
+          if (!ke) return j("Choose a worker first.");
+          if (!kgOffForm.start_date || !kgOffForm.end_date || kgOffForm.end_date < kgOffForm.start_date)
+            return j("Worker off End date must be the same as or after Start date.");
+          kgSetOffSaving(!0);
+          const Le = kgWorkerOffPeriods(ke), Qe = {
+            id: `off-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            start_date: kgOffForm.start_date,
+            end_date: kgOffForm.end_date,
+            reason: String(kgOffForm.reason || "OFF").trim() || "OFF",
+          };
+          const { error: Ve } = await qe.from("workers").update({ off_periods: [...Le, Qe] }).eq("id", xe);
+          kgSetOffSaving(!1);
+          if (Ve) return j(/off_periods|schema cache|column/i.test(String(Ve.message || Ve.details || ""))
+            ? "Worker Off database field is not ready. Run the v52 SAFE SQL first."
+            : Ve.message);
+          await de();
+          kgSetOffForm({ worker_id: "", start_date: n, end_date: n, reason: "OFF" });
+          He(`${kgNameNick(ke)} marked OFF from ${Qe.start_date} to ${Qe.end_date}.`);
+        }
+        async function kgDeleteWorkerOff(V, xe) {
+          const ke = p.workers.find((Le) => Number(Le.id) === Number(V));
+          if (!ke || !window.confirm(`Remove this OFF period for ${kgNameNick(ke)}?`)) return;
+          const Le = kgWorkerOffPeriods(ke).filter((Qe) => String(Qe.id) !== String(xe));
+          const { error: Qe } = await qe.from("workers").update({ off_periods: Le }).eq("id", V);
+          if (Qe) return j(Qe.message);
+          await de();
+          He("Worker OFF period removed.");
+        }
+        async function kgInsertAssignmentCopy(V, xe, ke, Le, Qe) {
+          const { data: Ve, error: Re } = await qe.from("site_assignments").insert(V).select("id").single();
+          if (Re) throw new Error(Re.message);
+          const At = Ve.id;
+          if (xe.length) {
+            const { error: Tt } = await qe.from("assignment_lorries").insert(xe.map((Dt, It) => ({ assignment_id: At, lorry_id: Number(Dt), sort_order: It })));
+            if (Tt) throw new Error(Tt.message);
+          }
+          if (ke.length) {
+            const { error: Tt } = await qe.from("assignment_foremen").insert(ke.map((Dt, It) => ({ assignment_id: At, foreman_id: Number(Dt), sort_order: It })));
+            if (Tt) throw new Error(Tt.message);
+          }
+          if (Le.length) {
+            const Dt = Le.map((It, qt) => {
+              const Vt = String((Qe || {})[String(It)] || "").trim(), Xt = { assignment_id: At, worker_id: Number(It), sort_order: qt };
+              return Vt ? { ...Xt, ot_end_time: Vt, ot_hours: kgOtHoursFromEndTime(Vt) } : Xt;
+            });
+            let { error: Tt } = await qe.from("assignment_workers").insert(Dt);
+            if (Tt && /ot_end_time|ot_hours|schema cache|column/i.test(String(Tt.message || Tt.details || ""))) {
+              const It = Dt.map(({ ot_end_time: qt, ot_hours: Vt, ...Xt }) => Xt);
+              ({ error: Tt } = await qe.from("assignment_workers").insert(It));
+            }
+            if (Tt) throw new Error(Tt.message);
+          }
+          return At;
+        }
+        async function kgSaveAssignmentRange() {
+          const V = w.range_start || n, xe = w.range_end || V, ke = kgDateRange(V, xe);
+          if (!ke.length) return j("Choose a valid From / To date range.");
+          if (ke.length > 120 && !window.confirm(`This will create ${ke.length} daily assignments. Continue?`)) return;
+          const { data: Le, error: Qe } = await qe.from("site_assignments").select("id,plan_date,shift,site_id").eq("site_id", Number(w.site_id)).gte("plan_date", V).lte("plan_date", xe);
+          if (Qe) return j(Qe.message);
+          const Ve = new Set((Le || []).map((Re) => `${Re.plan_date}|${Re.shift || "day"}`));
+          const Re = (w.lorry_ids || []).map(Number).filter(Boolean), At = (w.foreman_ids || []).map(Number).filter(Boolean);
+          let Tt = 0, Dt = 0;
+          try {
+            for (const It of ke) {
+              const qt = `${It}|${w.shift || "day"}`;
+              if (Ve.has(qt)) { Dt += 1; continue; }
+              const Vt = p.workers.filter((Xt) => (w.worker_ids || []).includes(Number(Xt.id)) && !kgWorkerOffOnDate(Xt, It) && kgWorkerAllowedForSite(Xt.id, kgSelectedSite)).map((Xt) => Number(Xt.id));
+              const Xt = { plan_date: It, site_id: Number(w.site_id), lorry_id: Re.length ? Re[0] : null, foreman_id: At.length ? At[0] : null, shift: w.shift, job_status: w.job_status || "CONTINUE JOB", pic: w.pic || null, is_confirmed: !!w.is_confirmed, remark: w.remark || null, notes: w.notes || null };
+              await kgInsertAssignmentCopy(Xt, Re, At, Vt, w.worker_ot || {});
+              Tt += 1;
+            }
+          } catch (It) { return j(`Range save stopped: ${It.message || It}. ${Tt} day(s) were already saved and were not removed.`); }
+          E(null); _(Bo); await oe();
+          He(`Date range saved: ${Tt} day(s) added${Dt ? `, ${Dt} existing day(s) skipped` : ""}.`);
+        }
+        async function kgCopyYesterday() {
+          const V = wr(n, -1);
+          if (!window.confirm(`Copy all Planner work from ${D0(V)} to ${D0(n)}?\n\nExisting site + shift records today will be kept and skipped. Worker OFF and SIC restrictions for today will be respected.`)) return;
+          j("");
+          const [xe, ke] = await Promise.all([
+            qe.from("site_assignments").select(_s).eq("plan_date", V).order("sort_order").order("shift"),
+            qe.from("plan_sections").select("*").eq("plan_date", V).order("sort_order"),
+          ]);
+          if (xe.error || ke.error) return j((xe.error || ke.error).message);
+          if (!(xe.data || []).length && !(ke.data || []).length) return He("Yesterday has no Planner work to copy.");
+          const Le = new Set((s || []).map((Re) => `${Number((Re.site || {}).id)}|${Re.shift || "day"}`));
+          let Qe = 0, Ve = 0, Re = 0;
+          try {
+            for (const At of xe.data || []) {
+              const Tt = `${Number((At.site || {}).id)}|${At.shift || "day"}`;
+              if (Le.has(Tt)) { Ve += 1; continue; }
+              const Dt = kgAssignmentLorries(At).map((qt) => Number(qt.id)).filter(Boolean), It = ar(At).map((qt) => Number(qt.id)).filter(Boolean), qt = {};
+              const Vt = (At.assignment_workers || []).map((Zt) => {
+                const er = Zt.worker || p.workers.find((tr) => Number(tr.id) === Number(Zt.worker_id));
+                if (!er || kgWorkerOffOnDate(er, n) || !kgWorkerAllowedForSite(er.id, At.site)) { Re += 1; return null; }
+                if (Zt.ot_end_time) qt[String(Zt.worker_id)] = Zt.ot_end_time;
+                return Number(Zt.worker_id);
+              }).filter(Boolean);
+              const Xt = { plan_date: n, site_id: Number((At.site || {}).id), lorry_id: Dt.length ? Dt[0] : null, foreman_id: It.length ? It[0] : null, shift: At.shift || "day", job_status: At.job_status || "CONTINUE JOB", pic: At.pic || null, is_confirmed: !!At.is_confirmed, remark: At.remark || null, notes: At.notes || null };
+              await kgInsertAssignmentCopy(Xt, Dt, It, Vt, qt);
+              Le.add(Tt); Qe += 1;
+            }
+            const existingSections = new Set((c || []).map((At) => `${At.title || ""}|${At.body || ""}`));
+            for (const At of ke.data || []) {
+              const Tt = `${At.title || ""}|${At.body || ""}`;
+              if (existingSections.has(Tt)) continue;
+              const { error: Dt } = await qe.from("plan_sections").insert({ plan_date: n, title: At.title, body: At.body, sort_order: At.sort_order || 0 });
+              if (Dt) throw new Error(Dt.message);
+            }
+          } catch (At) { return j(`Copy Yesterday stopped: ${At.message || At}. Existing data was not deleted.`); }
+          await oe();
+          He(`Copied ${Qe} site assignment${Qe === 1 ? "" : "s"}${Ve ? `; ${Ve} existing skipped` : ""}${Re ? `; ${Re} unavailable/SIC worker${Re === 1 ? "" : "s"} skipped` : ""}.`);
+        }
         async function se(V) {
           (V.preventDefault(), j(""));
+          if (S === "new" && (w.range_start || n) !== (w.range_end || w.range_start || n)) return kgSaveAssignmentRange();
           const xe = U();
           if (
             xe.length &&
@@ -37142,6 +37550,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           )
             return;
           const kgSelectedLorries = (w.lorry_ids || []).map((Qe) => Number(Qe)).filter(Boolean);
+          if (S === "new") {
+            const kgAvailableWorkerIds = (w.worker_ids || []).filter((Qe) => {
+              const Ve = p.workers.find((Re) => Number(Re.id) === Number(Qe));
+              return Ve && !kgWorkerOffOnDate(Ve, n) && kgWorkerAllowedForSite(Ve.id, kgSelectedSite);
+            });
+            if (kgAvailableWorkerIds.length !== (w.worker_ids || []).length) {
+              _((Qe) => ({ ...Qe, worker_ids: kgAvailableWorkerIds }));
+              He("Unavailable worker was skipped. Please press Save assignment again.");
+              return;
+            }
+          }
           const ke = {
             plan_date: n,
             site_id: Number(w.site_id),
@@ -37770,10 +38189,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             children: ["P.I.C.: ", d.jsx("strong", { children: kgPlannerPicFilter })],
                           }),
                         r &&
-                          d.jsxs("button", {
-                            className: "primary-button",
-                            onClick: () => P(),
-                            children: [d.jsx(ti, { size: 17 }), "Add site"],
+                          d.jsxs("div", {
+                            className: "button-row",
+                            children: [
+                              d.jsx("button", { type: "button", className: "secondary-button", onClick: kgCopyYesterday, children: "Copy Previous Day → Selected Day" }),
+                              d.jsxs("button", { type: "button", className: "secondary-button", onClick: () => kgSetOffModal(!0), children: [d.jsx(Rs, { size: 16 }), ` Worker Off${kgWorkersOffToday.length ? ` (${kgWorkersOffToday.length})` : ""}`] }),
+                              d.jsxs("button", { className: "primary-button", onClick: () => P(), children: [d.jsx(ti, { size: 17 }), "Add site"] }),
+                            ],
                           }),
                       ],
                     }),
@@ -38114,6 +38536,18 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 }),
                         ],
                       }),
+                    S === "new" &&
+                      d.jsxs("div", {
+                        className: "wide planner-range-box",
+                        children: [
+                          d.jsx("strong", { children: "Chain of dates / repeat this work" }),
+                          d.jsx("span", { className: "field-help", children: "Choose From and To. The same site, workers, foremen, lorries, notes and OT will be added to every day. Existing same site + shift dates are skipped, never wiped." }),
+                          d.jsxs("div", { className: "planner-range-grid", children: [
+                            d.jsxs("label", { children: ["From", d.jsx("input", { type: "date", value: w.range_start || n, onChange: (V) => _({ ...w, range_start: V.target.value, range_end: (w.range_end || n) < V.target.value ? V.target.value : (w.range_end || n) }) })] }),
+                            d.jsxs("label", { children: ["To", d.jsx("input", { type: "date", min: w.range_start || n, value: w.range_end || n, onChange: (V) => _({ ...w, range_end: V.target.value }) })] }),
+                          ] }),
+                        ],
+                      }),
                     d.jsxs("label", {
                       children: [
                         "Shift",
@@ -38439,6 +38873,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     }),
                   ],
                 }),
+              }),
+            kgOffModal &&
+              d.jsx(hl, {
+                title: "Worker Off / Leave date range",
+                onClose: () => kgSetOffModal(!1),
+                children: d.jsxs("div", { className: "worker-off-modal", children: [
+                  d.jsx("div", { className: "important-box", children: "Workers marked OFF are hidden from new Planner assignments during that date range. Old history is never removed." }),
+                  d.jsxs("form", { className: "form-grid", onSubmit: kgSaveWorkerOff, children: [
+                    d.jsxs("label", { className: "wide", children: ["Worker", d.jsxs("select", { value: kgOffForm.worker_id, onChange: (V) => kgSetOffForm({ ...kgOffForm, worker_id: V.target.value }), required: !0, children: [d.jsx("option", { value: "", children: "Choose worker" }), ...p.workers.map((V) => d.jsx("option", { value: V.id, children: kgNameNick(V) }, V.id))] })] }),
+                    d.jsxs("label", { children: ["Off from", d.jsx("input", { type: "date", value: kgOffForm.start_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, start_date: V.target.value, end_date: kgOffForm.end_date < V.target.value ? V.target.value : kgOffForm.end_date }), required: !0 })] }),
+                    d.jsxs("label", { children: ["Off until", d.jsx("input", { type: "date", min: kgOffForm.start_date, value: kgOffForm.end_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, end_date: V.target.value }), required: !0 })] }),
+                    d.jsxs("label", { className: "wide", children: ["Reason", d.jsx("input", { value: kgOffForm.reason, onChange: (V) => kgSetOffForm({ ...kgOffForm, reason: V.target.value }), placeholder: "OFF / Leave / Home leave / MC" })] }),
+                    d.jsx("div", { className: "form-actions wide", children: d.jsx("button", { className: "primary-button", disabled: kgOffSaving, children: kgOffSaving ? "Saving…" : "Save worker off period" }) }),
+                  ] }),
+                  d.jsx("div", { className: "worker-off-list", children: p.workers.flatMap((V) => kgWorkerOffPeriods(V).map((xe) => ({ worker: V, off: xe }))).filter((V) => V.off.end_date >= wr(n, -30)).sort((V, xe) => V.off.start_date.localeCompare(xe.off.start_date)).map((V) => d.jsxs("div", { className: `worker-off-row ${V.off.start_date <= n && V.off.end_date >= n ? "active" : ""}`, children: [d.jsxs("div", { children: [d.jsx("strong", { children: kgNameNick(V.worker) }), d.jsxs("span", { children: [V.off.start_date, " → ", V.off.end_date, " · ", V.off.reason || "OFF"] })] }), d.jsx("button", { type: "button", className: "secondary-button small-button danger-text", onClick: () => kgDeleteWorkerOff(V.worker.id, V.off.id), children: "Remove" })] }, `${V.worker.id}-${V.off.id}`)) }),
+                ] }),
               }),
             T &&
               d.jsx(hl, {
@@ -40346,6 +40796,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               : "Project foreman"
             : j.key === "worker_type"
               ? kgWorkerTypeText(J)
+            : j.key === "off_periods"
+              ? (kgWorkerOffPeriods(J).length ? kgWorkerOffPeriods(J).map((fe) => `${fe.start_date}→${fe.end_date}`).join(", ") : "Available")
             : j.key === "site_type"
               ? kgSiteTypeText(J)
               : j.key === "sic_restricted"
@@ -41404,6 +41856,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "phone", label: "Phone" },
             { key: "pass", label: "Pass" },
             { key: "license", label: "License" },
+            { key: "off_periods", label: "Off / Leave" },
           ],
           fields: [
             { name: "sort_order", label: "Manual No.", type: "number", min: "0", step: "1" },
@@ -44740,6 +45193,35 @@ Press OK to assign them to both sites, or Cancel to go back.`)
       }
 
       .delivery-items-table, .items-editor, .items-editor-heading, .order-total-bar { display: none !important; }
+
+      .planner-range-box {
+        border: 2px solid #0f766e;
+        background: #f0fdfa;
+        border-radius: 14px;
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+      }
+      .planner-range-box > strong { color: #115e59; font-size: 15px; }
+      .planner-range-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .planner-range-grid label { display: grid; gap: 5px; font-weight: 800; }
+      .worker-off-card { border-color: #f59e0b !important; background: #fffbeb !important; }
+      .worker-off-warning-text { display: block; color: #b45309; font-weight: 900; }
+      .worker-off-modal { display: grid; gap: 14px; }
+      .worker-off-list { display: grid; gap: 8px; max-height: 360px; overflow: auto; }
+      .worker-off-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 9px 10px; }
+      .worker-off-row.active { border-color: #f59e0b; background: #fffbeb; }
+      .worker-off-row > div { display: grid; gap: 2px; }
+      .worker-off-row span { color: #64748b; font-size: 12px; }
+      .google-calendar-sync-panel { display: grid; gap: 12px; margin-bottom: 16px; }
+      .google-sync-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .google-sync-settings label { display: grid; gap: 5px; font-weight: 800; }
+      .google-sync-settings input { width: 100%; min-width: 0; }
+      @media (max-width: 720px) {
+        .planner-range-grid, .google-sync-settings { grid-template-columns: 1fr; }
+        .worker-off-row { align-items: stretch; flex-direction: column; }
+        .worker-off-row button { width: 100%; }
+      }
 </style>
   </head>
   <body>
