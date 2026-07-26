@@ -16537,9 +16537,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const _s = `
   id, plan_date, shift, notes, remark, sort_order, job_status, pic, is_confirmed, lorry_id, google_event_id, google_event_updated_at,
   site:sites(id,address,status,foreman_detail,pic,foreman_in_charge,notes,remark,id_name_tel,lock_info,site_info,is_boss_site,is_project_site,sic_restricted,sic_worker_ids,sic_foreman_restricted,sic_foreman_ids,sic_lorry_restricted,sic_lorry_ids,sic_driver_restricted,sic_driver_names),
-  assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name,driver_full_name)),
+  assignment_lorries(lorry_id, sort_order, lorry:lorries!assignment_lorries_lorry_id_fkey(id,registration_no,driver_name,driver_full_name,driver_base_location)),
   assignment_foremen(foreman_id, sort_order, foreman:foremen(id,name,nickname,status,foreman_type)),
-  assignment_workers(*, worker:workers(id,name,nickname,status,worker_type))
+  assignment_workers(*, worker:workers(id,name,nickname,status,worker_type,base_location))
 `,
         w0 = `
   id, delivery_date, delivery_driver, order_type, billing_date, billing_no, billing_status, billing_remark, sent_on, notes, remark, created_at, updated_at,
@@ -36026,6 +36026,37 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           .replace(/\s{2,}/g, " ")
           .trim();
       const kgCopyPersonName = (t) => kgRemoveCopySl(kgNameNick(t));
+      function kgBaseLocationCode(t) {
+        const r = String(t || "").trim().toLowerCase();
+        return r === "mandai" || r === "m" ? "M" : r === "tuas" || r === "t" ? "T" : "";
+      }
+      function kgPlannerWorkerName(t) {
+        const r = kgNameNick(t), n = kgBaseLocationCode(t == null ? void 0 : t.base_location);
+        return n ? `${r} (${n})` : r;
+      }
+      function kgPlannerDriverLabel(t) {
+        const r = kgDriverLabel(t), n = kgBaseLocationCode(t == null ? void 0 : t.driver_base_location);
+        return n ? `${r} (${n})` : r;
+      }
+      function kgPlannerWorkerNames(t) {
+        return (t.assignment_workers || []).map((r) => kgPlannerWorkerName(r.worker)).filter(Boolean).join(" + ");
+      }
+      function kgPlannerWorkerNamesForAssignment(t, r) {
+        return (t.assignment_workers || [])
+          .map((n) => {
+            const l = n.worker || {}, s = kgPlannerWorkerName(l);
+            return s ? `${s}${kgRankSuffix("worker", n.worker_id || l.id, t.id, r)}` : "";
+          })
+          .filter(Boolean);
+      }
+      function kgPlannerLorryList(t) {
+        const r = kgAssignmentLorries(t).map((n) => {
+          if (!n) return "";
+          const l = Ca(n.registration_no, ""), s = kgPlannerDriverLabel(n);
+          return `${l} @${s}`;
+        }).filter(Boolean);
+        return r.length ? r.join(" + ") : "No lorry";
+      }
       const kgCleanCopyText = (t) =>
         String(t || "")
           .split("\n")
@@ -37397,7 +37428,7 @@ Worker : ${c}`;
                 }),
                 d.jsxs("span", {
                   children: [
-                    kgNameNick(V),
+                    kgPlannerWorkerName(V),
                     d.jsxs("small", { children: [" ", kgWorkerTypeText(V)] }),
                     !Ve &&
                       d.jsx("small", {
@@ -37616,7 +37647,18 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             if (kgAvailableWorkerIds.length !== (w.worker_ids || []).length || kgAvailableForemanIds.length !== (w.foreman_ids || []).length || kgAvailableLorryIds.length !== kgSelectedLorries.length) {
               kgSelectedLorries = kgAvailableLorryIds;
               _((Qe) => ({ ...Qe, worker_ids: kgAvailableWorkerIds, foreman_ids: kgAvailableForemanIds, lorry_ids: kgAvailableLorryIds, lorry_id: kgAvailableLorryIds.length ? String(kgAvailableLorryIds[0]) : "" }));
-              He("OFF or non-SIC worker / foreman / lorry / driver was skipped. Please check and press Save assignment again.");
+              He("SIC/OFF check failed. Lorry AND driver must both match this site. Any non-approved worker, foreman, lorry or driver was removed. Please check and Save again.");
+              return;
+            }
+          } else {
+            const kgAvailableLorryIds = kgSelectedLorries.filter((Qe) => {
+              const Ve = p.lorries.find((Re) => Number(Re.id) === Number(Qe));
+              return Ve && kgLorryAllowedForSite(Ve, kgSelectedSite);
+            });
+            if (kgAvailableLorryIds.length !== kgSelectedLorries.length) {
+              kgSelectedLorries = kgAvailableLorryIds;
+              _((Qe) => ({ ...Qe, lorry_ids: kgAvailableLorryIds, lorry_id: kgAvailableLorryIds.length ? String(kgAvailableLorryIds[0]) : "" }));
+              He("Cannot save this lorry/driver combination. BOTH the lorry AND driver must have SIC approval for this site. The mismatched lorry was removed; please check and Save again.");
               return;
             }
           }
@@ -37968,7 +38010,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 "span",
                                 {
                                   className: "warning-chip",
-                                  children: kgNameNick(V),
+                                  children: kgPlannerWorkerName(V),
                                 },
                                 V.id,
                               ),
@@ -38012,7 +38054,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                 "span",
                                 {
                                   className: "warning-chip",
-                                  children: kgNameNick(V),
+                                  children: kgPlannerWorkerName(V),
                                 },
                                 V.id,
                               ),
@@ -38266,7 +38308,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             })
                           : kgRows.map((V) => {
                               var Qe, Ve;
-                              const xe = kgWorkerNamesForAssignment(V, kgRankMap),
+                              const xe = kgPlannerWorkerNamesForAssignment(V, kgRankMap),
                                 ke = kgForemanNamesForAssignment(V, kgRankMap),
                                 Le = Te.has(
                                   Number(
@@ -38322,7 +38364,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                             d.jsxs("span", {
                                               children: [
                                                 d.jsx(b0, { size: 15 }),
-                                                kgLorryCopyList(V),
+                                                kgPlannerLorryList(V),
                                               ],
                                             }),
                                             d.jsxs("span", { children: ["Status: ", V.job_status || "CONTINUE JOB"] }),
@@ -38573,7 +38615,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                         children: [
                                           d.jsx("b", { children: kgHistoryDate(V.plan_date) }),
                                           d.jsxs("span", { children: ["Foreman: ", kgForemanNames(V) || "-"] }),
-                                          d.jsxs("span", { children: ["Worker: ", kgWorkerNames(V) || "-"] }),
+                                          d.jsxs("span", { children: ["Worker: ", kgPlannerWorkerNames(V) || "-"] }),
                                           d.jsxs("span", { children: ["P.I.C.: ", V.pic || kgSitePicText(V.site)] }),
                                           d.jsx("button", {
                                             type: "button",
@@ -38650,7 +38692,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         "Lorries ",
                         d.jsx("span", {
                           className: "field-help",
-                          children: kgSiteSicLorryRestricted(kgSelectedSite) || kgSiteSicDriverRestricted(kgSelectedSite) ? "Only SIC-approved lorry + driver combinations are shown. You can tick more than one." : "Can tick more than one lorry for the same site.",
+                          children: kgSiteSicLorryRestricted(kgSelectedSite) || kgSiteSicDriverRestricted(kgSelectedSite) ? "STRICT SIC: BOTH lorry AND driver must be approved. If either one does not match, that lorry cannot go to this site." : "Can tick more than one lorry for the same site.",
                         }),
                         d.jsx("div", {
                           className: "check-grid",
@@ -38665,7 +38707,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     checked: (w.lorry_ids || []).includes(Number(V.id)),
                                     onChange: () => kgToggleLorry(V.id),
                                   }),
-                                  d.jsx("span", { children: `${V.registration_no} @ ${kgDriverLabel(V)}` }),
+                                  d.jsx("span", { children: `${V.registration_no} @ ${kgPlannerDriverLabel(V)}` }),
                                 ],
                               },
                               V.id,
@@ -38937,7 +38979,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   d.jsx("div", { className: "important-box", children: "Mark a worker or foreman OFF for a date range, or choose No end date for long-term off. They are hidden from new Planner assignments while OFF. Old history is never removed." }),
                   d.jsxs("form", { className: "form-grid", onSubmit: kgSaveWorkerOff, children: [
                     d.jsxs("label", { children: ["Type", d.jsxs("select", { value: kgOffForm.person_type, onChange: (V) => kgSetOffForm({ ...kgOffForm, person_type: V.target.value, person_id: "" }), children: [d.jsx("option", { value: "worker", children: "Worker" }), d.jsx("option", { value: "foreman", children: "Foreman" })] })] }),
-                    d.jsxs("label", { children: [kgOffForm.person_type === "foreman" ? "Foreman" : "Worker", d.jsxs("select", { value: kgOffForm.person_id, onChange: (V) => kgSetOffForm({ ...kgOffForm, person_id: V.target.value }), required: !0, children: [d.jsx("option", { value: "", children: kgOffForm.person_type === "foreman" ? "Choose foreman" : "Choose worker" }), ...(kgOffForm.person_type === "foreman" ? p.foremen : p.workers).map((V) => d.jsx("option", { value: V.id, children: kgNameNick(V) }, V.id))] })] }),
+                    d.jsxs("label", { children: [kgOffForm.person_type === "foreman" ? "Foreman" : "Worker", d.jsxs("select", { value: kgOffForm.person_id, onChange: (V) => kgSetOffForm({ ...kgOffForm, person_id: V.target.value }), required: !0, children: [d.jsx("option", { value: "", children: kgOffForm.person_type === "foreman" ? "Choose foreman" : "Choose worker" }), ...(kgOffForm.person_type === "foreman" ? p.foremen : p.workers).map((V) => d.jsx("option", { value: V.id, children: kgOffForm.person_type === "foreman" ? kgNameNick(V) : kgPlannerWorkerName(V) }, V.id))] })] }),
                     d.jsxs("label", { children: ["Off from", d.jsx("input", { type: "date", value: kgOffForm.start_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, start_date: V.target.value, end_date: !kgOffForm.no_end_date && kgOffForm.end_date < V.target.value ? V.target.value : kgOffForm.end_date }), required: !0 })] }),
                     d.jsxs("label", { children: ["Off until", d.jsx("input", { type: "date", min: kgOffForm.start_date, value: kgOffForm.end_date, disabled: !!kgOffForm.no_end_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, end_date: V.target.value }) })] }),
                     d.jsxs("label", { className: "wide confirm-check", children: ["Long-term off", d.jsxs("span", { className: "inline-check", children: [d.jsx("input", { type: "checkbox", checked: !!kgOffForm.no_end_date, onChange: (V) => kgSetOffForm({ ...kgOffForm, no_end_date: V.target.checked, end_date: V.target.checked ? "" : (kgOffForm.end_date || kgOffForm.start_date || n) }) }), " No end date — stays OFF until I remove it"] })] }),
@@ -38947,7 +38989,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                   d.jsx("div", { className: "worker-off-list", children: [
                     ...p.workers.flatMap((V) => kgOffPeriods(V).map((xe) => ({ type: "worker", person: V, off: xe }))),
                     ...p.foremen.flatMap((V) => kgOffPeriods(V).map((xe) => ({ type: "foreman", person: V, off: xe }))),
-                  ].filter((V) => V.off.open_ended || !V.off.end_date || V.off.end_date >= wr(n, -30)).sort((V, xe) => V.off.start_date.localeCompare(xe.off.start_date)).map((V) => d.jsxs("div", { className: `worker-off-row ${V.off.start_date <= n && (V.off.open_ended || !V.off.end_date || V.off.end_date >= n) ? "active" : ""}`, children: [d.jsxs("div", { children: [d.jsxs("strong", { children: [kgNameNick(V.person), " · ", V.type === "foreman" ? "Foreman" : "Worker"] }), d.jsxs("span", { children: [V.off.start_date, " → ", kgOffEndText(V.off), " · ", V.off.reason || "OFF"] })] }), d.jsx("button", { type: "button", className: "secondary-button small-button danger-text", onClick: () => kgDeleteWorkerOff(V.type, V.person.id, V.off.id), children: "Remove" })] }, `${V.type}-${V.person.id}-${V.off.id}`)) }),
+                  ].filter((V) => V.off.open_ended || !V.off.end_date || V.off.end_date >= wr(n, -30)).sort((V, xe) => V.off.start_date.localeCompare(xe.off.start_date)).map((V) => d.jsxs("div", { className: `worker-off-row ${V.off.start_date <= n && (V.off.open_ended || !V.off.end_date || V.off.end_date >= n) ? "active" : ""}`, children: [d.jsxs("div", { children: [d.jsxs("strong", { children: [V.type === "foreman" ? kgNameNick(V.person) : kgPlannerWorkerName(V.person), " · ", V.type === "foreman" ? "Foreman" : "Worker"] }), d.jsxs("span", { children: [V.off.start_date, " → ", kgOffEndText(V.off), " · ", V.off.reason || "OFF"] })] }), d.jsx("button", { type: "button", className: "secondary-button small-button danger-text", onClick: () => kgDeleteWorkerOff(V.type, V.person.id, V.off.id), children: "Remove" })] }, `${V.type}-${V.person.id}-${V.off.id}`)) }),
                 ] }),
               }),
             T &&
@@ -41317,7 +41359,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     r.table === "sites" &&
                       d.jsxs("div", { className: "wide sic-site-box", children: [
                         d.jsx("strong", { children: "SIC access — Drivers" }),
-                        d.jsx("span", { className: "field-help", children: "Default is all drivers. Driver SIC is checked together with the selected lorry." }),
+                        d.jsx("span", { className: "field-help", children: "Default is all drivers. STRICT rule: the selected lorry AND its driver must both pass SIC. One mismatch = cannot go." }),
                         d.jsxs("label", { children: ["Which drivers can enter?", d.jsxs("select", { value: p.sic_driver_restricted ? "selected" : "all", onChange: (J) => g({ ...p, sic_driver_restricted: J.target.value === "selected", sic_driver_names: J.target.value === "selected" ? kgSiteSicDriverNames(p) : [] }), children: [
                           d.jsx("option", { value: "all", children: "All drivers allowed (default)" }),
                           d.jsx("option", { value: "selected", children: "Only selected SIC drivers allowed" }),
@@ -41993,13 +42035,14 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Add manual No., choose Skilled or General worker, nickname, pass and license details. Lists are arranged by manual No., then nickname.",
+            "Maintain workers available for deployment. Choose worker address/base as Mandai or Tuas. Planner shows (M)/(T) beside nickname; WhatsApp and Excel names stay clean.",
           searchPlaceholder:
             "Search name, nickname, phone, pass, license, skilled or general — type pass or license to show only those records…",
           columns: [
             { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
             { key: "name", label: "Name" },
+            { key: "base_location", label: "Address / Base" },
             { key: "worker_type", label: "Worker type" },
             { key: "phone", label: "Phone" },
             { key: "pass", label: "Pass" },
@@ -42010,6 +42053,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "sort_order", label: "Manual No.", type: "number", min: "0", step: "1" },
             { name: "nickname", label: "Nickname / short name" },
             { name: "name", label: "Worker full name", required: !0 },
+            {
+              name: "base_location",
+              label: "Worker address / base",
+              type: "select",
+              required: !0,
+              options: [
+                ["", "Choose Mandai or Tuas"],
+                ["mandai", "Mandai (M)"],
+                ["tuas", "Tuas (T)"],
+              ],
+            },
             {
               name: "worker_type",
               label: "Worker type",
@@ -42024,7 +42078,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "pass", label: "Pass" },
             { name: "license", label: "License" },
           ],
-          defaults: { sort_order: 0, worker_type: "general" },
+          defaults: { sort_order: 0, worker_type: "general", base_location: "" },
         },
         lorries: {
           title: "Lorries",
@@ -42032,17 +42086,30 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "lorries",
           orderBy: "registration_no",
           description:
-            "Maintain lorry numbers plus driver short name and full name. Driver full name can be found in Name Search and used for Site SIC.",
+            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner shows (M)/(T); WhatsApp and Excel names stay clean.",
           columns: [
             { key: "registration_no", label: "Lorry" },
             { key: "driver_name", label: "Driver short name" },
             { key: "driver_full_name", label: "Driver full name" },
+            { key: "driver_base_location", label: "Driver address / base" },
           ],
           fields: [
             { name: "registration_no", label: "Lorry number", required: !0 },
             { name: "driver_name", label: "Driver short name / nickname" },
             { name: "driver_full_name", label: "Driver full name" },
+            {
+              name: "driver_base_location",
+              label: "Driver address / base",
+              type: "select",
+              required: !0,
+              options: [
+                ["", "Choose Mandai or Tuas"],
+                ["mandai", "Mandai (M)"],
+                ["tuas", "Tuas (T)"],
+              ],
+            },
           ],
+          defaults: { driver_base_location: "" },
         },
         foremen: {
           title: "Foremen",
