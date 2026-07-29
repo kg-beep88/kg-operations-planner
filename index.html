@@ -34656,7 +34656,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     ID: Pe.id,
                     Nickname: kgExcelWorkerName(Pe),
                     Name: Pe.name,
-                    "Address / Base": Pe.base_location === "mandai" ? "Mandai (M)" : Pe.base_location === "tuas" ? "Tuas (T)" : "",
+                    "Address / Base": Pe.base_location === "mandai" ? "Mandai (M)" : Pe.base_location === "tuas" ? "Tuas (T)" : Pe.base_location === "kranji" ? "Kranji (K)" : "",
                     Phone: Pe.phone || "",
                     Pass: Pe.pass || "",
                     License: Pe.license || "",
@@ -36042,6 +36042,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const kgCopyPersonName = (t) => kgRemoveCopySl(kgNameNick(t));
       function kgBaseLocationCode(t) {
         const r = String(t || "").trim().toLowerCase();
+        return r === "mandai" || r === "m" ? "M" : r === "tuas" || r === "t" ? "T" : r === "kranji" || r === "k" ? "K" : "";
+      }
+      function kgDriverBaseLocationCode(t) {
+        const r = String(t || "").trim().toLowerCase();
         return r === "mandai" || r === "m" ? "M" : r === "tuas" || r === "t" ? "T" : "";
       }
       function kgPlannerWorkerName(t) {
@@ -36049,7 +36053,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return n ? `${r} (${n})` : r;
       }
       function kgPlannerDriverLabel(t) {
-        const r = kgDriverLabel(t), n = kgBaseLocationCode(t == null ? void 0 : t.driver_base_location);
+        const r = kgDriverLabel(t), n = kgDriverBaseLocationCode(t == null ? void 0 : t.driver_base_location);
         return n ? `${r} (${n})` : r;
       }
       function kgExcelWorkerName(t) {
@@ -36058,7 +36062,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       function kgExcelDriverName(t) {
         const r = Ca((t == null ? void 0 : t.driver_name) || (t == null ? void 0 : t.driver_full_name), "No driver"),
-          n = kgBaseLocationCode(t == null ? void 0 : t.driver_base_location);
+          n = kgDriverBaseLocationCode(t == null ? void 0 : t.driver_base_location);
         return n ? `${r} (${n})` : r;
       }
       function kgPlannerWorkerNames(t) {
@@ -42073,7 +42077,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Choose worker address/base as Mandai or Tuas. Planner and Excel show (M)/(T) beside nickname; WhatsApp keeps names clean and removes (SL).",
+            "Maintain workers available for deployment. Choose worker address/base as Mandai, Tuas or Kranji. Planner and Excel show (M)/(T)/(K) beside nickname; WhatsApp keeps names clean and removes location tags and (SL).",
           searchPlaceholder:
             "Search name, nickname, phone, pass, license, skilled or general — type pass or license to show only those records…",
           columns: [
@@ -42097,9 +42101,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               type: "select",
               required: !0,
               options: [
-                ["", "Choose Mandai or Tuas"],
+                ["", "Choose Mandai, Tuas or Kranji"],
                 ["mandai", "Mandai (M)"],
                 ["tuas", "Tuas (T)"],
+                ["kranji", "Kranji (K)"],
               ],
             },
             {
@@ -42124,7 +42129,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "lorries",
           orderBy: "registration_no",
           description:
-            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner and Excel show (M)/(T); WhatsApp keeps names clean and removes (SL).",
+            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner and Excel show (M)/(T); WhatsApp keeps names clean and removes location tags and (SL).",
           columns: [
             { key: "registration_no", label: "Lorry" },
             { key: "driver_name", label: "Driver short name" },
