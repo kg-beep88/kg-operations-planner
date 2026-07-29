@@ -34055,15 +34055,22 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             Address: ((n = r.site) == null ? void 0 : n.address) || "",
             Shift: r.shift || "",
             Lorry: ((l = r.lorry) == null ? void 0 : l.registration_no) || "",
-            Driver: ((s = r.lorry) == null ? void 0 : s.driver_name) || "",
+            Driver: kgFirstLorry(r) ? kgExcelDriverName(kgFirstLorry(r)) : (((s = r.lorry) == null ? void 0 : s.driver_name) || ""),
             Foremen: typeof kgForemanNames == "function" ? kgForemanNames(r) : ar(r).map((f) => kgNameNick(f)).join(" + "),
             "Foreman shifts": ar(r).length,
-            Workers: typeof kgWorkerNames == "function" ? kgWorkerNames(r) : (r.assignment_workers || [])
-              .map((f) => kgNameNick(f.worker))
+            Workers: typeof kgExcelWorkerNames == "function" ? kgExcelWorkerNames(r) : (r.assignment_workers || [])
+              .map((f) => kgExcelWorkerName(f.worker))
               .filter(Boolean)
               .join(" + "),
             "Worker shifts": (r.assignment_workers || []).length,
-            "OT shift": kgAssignmentOtText(r),
+            "OT shift": (r.assignment_workers || [])
+              .map((f) => {
+                const c = kgWorkerOtHours(f), m = kgFormatOtHours(c);
+                if (!m) return "";
+                return `${kgCopy3CleanChinaSubName(kgExcelWorkerName(f.worker)) || "Worker"} ${m}`;
+              })
+              .filter(Boolean)
+              .join(" + "),
             Remark: r.remark || "",
             Notes: r.notes || "",
           };
@@ -34380,6 +34387,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   workers: new Set(),
                   foremen: new Set(),
                   workerNames: new Set(),
+                  workerExcelNames: new Set(),
                   foremanNames: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
@@ -34397,6 +34405,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               for (const xe of ue.assignment_workers || [])
                 (V.workers.add(Number(xe.worker_id)),
                   V.workerNames.add(kgNameNick(xe.worker)),
+                  V.workerExcelNames.add(kgExcelWorkerName(xe.worker)),
                   (V.workerShifts += 1));
               V.otHours += kgAssignmentOtHours(ue);
             }
@@ -34408,6 +34417,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   workers: new Set(),
                   foremen: new Set(),
                   workerNames: new Set(),
+                  workerExcelNames: new Set(),
                   foremanNames: new Set(),
                   workerShifts: 0,
                   foremanShifts: 0,
@@ -34525,7 +34535,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     Shifts: [...ee.shifts].join(", "),
                     Foremen: [...ee.foremanNames].filter(Boolean).join(", "),
                     "Foreman shifts": ee.foremanShifts,
-                    Workers: [...ee.workerNames].filter(Boolean).join(", "),
+                    Workers: [...ee.workerExcelNames].filter(Boolean).join(", "),
                     "Worker shifts": ee.workerShifts,
                     "OT shift": kgFormatOtHours(ee.otHours) || "",
                     "DO sent":
@@ -34582,7 +34592,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .limit(1e4),
               qe
                 .from("assignment_lorries")
-                .select("assignment_id,lorry_id,sort_order,lorry:lorries!assignment_lorries_lorry_id_fkey(registration_no,driver_name)")
+                .select("assignment_id,lorry_id,sort_order,lorry:lorries!assignment_lorries_lorry_id_fkey(registration_no,driver_name,driver_full_name,driver_base_location)")
                 .order("assignment_id")
                 .order("sort_order")
                 .limit(1e4),
@@ -34644,8 +34654,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   name: "Workers",
                   rows: xe.map((Pe) => ({
                     ID: Pe.id,
-                    Nickname: Pe.nickname || "",
+                    Nickname: kgExcelWorkerName(Pe),
                     Name: Pe.name,
+                    "Address / Base": Pe.base_location === "mandai" ? "Mandai (M)" : Pe.base_location === "tuas" ? "Tuas (T)" : "",
                     Phone: Pe.phone || "",
                     Pass: Pe.pass || "",
                     License: Pe.license || "",
@@ -34659,7 +34670,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   rows: ke.map((Pe) => ({
                     ID: Pe.id,
                     Lorry: Pe.registration_no,
-                    Driver: Pe.driver_name || "",
+                    Driver: kgExcelDriverName(Pe),
+                    "Driver full name": Pe.driver_full_name || "",
+                    "Driver address / base": Pe.driver_base_location === "mandai" ? "Mandai (M)" : Pe.driver_base_location === "tuas" ? "Tuas (T)" : "",
                     Status: Pe.status,
                     Created: Pe.created_at,
                     Updated: Pe.updated_at,
@@ -34697,7 +34710,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     "Assignment ID": Pe.assignment_id,
                     "Lorry ID": Pe.lorry_id,
                     Lorry: Pe.lorry ? Pe.lorry.registration_no : "",
-                    Driver: Pe.lorry ? Pe.lorry.driver_name || "" : "",
+                    Driver: Pe.lorry ? kgExcelDriverName(Pe.lorry) : "",
+                    "Driver address / base": Pe.lorry && Pe.lorry.driver_base_location === "mandai" ? "Mandai (M)" : Pe.lorry && Pe.lorry.driver_base_location === "tuas" ? "Tuas (T)" : "",
                     "Sort order": Pe.sort_order,
                   })),
                 },
@@ -36038,6 +36052,15 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const r = kgDriverLabel(t), n = kgBaseLocationCode(t == null ? void 0 : t.driver_base_location);
         return n ? `${r} (${n})` : r;
       }
+      function kgExcelWorkerName(t) {
+        const r = kgNameNick(t), n = kgBaseLocationCode(t == null ? void 0 : t.base_location);
+        return n ? `${r} (${n})` : r;
+      }
+      function kgExcelDriverName(t) {
+        const r = Ca((t == null ? void 0 : t.driver_name) || (t == null ? void 0 : t.driver_full_name), "No driver"),
+          n = kgBaseLocationCode(t == null ? void 0 : t.driver_base_location);
+        return n ? `${r} (${n})` : r;
+      }
       function kgPlannerWorkerNames(t) {
         return (t.assignment_workers || []).map((r) => kgPlannerWorkerName(r.worker)).filter(Boolean).join(" + ");
       }
@@ -36088,6 +36111,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         (t || []).map((r) => kgNameNick(r)).filter(Boolean).join(" + ");
       const kgWorkerNames = (t) =>
         kgJoinNames((t.assignment_workers || []).map((r) => r.worker));
+      const kgExcelWorkerNames = (t) =>
+        (t.assignment_workers || []).map((r) => kgExcelWorkerName(r.worker)).filter(Boolean).join(" + ");
       const kgForemanNames = (t) => kgJoinNames(ar(t));
       const kgDayName = ["Sun", "Mon", "Tues", "Wed", "Thu", "Fri", "Sat"];
       function kgDayShort(t) {
@@ -36123,7 +36148,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       }
       function kgLorryText(t, r = "copy") {
         if (!t) return r === "excel" ? "" : "No lorry";
-        const n = Ca(t.registration_no, ""), l = Ca(t.driver_name || t.driver_full_name, "No driver");
+        const n = Ca(t.registration_no, ""),
+          l = r === "excel"
+            ? kgExcelDriverName(t)
+            : kgRemoveCopySl(Ca(t.driver_name || t.driver_full_name, "No driver"));
         return r === "excel" ? `${n}${l ? ` (${l})` : ""}` : `${n} @${l}`;
       }
       const kgLorryCopy = (t) => kgLorryText(t);
@@ -36417,7 +36445,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             m = ar(l).length;
           n.push({
             LORRY: f,
-            WORKER: kgWorkerNames(l),
+            WORKER: kgExcelWorkerNames(l),
             FOREMAN: kgForemanNames(l),
             DATE: c,
             PIC: l.pic || l.pic_name || l.picName || "",
@@ -36426,7 +36454,15 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             FS: m,
             SUB: kgSubWorkerCount(l),
             CHINA: kgChinaWorkerCount(l),
-            "OT SHIFT": kgAssignmentOtText(l),
+            "OT SHIFT": (l.assignment_workers || [])
+              .map((r) => {
+                const n = kgWorkerOtHours(r), s = kgFormatOtHours(n);
+                if (!s) return "";
+                const f = kgCopy3CleanChinaSubName(kgExcelWorkerName(r.worker));
+                return `${f || "Worker"} ${s}`;
+              })
+              .filter(Boolean)
+              .join(" + "),
             __kgDateKey: c,
             __kgLorryGroup: f || "__NO_LORRY__",
           });
@@ -36980,7 +37016,9 @@ Worker : ${c}`;
           await n(s.value);
         };
         l.querySelector("#kg-copy-whatsapp").onclick = () => {
-          window.open(`https://wa.me/?text=${encodeURIComponent(s.value)}`, "_blank", "noopener,noreferrer");
+          const f = kgCleanCopyText(s.value);
+          s.value = f;
+          window.open(`https://wa.me/?text=${encodeURIComponent(f)}`, "_blank", "noopener,noreferrer");
         };
       }
       function hl({ title: t, children: r, onClose: n }) {
@@ -42035,7 +42073,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Choose worker address/base as Mandai or Tuas. Planner shows (M)/(T) beside nickname; WhatsApp and Excel names stay clean.",
+            "Maintain workers available for deployment. Choose worker address/base as Mandai or Tuas. Planner and Excel show (M)/(T) beside nickname; WhatsApp keeps names clean and removes (SL).",
           searchPlaceholder:
             "Search name, nickname, phone, pass, license, skilled or general — type pass or license to show only those records…",
           columns: [
@@ -42086,7 +42124,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "lorries",
           orderBy: "registration_no",
           description:
-            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner shows (M)/(T); WhatsApp and Excel names stay clean.",
+            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner and Excel show (M)/(T); WhatsApp keeps names clean and removes (SL).",
           columns: [
             { key: "registration_no", label: "Lorry" },
             { key: "driver_name", label: "Driver short name" },
