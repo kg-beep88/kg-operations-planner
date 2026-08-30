@@ -39298,13 +39298,13 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         q.useEffect(() => { _(); }, []);
         const T = q.useMemo(() => new Map((f || []).map((I) => [String(I.id), I])), [f]),
           D = q.useMemo(() => new Map((m || []).map((I) => [String(I.id), I])), [m]),
-          workerSicSites = q.useMemo(() => (l || []).filter((I) => kgSiteSicWorkerRestricted(I)), [l]),
-          foremanSicSites = q.useMemo(() => (l || []).filter((I) => kgSiteSicForemanRestricted(I)), [l]);
+          workerSicSites = q.useMemo(() => (l || []).filter((I) => String(I.status || "active").toLowerCase() !== "closed" && kgSiteSicWorkerRestricted(I)), [l]),
+          foremanSicSites = q.useMemo(() => (l || []).filter((I) => String(I.status || "active").toLowerCase() !== "closed" && kgSiteSicForemanRestricted(I)), [l]);
         function workersForSite(I) {
-          return kgSiteSicWorkerIds(I).map((L) => T.get(String(L))).filter(Boolean);
+          return kgSiteSicWorkerIds(I).map((L) => T.get(String(L))).filter((L) => L && String(L.status || "active").toLowerCase() !== "closed");
         }
         function foremenForSite(I) {
-          return kgSiteSicForemanIds(I).map((L) => D.get(String(L))).filter(Boolean);
+          return kgSiteSicForemanIds(I).map((L) => D.get(String(L))).filter((L) => L && String(L.status || "active").toLowerCase() !== "closed");
         }
         function workerMatchesType(I) {
           return workerTypeFilter === "all" || kgWorkerType(I) === workerTypeFilter;
@@ -39326,6 +39326,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (r !== "worker" || viewMode !== "worker") return [];
           const I = String(E || "").trim().toLowerCase(), rows = [];
           for (const L of f || []) {
+            if (String(L.status || "active").toLowerCase() === "closed") continue;
             if (!workerMatchesType(L)) continue;
             const sites = workerSicSites.filter((W) => kgSiteSicWorkerIds(W).includes(String(L.id)));
             if (!sites.length) continue;
