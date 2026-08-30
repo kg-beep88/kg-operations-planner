@@ -36598,6 +36598,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return [];
       }
       function kgSiteSicRestricted(t) { return !!(t && t.sic_restricted); }
+      function kgSiteSicWorkerRestricted(t) { return kgSiteSicRestricted(t); }
       function kgSiteSicWorkerIds(t) { return kgJsonStringArray(t == null ? void 0 : t.sic_worker_ids); }
       function kgSiteSicForemanRestricted(t) { return !!(t && t.sic_foreman_restricted); }
       function kgSiteSicForemanIds(t) { return kgJsonStringArray(t == null ? void 0 : t.sic_foreman_ids); }
