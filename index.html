@@ -16204,6 +16204,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           { to: "/planner", label: "Planner", icon: eE },
           { to: "/logistics", label: "Logistics", icon: b0 },
           { to: "/manpower-search", label: "Name Search", icon: fE, hot: !0 },
+          { to: "/sic-overview", label: "SIC Overview", icon: Rs },
           { to: "/sites", label: "Site", icon: $S, hot: !0 },
           { to: "/checker", label: "Checker", icon: fE, hot: !0 },
           { to: "/deliveries", label: "Delivery", icon: Q0, hot: !0 },
@@ -36053,7 +36054,9 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         return n ? `${r} (${n})` : r;
       }
       function kgPlannerDriverLabel(t) {
-        const r = kgDriverLabel(t), n = kgDriverBaseLocationCode(t == null ? void 0 : t.driver_base_location);
+        const rawDriver = String((t && (t.driver_name || t.driver_full_name)) || "").trim();
+        if (!rawDriver) return "";
+        const r = kgRemoveCopySl(rawDriver), n = kgDriverBaseLocationCode(t == null ? void 0 : t.driver_base_location);
         return n ? `${r} (${n})` : r;
       }
       function kgExcelWorkerName(t) {
@@ -36080,7 +36083,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const r = kgAssignmentLorries(t).map((n) => {
           if (!n) return "";
           const l = Ca(n.registration_no, ""), s = kgPlannerDriverLabel(n);
-          return `${l} @${s}`;
+          return s ? `${l} @${s}` : l;
         }).filter(Boolean);
         return r.length ? r.join(" + ") : "No lorry";
       }
@@ -36153,10 +36156,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgLorryText(t, r = "copy") {
         if (!t) return r === "excel" ? "" : "No lorry";
         const n = Ca(t.registration_no, ""),
-          l = r === "excel"
+          rawDriver = String((t && (t.driver_name || t.driver_full_name)) || "").trim();
+        if (!rawDriver) return n;
+        const l = r === "excel"
             ? kgExcelDriverName(t)
-            : kgRemoveCopySl(Ca(t.driver_name || t.driver_full_name, "No driver"));
-        return r === "excel" ? `${n}${l ? ` (${l})` : ""}` : `${n} @${l}`;
+            : kgRemoveCopySl(rawDriver);
+        return r === "excel" ? `${n}${l ? ` (${l})` : ""}` : `${n}${l ? ` @${l}` : ""}`;
       }
       const kgLorryCopy = (t) => kgLorryText(t);
       const kgLorryExcel = (t) => kgLorryText(t, "excel");
@@ -38749,7 +38754,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     checked: (w.lorry_ids || []).includes(Number(V.id)),
                                     onChange: () => kgToggleLorry(V.id),
                                   }),
-                                  d.jsx("span", { children: `${V.registration_no} @ ${kgPlannerDriverLabel(V)}` }),
+                                  d.jsx("span", { children: kgPlannerDriverLabel(V) ? `${V.registration_no} @ ${kgPlannerDriverLabel(V)}` : `${V.registration_no}` }),
                                 ],
                               },
                               V.id,
@@ -39265,6 +39270,103 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         d.jsx("p", { className: "muted", children: "Showing latest planner records first. Search checks both name and nickname." }),
                       ],
                     }),
+          ],
+        });
+      }
+
+      function kgSicOverviewPage({ profile: t }) {
+        const [r, n] = q.useState("worker"),
+          [l, s] = q.useState([]),
+          [f, c] = q.useState([]),
+          [m, v] = q.useState([]),
+          [x, p] = q.useState(!0),
+          [g, S] = q.useState(""),
+          [E, w] = q.useState("");
+        async function _() {
+          (p(!0), S(""));
+          const [I, L, W] = await Promise.all([
+            qe.from("sites").select("*").order("address"),
+            qe.from("workers").select("*").order("sort_order", { nullsFirst: !1 }).order("nickname", { nullsFirst: !1 }).order("name"),
+            qe.from("foremen").select("*").order("sort_order", { nullsFirst: !1 }).order("nickname", { nullsFirst: !1 }).order("name"),
+          ]), he = I.error || L.error || W.error;
+          he ? S(he.message) : (s(I.data || []), c(L.data || []), v(W.data || []));
+          p(!1);
+        }
+        q.useEffect(() => { _(); }, []);
+        const T = q.useMemo(() => new Map((f || []).map((I) => [String(I.id), I])), [f]),
+          D = q.useMemo(() => new Map((m || []).map((I) => [String(I.id), I])), [m]),
+          A = q.useMemo(() => {
+            const I = String(E || "").trim().toLowerCase();
+            return (l || []).filter((L) => {
+              const W = r === "worker" ? kgSiteSicWorkerRestricted(L) : kgSiteSicForemanRestricted(L);
+              if (!W) return !1;
+              if (!I) return !0;
+              const he = r === "worker" ? kgSiteSicWorkerIds(L).map((J) => T.get(String(J))).filter(Boolean) : kgSiteSicForemanIds(L).map((J) => D.get(String(J))).filter(Boolean),
+                J = [L.address, L.pic, L.status, ...he.flatMap((j) => [j.name, j.nickname, kgNameNick(j)])].map((j) => String(j || "").toLowerCase()).join(" ");
+              return J.includes(I);
+            }).sort((L, W) => String(L.address || "").localeCompare(String(W.address || ""), void 0, { numeric: !0, sensitivity: "base" }));
+          }, [l, r, E, T, D]);
+        function P(I) {
+          if (r === "worker") return kgSiteSicWorkerIds(I).map((L) => T.get(String(L))).filter(Boolean);
+          return kgSiteSicForemanIds(I).map((L) => D.get(String(L))).filter(Boolean);
+        }
+        return d.jsxs("div", {
+          className: "page sic-overview-page",
+          children: [
+            d.jsxs("header", {
+              className: "page-header",
+              children: [
+                d.jsxs("div", { children: [
+                  d.jsx("p", { className: "eyebrow", children: "Site access list" }),
+                  d.jsx("h1", { children: "SIC Overview" }),
+                  d.jsx("p", { children: "Only sites that require SIC are shown. Use the top tabs to check approved Workers or Foremen." }),
+                ] }),
+                d.jsx("button", { className: "secondary-button", onClick: _, children: "Refresh" }),
+              ],
+            }),
+            d.jsxs("section", {
+              className: "panel",
+              children: [
+                d.jsxs("div", {
+                  className: "panel-title-row",
+                  style: { alignItems: "center", gap: "12px", flexWrap: "wrap" },
+                  children: [
+                    d.jsxs("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: [
+                      d.jsx("button", { type: "button", className: r === "worker" ? "primary-button" : "secondary-button", onClick: () => n("worker"), children: "Worker" }),
+                      d.jsx("button", { type: "button", className: r === "foreman" ? "primary-button" : "secondary-button", onClick: () => n("foreman"), children: "Foreman" }),
+                    ] }),
+                    d.jsx("input", { value: E, onChange: (I) => w(I.target.value), placeholder: `Search ${r === "worker" ? "worker" : "foreman"} or SIC site…`, style: { minWidth: "260px", maxWidth: "420px" } }),
+                  ],
+                }),
+                d.jsx("div", { className: "success-box", style: { margin: "12px 16px" }, children: r === "worker" ? "Worker tab: only sites with Worker SIC restriction are shown." : "Foreman tab: only sites with Foreman SIC restriction are shown." }),
+                g && d.jsx("div", { className: "error-box", children: g }),
+                x ? d.jsx("div", { className: "empty-state", children: "Loading SIC sites…" }) : A.length === 0 ? d.jsx("div", { className: "empty-state", children: r === "worker" ? "No Worker SIC sites found." : "No Foreman SIC sites found." }) : d.jsx("div", {
+                  className: "table-wrap",
+                  children: d.jsxs("table", {
+                    className: "data-table",
+                    children: [
+                      d.jsx("thead", { children: d.jsxs("tr", { children: [
+                        d.jsx("th", { children: "Site" }),
+                        d.jsx("th", { children: "PIC" }),
+                        d.jsx("th", { children: "Status" }),
+                        d.jsx("th", { children: r === "worker" ? "Approved Workers" : "Approved Foremen" }),
+                        d.jsx("th", { children: "Count" }),
+                      ] }) }),
+                      d.jsx("tbody", { children: A.map((I) => {
+                        const L = P(I);
+                        return d.jsxs("tr", { children: [
+                          d.jsx("td", { "data-label": "Site", children: d.jsx("strong", { children: I.address || "-" }) }),
+                          d.jsx("td", { "data-label": "PIC", children: kgSitePicText(I) }),
+                          d.jsx("td", { "data-label": "Status", children: kgSiteIsPause(I) ? "PAUSE" : String(I.status || "active").toUpperCase() }),
+                          d.jsx("td", { "data-label": r === "worker" ? "Approved Workers" : "Approved Foremen", children: L.length ? d.jsx("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" }, children: L.map((W) => d.jsx("span", { style: { display: "inline-block", padding: "5px 9px", borderRadius: "999px", background: "#eef6f3", border: "1px solid #d7e8e2", fontWeight: 800, fontSize: "12px" }, children: kgNameNick(W) }, `${I.id}-${r}-${W.id}`)) }) : d.jsx("strong", { style: { color: "#b91c1c" }, children: r === "worker" ? "No worker selected" : "No foreman selected" }) }),
+                          d.jsx("td", { "data-label": "Count", children: L.length }),
+                        ] }, `${r}-${I.id}`);
+                      }) }),
+                    ],
+                  }),
+                }),
+              ],
+            }),
           ],
         });
       }
@@ -42352,6 +42454,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                       d.jsx(jn, {
                         path: "/manpower-search",
                         element: d.jsx(kgManpowerSearchPage, { profile: t }),
+                      }),
+                      d.jsx(jn, {
+                        path: "/sic-overview",
+                        element: d.jsx(kgSicOverviewPage, { profile: t }),
                       }),
                       d.jsx(jn, {
                         path: "/deliveries",
