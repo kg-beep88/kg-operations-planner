@@ -16416,7 +16416,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 children: [
                   "Connected: ",
                   GS || "Not configured",
-                  " · Build V5.8 OFF/MC tally + Copy 3 site remark",
+                  " · Build V5.8.1 show OFF workers already assigned elsewhere",
                 ],
               }),
             ],
@@ -37494,11 +37494,17 @@ Worker : ${c}`;
           kgSelectedWorkerIds = new Set((w.worker_ids || []).map((V) => String(V))),
           kgSelectedForemanIds = new Set((w.foreman_ids || []).map((V) => String(V))),
           kgSelectedLorryIds = new Set((w.lorry_ids || []).map((V) => String(V))),
+          kgWorkersAssignedAnySite = new Set(
+            s.flatMap((V) => (V.assignment_workers || []).map((xe) => String(xe.worker_id || (xe.worker && xe.worker.id) || ""))).filter(Boolean),
+          ),
           kgPlannerWorkerPool = p.workers.filter((V) => {
             if (kgSelectedSpecialOffKind) return !0;
-            const xe = kgOffOnDate(V, n);
-            const ke = !kgSelectedSiteSicRestricted || kgSelectedSiteSicApproved.has(String(V.id)) || kgSelectedWorkerIds.has(String(V.id));
-            const Le = !xe || kgSelectedWorkerIds.has(String(V.id));
+            const xe = kgOffOnDate(V, n),
+              kgAlreadyAtAnotherSite = kgWorkersAssignedAnySite.has(String(V.id)),
+              ke = !kgSelectedSiteSicRestricted || kgSelectedSiteSicApproved.has(String(V.id)) || kgSelectedWorkerIds.has(String(V.id));
+            // OFF workers normally stay out of the picker, but if they are already assigned
+            // somewhere on this Planner date keep them visible so users can see the conflict.
+            const Le = !xe || kgSelectedWorkerIds.has(String(V.id)) || kgAlreadyAtAnotherSite;
             return ke && Le;
           }),
           kgPlannerForemanPool = p.foremen.filter((V) => {
@@ -37665,6 +37671,8 @@ Worker : ${c}`;
                 d.jsx("input", {
                   type: "checkbox",
                   checked: ke,
+                  disabled: !!kgOff && !ke,
+                  title: kgOff && !ke ? "Worker is OFF on this date. Existing other-site assignment is shown for checking only." : "",
                   onChange: () => F(V.id),
                 }),
                 d.jsxs("span", {
@@ -39187,8 +39195,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             d.jsx("span", {
                               className: "field-help",
                               children: kgSelectedSiteSicRestricted
-                                ? "Only SIC-approved skilled workers for this site are shown."
-                                : "Tick skilled workers. Change skilled/general type in Workers page.",
+                                ? "Only SIC-approved skilled workers are selectable. OFF workers already assigned to another site stay visible for checking."
+                                : "Tick skilled workers. OFF workers already assigned to another site stay visible for checking.",
                             }),
                             d.jsx("div", {
                               className: "check-grid",
@@ -39205,8 +39213,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             d.jsx("span", {
                               className: "field-help",
                               children: kgSelectedSiteSicRestricted
-                                ? "Only SIC-approved general workers for this site are shown."
-                                : "Tick general workers. A warning will appear before saving if worker already has another site.",
+                                ? "Only SIC-approved general workers are selectable. OFF workers already assigned to another site stay visible for checking."
+                                : "Tick general workers. OFF workers already assigned to another site stay visible for checking; a duplicate-site warning still appears before save.",
                             }),
                             d.jsx("div", {
                               className: "check-grid",
