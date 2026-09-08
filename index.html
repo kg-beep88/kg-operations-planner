@@ -39564,10 +39564,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         q.useEffect(() => { _(); }, []);
         const T = q.useMemo(() => new Map((f || []).map((I) => [String(I.id), I])), [f]),
           D = q.useMemo(() => new Map((m || []).map((I) => [String(I.id), I])), [m]),
-          workerSicSites = q.useMemo(() => (l || []).filter((I) => String(I.status || "active").toLowerCase() !== "closed" && kgSiteSicWorkerRestricted(I)), [l]),
-          foremanSicSites = q.useMemo(() => (l || []).filter((I) => String(I.status || "active").toLowerCase() !== "closed" && kgSiteSicForemanRestricted(I)), [l]);
+          workerSicSites = q.useMemo(() => (l || []).filter((I) => ["active", "pause"].includes(String(I.status || "active").toLowerCase()) && kgSiteSicWorkerRestricted(I)), [l]),
+          foremanSicSites = q.useMemo(() => (l || []).filter((I) => ["active", "pause"].includes(String(I.status || "active").toLowerCase()) && kgSiteSicForemanRestricted(I)), [l]);
         function workersForSite(I) {
-          return kgSiteSicWorkerIds(I).map((L) => T.get(String(L))).filter((L) => L && String(L.status || "active").toLowerCase() !== "closed");
+          return kgSiteSicWorkerIds(I).map((L) => T.get(String(L))).filter((L) => L && String(L.status || "").toLowerCase() === "active");
         }
         function foremenForSite(I) {
           return kgSiteSicForemanIds(I).map((L) => D.get(String(L))).filter((L) => L && String(L.status || "active").toLowerCase() !== "closed");
@@ -39592,7 +39592,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (r !== "worker" || viewMode !== "worker") return [];
           const I = String(E || "").trim().toLowerCase(), rows = [];
           for (const L of f || []) {
-            if (String(L.status || "active").toLowerCase() === "closed") continue;
+            if (String(L.status || "").toLowerCase() !== "active") continue;
             if (!workerMatchesType(L)) continue;
             const sites = workerSicSites.filter((W) => kgSiteSicWorkerIds(W).includes(String(L.id)));
             const searchText = [L.name, L.nickname, kgNameNick(L), kgWorkerTypeText(L), sites.length ? "SIC site" : "No SIC site", ...sites.flatMap((W) => [W.address, W.pic, W.status])]
@@ -39701,7 +39701,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 d.jsxs("div", { children: [
                   d.jsx("p", { className: "eyebrow", children: "Site access list" }),
                   d.jsx("h1", { children: "SIC Overview" }),
-                  d.jsx("p", { children: "By Site shows only SIC-restricted sites. By Worker shows every active worker, including workers with no SIC site. Skilled and General workers remain separated." }),
+                  d.jsx("p", { children: "Shows only ACTIVE workers. SIC sites can be ACTIVE or PAUSE. By Worker also shows active workers with No SIC site." }),
                 ] }),
                 d.jsx("button", { className: "secondary-button", onClick: _, children: "Refresh" }),
               ],
@@ -39733,7 +39733,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("button", { type: "button", className: workerTypeFilter === "general" ? "primary-button" : "secondary-button", onClick: () => setWorkerTypeFilter("general"), children: "General Worker" }),
                   ] }),
                 ] }),
-                d.jsx("div", { className: "success-box", style: { margin: "12px 16px" }, children: r === "worker" ? (viewMode === "site" ? "By Site: every Worker SIC site is listed, with Skilled and General workers separated." : "By Worker: every active worker is listed. Workers without any SIC access will show No SIC site.") : "Foreman: only sites with Foreman SIC restriction are shown." }),
+                d.jsx("div", { className: "success-box", style: { margin: "12px 16px" }, children: r === "worker" ? (viewMode === "site" ? "By Site: ACTIVE and PAUSE Worker SIC sites are listed. Only ACTIVE workers are shown, separated into Skilled and General." : "By Worker: every ACTIVE worker is listed. Workers without any SIC access will show No SIC site. PAUSE SIC sites are included.") : "Foreman: only sites with Foreman SIC restriction are shown." }),
                 g && d.jsx("div", { className: "error-box", children: g }),
                 x ? d.jsx("div", { className: "empty-state", children: "Loading SIC sites…" }) : noRows ? d.jsx("div", { className: "empty-state", children: r === "worker" ? (viewMode === "worker" ? "No matching active workers found." : "No matching Worker SIC sites found.") : "No Foreman SIC sites found." }) : (r === "worker" ? (viewMode === "worker" ? workerByWorkerTable : workerSiteTable) : foremanTable),
               ],
