@@ -39595,8 +39595,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             if (String(L.status || "active").toLowerCase() === "closed") continue;
             if (!workerMatchesType(L)) continue;
             const sites = workerSicSites.filter((W) => kgSiteSicWorkerIds(W).includes(String(L.id)));
-            if (!sites.length) continue;
-            const searchText = [L.name, L.nickname, kgNameNick(L), kgWorkerTypeText(L), ...sites.flatMap((W) => [W.address, W.pic, W.status])]
+            const searchText = [L.name, L.nickname, kgNameNick(L), kgWorkerTypeText(L), sites.length ? "SIC site" : "No SIC site", ...sites.flatMap((W) => [W.address, W.pic, W.status])]
               .map((W) => String(W || "").toLowerCase()).join(" ");
             if (I && !searchText.includes(I)) continue;
             rows.push({ worker: L, sites });
@@ -39661,7 +39660,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               d.jsx("tbody", { children: workerRows.map(({ worker: I, sites: L }) => d.jsxs("tr", { children: [
                 d.jsx("td", { "data-label": "Worker", children: d.jsx("strong", { children: kgNameNick(I) }) }),
                 d.jsx("td", { "data-label": "Type", children: kgWorkerTypeText(I) }),
-                d.jsx("td", { "data-label": "SIC Sites Allowed", children: d.jsx("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" }, children: L.map((W) => sitePill(W, `${I.id}-site-${W.id}`)) }) }),
+                d.jsx("td", { "data-label": "SIC Sites Allowed", children: L.length ? d.jsx("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" }, children: L.map((W) => sitePill(W, `${I.id}-site-${W.id}`)) }) : d.jsx("strong", { style: { color: "#64748b" }, children: "No SIC site" }) }),
                 d.jsx("td", { "data-label": "Site Count", children: d.jsx("strong", { children: L.length }) }),
               ] }, `worker-sites-${I.id}`)) }),
             ],
@@ -39702,7 +39701,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 d.jsxs("div", { children: [
                   d.jsx("p", { className: "eyebrow", children: "Site access list" }),
                   d.jsx("h1", { children: "SIC Overview" }),
-                  d.jsx("p", { children: "Only SIC-restricted sites are shown. Worker view can be checked by Site or by Worker, with Skilled and General workers separated." }),
+                  d.jsx("p", { children: "By Site shows only SIC-restricted sites. By Worker shows every active worker, including workers with no SIC site. Skilled and General workers remain separated." }),
                 ] }),
                 d.jsx("button", { className: "secondary-button", onClick: _, children: "Refresh" }),
               ],
@@ -39734,9 +39733,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("button", { type: "button", className: workerTypeFilter === "general" ? "primary-button" : "secondary-button", onClick: () => setWorkerTypeFilter("general"), children: "General Worker" }),
                   ] }),
                 ] }),
-                d.jsx("div", { className: "success-box", style: { margin: "12px 16px" }, children: r === "worker" ? (viewMode === "site" ? "By Site: every Worker SIC site is listed, with Skilled and General workers separated." : "By Worker: each approved worker is listed with all SIC sites they are allowed to enter.") : "Foreman: only sites with Foreman SIC restriction are shown." }),
+                d.jsx("div", { className: "success-box", style: { margin: "12px 16px" }, children: r === "worker" ? (viewMode === "site" ? "By Site: every Worker SIC site is listed, with Skilled and General workers separated." : "By Worker: every active worker is listed. Workers without any SIC access will show No SIC site.") : "Foreman: only sites with Foreman SIC restriction are shown." }),
                 g && d.jsx("div", { className: "error-box", children: g }),
-                x ? d.jsx("div", { className: "empty-state", children: "Loading SIC sites…" }) : noRows ? d.jsx("div", { className: "empty-state", children: r === "worker" ? (viewMode === "worker" ? "No matching SIC workers found." : "No matching Worker SIC sites found.") : "No Foreman SIC sites found." }) : (r === "worker" ? (viewMode === "worker" ? workerByWorkerTable : workerSiteTable) : foremanTable),
+                x ? d.jsx("div", { className: "empty-state", children: "Loading SIC sites…" }) : noRows ? d.jsx("div", { className: "empty-state", children: r === "worker" ? (viewMode === "worker" ? "No matching active workers found." : "No matching Worker SIC sites found.") : "No Foreman SIC sites found." }) : (r === "worker" ? (viewMode === "worker" ? workerByWorkerTable : workerSiteTable) : foremanTable),
               ],
             }),
           ],
