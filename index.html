@@ -34197,7 +34197,8 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           [T, D] = q.useState([]),
           [I, L] = q.useState(!0),
           [W, he] = q.useState(!1),
-          [J, j] = q.useState("");
+          [J, j] = q.useState(""),
+          [kgCrossAssignments, kgSetCrossAssignments] = q.useState([]);
         async function fe() {
           const [B, me] = await Promise.all([
               sh(),
@@ -34252,7 +34253,22 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           }
           const [ue, ee] = await Promise.all([B, me]),
             V = ue.error || ee.error;
-          (V && j(V.message), _(ue.data || []), D(ee.data || []), L(!1));
+          let kgCrossRows = ue.data || [];
+          if (n === "site" && v && !ue.error) {
+            const kgDates = (ue.data || []).map((xe) => xe.plan_date).filter(Boolean).sort();
+            if (kgDates.length) {
+              const kgCrossResult = await qe
+                .from("site_assignments")
+                .select(_s)
+                .gte("plan_date", kgDates[0])
+                .lt("plan_date", wr(kgDates[kgDates.length - 1], 1))
+                .order("plan_date")
+                .limit(1e4);
+              if (kgCrossResult.error) j(kgCrossResult.error.message);
+              else kgCrossRows = kgCrossResult.data || [];
+            }
+          }
+          (V && j(V.message), _(ue.data || []), D(ee.data || []), kgSetCrossAssignments(kgCrossRows), L(!1));
         }
         (q.useEffect(() => {
           fe();
@@ -34413,6 +34429,25 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               );
             });
           }, [w, T]),
+          kgMultiSiteByDay = q.useMemo(() => {
+            const B = new Map(), me = new Map(), kgRows = n === "site" ? kgCrossAssignments : w;
+            const ue = (ee, V, xe, ke, Ee) => {
+              if (!V || xe == null || ke == null) return;
+              const Be = `${V}|${String(xe)}`;
+              ee.has(Be) || ee.set(Be, new Map());
+              ee.get(Be).set(String(ke), Ee || String(ke));
+            };
+            for (const ee of kgRows) {
+              const V = ee == null ? void 0 : ee.site,
+                xe = V == null ? void 0 : V.id,
+                ke = (V == null ? void 0 : V.address) || "";
+              for (const Ee of ee.assignment_workers || [])
+                ue(B, ee.plan_date, Ee.worker_id, xe, ke);
+              for (const Ee of ar(ee))
+                ue(me, ee.plan_date, Ee.id, xe, ke);
+            }
+            return { workers: B, foremen: me };
+          }, [w, kgCrossAssignments, n]),
           N = q.useMemo(() => {
             var me;
             const B = new Map();
@@ -34435,15 +34470,19 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 });
               const V = B.get(ee);
               V.shifts.add(ue.shift);
-              for (const xe of ar(ue))
+              for (const xe of ar(ue)) {
+                const ke = kgMultiSiteByDay.foremen.get(`${ee}|${String(xe.id)}`);
                 (V.foremen.add(Number(xe.id)),
-                  V.foremanNames.add(kgNameNick(xe)),
+                  V.foremanNames.add(kgSummaryMultiSiteText(kgNameNick(xe), ke)),
                   (V.foremanShifts += 1));
-              for (const xe of ue.assignment_workers || [])
+              }
+              for (const xe of ue.assignment_workers || []) {
+                const ke = kgMultiSiteByDay.workers.get(`${ee}|${String(xe.worker_id)}`);
                 (V.workers.add(Number(xe.worker_id)),
-                  V.workerNames.add(kgNameNick(xe.worker)),
-                  V.workerExcelNames.add(kgExcelWorkerName(xe.worker)),
+                  V.workerNames.add(kgSummaryMultiSiteText(kgNameNick(xe.worker), ke)),
+                  V.workerExcelNames.add(kgSummaryMultiSiteText(kgExcelWorkerName(xe.worker), ke)),
                   (V.workerShifts += 1));
+              }
               V.otHours += kgAssignmentOtHours(ue);
             }
             for (const ue of ge) {
@@ -34469,7 +34508,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             return [...B.values()].sort((ue, ee) =>
               ue.date.localeCompare(ee.date),
             );
-          }, [oe, ge]),
+          }, [oe, ge, kgMultiSiteByDay]),
           z = q.useMemo(
             () => ({
               sites: new Set(
@@ -34568,11 +34607,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   var V;
                   return {
                     Date: ee.date,
+                    Day: kgDayFull(ee.date),
                     Address: (ue == null ? void 0 : ue.address) || "",
                     Shifts: [...ee.shifts].join(", "),
                     Foremen: [...ee.foremanNames].filter(Boolean).join(", "),
+                    "Foreman multi-site": [...ee.foremanNames].filter((V) => String(V).includes("⚠")).join(" ; ") || "—",
                     "Foreman shifts": ee.foremanShifts,
                     Workers: [...ee.workerExcelNames].filter(Boolean).join(", "),
+                    "Worker multi-site": [...ee.workerExcelNames].filter((V) => String(V).includes("⚠")).join(" ; ") || "—",
                     "Worker shifts": ee.workerShifts,
                     "OT shift": kgFormatOtHours(ee.otHours) || "",
                     "DO sent":
@@ -35347,6 +35389,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                 children: d.jsxs("tr", {
                                   children: [
                                     d.jsx("th", { children: "Delivery date" }),
+                                    d.jsx("th", { children: "Day" }),
                                     d.jsx("th", { children: "Delivery address" }),
                                     d.jsx("th", { children: "Delivery type" }),
                                     d.jsx("th", { children: "Driver" }),
@@ -35359,14 +35402,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                 children: I
                                   ? d.jsx("tr", {
                                       children: d.jsx("td", {
-                                        colSpan: "6",
+                                        colSpan: "7",
                                         children: "Loading delivery…",
                                       }),
                                     })
                                   : ge.length === 0
                                     ? d.jsx("tr", {
                                         children: d.jsx("td", {
-                                          colSpan: "6",
+                                          colSpan: "7",
                                           className: "empty-cell",
                                           children: "No delivery order for this site.",
                                         }),
@@ -35380,6 +35423,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                               d.jsx("td", {
                                                 "data-label": "Delivery date",
                                                 children: d.jsx("strong", { children: B.delivery_date }),
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Day",
+                                                children: kgDayFull(B.delivery_date),
                                               }),
                                               d.jsx("td", {
                                                 "data-label": "Delivery address",
@@ -35416,6 +35463,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                 children: d.jsxs("tr", {
                                   children: [
                                     d.jsx("th", { children: "Date" }),
+                                    d.jsx("th", { children: "Day" }),
                                     d.jsx("th", { children: "Shifts" }),
                                     d.jsx("th", { children: "Foremen" }),
                                     d.jsx("th", { children: "Foreman shifts" }),
@@ -35429,14 +35477,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                 children: I
                                   ? d.jsx("tr", {
                                       children: d.jsx("td", {
-                                        colSpan: "7",
+                                        colSpan: "8",
                                         children: "Loading planner…",
                                       }),
                                     })
                                   : N.filter((B) => B.workerShifts || B.foremanShifts || B.shifts.size).length === 0
                                     ? d.jsx("tr", {
                                         children: d.jsx("td", {
-                                          colSpan: "7",
+                                          colSpan: "8",
                                           className: "empty-cell",
                                           children: "No planner records for this site.",
                                         }),
@@ -35449,6 +35497,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                               d.jsx("td", {
                                                 "data-label": "Date",
                                                 children: d.jsx("strong", { children: B.date }),
+                                              }),
+                                              d.jsx("td", {
+                                                "data-label": "Day",
+                                                children: kgDayFull(B.date),
                                               }),
                                               d.jsx("td", {
                                                 "data-label": "Shifts",
@@ -36161,6 +36213,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgDayShort(t) {
         const r = new Date(`${t}T12:00:00+08:00`);
         return kgDayName[r.getUTCDay()] || "";
+      }
+      function kgDayFull(t) {
+        const r = new Date(`${t}T12:00:00+08:00`),
+          n = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        return n[r.getUTCDay()] || "";
+      }
+      function kgSummaryMultiSiteText(t, r) {
+        const n = r instanceof Map ? [...r.values()].filter(Boolean) : [];
+        if (n.length <= 1) return t || "";
+        return `${t || ""} ⚠ ${n.length} sites: ${n.join(" | ")}`;
       }
       function kgCopyDateTitle(t) {
         return `${cp(t)} (${kgDayShort(t)})`;
