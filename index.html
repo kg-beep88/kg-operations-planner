@@ -34091,8 +34091,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             Date: r.plan_date,
             Address: ((n = r.site) == null ? void 0 : n.address) || "",
             Shift: r.shift || "",
-            Lorry: ((l = r.lorry) == null ? void 0 : l.registration_no) || "",
-            Driver: kgFirstLorry(r) ? kgExcelDriverName(kgFirstLorry(r)) : (((s = r.lorry) == null ? void 0 : s.driver_name) || ""),
+            Lorry: kgAssignmentLorries(r).map((f) => ((f == null ? void 0 : f.registration_no) || "")).filter(Boolean).join(" + "),
             Foremen: typeof kgForemanNames == "function" ? kgForemanNames(r) : ar(r).map((f) => kgNameNick(f)).join(" + "),
             "Foreman shifts": ar(r).length,
             Workers: typeof kgExcelWorkerNames == "function" ? kgExcelWorkerNames(r) : (r.assignment_workers || [])
@@ -34221,19 +34220,25 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 .select(w0)
                 .eq("delivery_date", s)
                 .order("created_at")));
-          else if (n === "site" && v)
+          else if (n === "site" && v) {
+            const { start: xe, endExclusive: ke } = lh(c);
             ((B = qe
               .from("site_assignments")
               .select(_s)
               .eq("site_id", Number(v))
+              .gte("plan_date", xe)
+              .lt("plan_date", ke)
               .order("plan_date")
               .limit(1e4)),
               (me = qe
                 .from("delivery_orders")
                 .select(w0)
                 .eq("site_id", Number(v))
+                .gte("delivery_date", xe)
+                .lt("delivery_date", ke)
                 .order("delivery_date")
                 .limit(1e4)));
+          }
           else {
             const { start: xe, endExclusive: ke } = lh(c);
             ((B = qe
@@ -34255,18 +34260,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
             V = ue.error || ee.error;
           let kgCrossRows = ue.data || [];
           if (n === "site" && v && !ue.error) {
-            const kgDates = (ue.data || []).map((xe) => xe.plan_date).filter(Boolean).sort();
-            if (kgDates.length) {
-              const kgCrossResult = await qe
-                .from("site_assignments")
-                .select(_s)
-                .gte("plan_date", kgDates[0])
-                .lt("plan_date", wr(kgDates[kgDates.length - 1], 1))
-                .order("plan_date")
-                .limit(1e4);
-              if (kgCrossResult.error) j(kgCrossResult.error.message);
-              else kgCrossRows = kgCrossResult.data || [];
-            }
+            const { start: kgMonthStart, endExclusive: kgMonthEnd } = lh(c);
+            const kgCrossResult = await qe
+              .from("site_assignments")
+              .select(_s)
+              .gte("plan_date", kgMonthStart)
+              .lt("plan_date", kgMonthEnd)
+              .order("plan_date")
+              .limit(1e4);
+            if (kgCrossResult.error) j(kgCrossResult.error.message);
+            else kgCrossRows = kgCrossResult.data || [];
           }
           (V && j(V.message), _(ue.data || []), D(ee.data || []), kgSetCrossAssignments(kgCrossRows), L(!1));
         }
@@ -34596,7 +34599,72 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               }),
                 (me = `KG-Month-Summary-${c}.xlsx`));
             } else {
-              const ue = S.find((ee) => Number(ee.id) === de);
+              const ue = S.find((ee) => Number(ee.id) === de),
+                kgSelectedAddress = (ue == null ? void 0 : ue.address) || "",
+                kgAlertPeople = new Map();
+              const kgAddAlertPerson = (kgType, kgDate, kgId, kgName, kgSiteId, kgAddress) => {
+                if (!kgDate || kgId == null || kgSiteId == null) return;
+                const kgKey = `${kgType}|${kgDate}|${String(kgId)}`;
+                if (!kgAlertPeople.has(kgKey))
+                  kgAlertPeople.set(kgKey, {
+                    date: kgDate,
+                    type: kgType,
+                    name: kgName || "",
+                    sites: new Map(),
+                  });
+                kgAlertPeople.get(kgKey).sites.set(String(kgSiteId), kgAddress || String(kgSiteId));
+              };
+              for (const kgAssignment of kgCrossAssignments || []) {
+                const kgSite = kgAssignment == null ? void 0 : kgAssignment.site,
+                  kgSiteId = kgSite == null ? void 0 : kgSite.id,
+                  kgAddress = (kgSite == null ? void 0 : kgSite.address) || "";
+                for (const kgAw of kgAssignment.assignment_workers || [])
+                  kgAddAlertPerson(
+                    "Worker",
+                    kgAssignment.plan_date,
+                    kgAw.worker_id,
+                    kgExcelWorkerName(kgAw.worker),
+                    kgSiteId,
+                    kgAddress,
+                  );
+                for (const kgFm of ar(kgAssignment))
+                  kgAddAlertPerson(
+                    "Foreman",
+                    kgAssignment.plan_date,
+                    kgFm.id,
+                    kgNameNick(kgFm),
+                    kgSiteId,
+                    kgAddress,
+                  );
+              }
+              const kgMultiSiteRows = [...kgAlertPeople.values()]
+                .filter((kgPerson) => kgPerson.sites.size > 1)
+                .map((kgPerson) => {
+                  const kgSites = [...kgPerson.sites.values()];
+                  return {
+                    "⚠ MULTI-SITE": "YES",
+                    Date: kgPerson.date,
+                    Day: kgDayFull(kgPerson.date),
+                    Type: kgPerson.type,
+                    Name: kgPerson.name,
+                    "Site count": kgSites.length,
+                    "Site 1": kgSites[0] || "",
+                    "Site 2": kgSites[1] || "",
+                    "Site 3": kgSites[2] || "",
+                    "All sites": kgSites.join(" | "),
+                    "Includes selected site": kgSelectedAddress && kgSites.includes(kgSelectedAddress) ? "YES" : "NO",
+                  };
+                })
+                .sort((kgA, kgB) =>
+                  String(kgA.Date).localeCompare(String(kgB.Date)) ||
+                  String(kgA.Type).localeCompare(String(kgB.Type)) ||
+                  String(kgA.Name).localeCompare(String(kgB.Name)),
+                );
+              B.push({
+                name: "Multi-Site Alert",
+                rows: kgMultiSiteRows,
+                emptyMessage: "No worker or foreman is working at 2 or more sites in this month.",
+              });
               B.push({
                 name: "Planner Export",
                 ...kgDailyExcelSheet(oe, []),
@@ -34605,16 +34673,18 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 name: "Site Monthly Summary",
                 rows: N.map((ee) => {
                   var V;
+                  const kgForemanWarnings = [...ee.foremanNames].filter((kgName) => String(kgName).includes("⚠")),
+                    kgWorkerWarnings = [...ee.workerExcelNames].filter((kgName) => String(kgName).includes("⚠"));
                   return {
                     Date: ee.date,
                     Day: kgDayFull(ee.date),
-                    Address: (ue == null ? void 0 : ue.address) || "",
+                    Address: kgSelectedAddress,
                     Shifts: [...ee.shifts].join(", "),
+                    "⚠ Foreman 2+ sites": kgForemanWarnings.join(" ; ") || "—",
                     Foremen: [...ee.foremanNames].filter(Boolean).join(", "),
-                    "Foreman multi-site": [...ee.foremanNames].filter((V) => String(V).includes("⚠")).join(" ; ") || "—",
                     "Foreman shifts": ee.foremanShifts,
+                    "⚠ Worker 2+ sites": kgWorkerWarnings.join(" ; ") || "—",
                     Workers: [...ee.workerExcelNames].filter(Boolean).join(", "),
-                    "Worker multi-site": [...ee.workerExcelNames].filter((V) => String(V).includes("⚠")).join(" ; ") || "—",
                     "Worker shifts": ee.workerShifts,
                     "OT shift": kgFormatOtHours(ee.otHours) || "",
                     "DO sent":
@@ -34749,9 +34819,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                   rows: ke.map((Pe) => ({
                     ID: Pe.id,
                     Lorry: Pe.registration_no,
-                    Driver: kgExcelDriverName(Pe),
-                    "Driver full name": Pe.driver_full_name || "",
-                    "Driver address / base": Pe.driver_base_location === "mandai" ? "Mandai (M)" : Pe.driver_base_location === "tuas" ? "Tuas (T)" : "",
                     Status: Pe.status,
                     Created: Pe.created_at,
                     Updated: Pe.updated_at,
@@ -34789,8 +34856,6 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     "Assignment ID": Pe.assignment_id,
                     "Lorry ID": Pe.lorry_id,
                     Lorry: Pe.lorry ? Pe.lorry.registration_no : "",
-                    Driver: Pe.lorry ? kgExcelDriverName(Pe.lorry) : "",
-                    "Driver address / base": Pe.lorry && Pe.lorry.driver_base_location === "mandai" ? "Mandai (M)" : Pe.lorry && Pe.lorry.driver_base_location === "tuas" ? "Tuas (T)" : "",
                     "Sort order": Pe.sort_order,
                   })),
                 },
@@ -36270,6 +36335,12 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       function kgLorryExcelList(t) {
         return kgAssignmentLorries(t).map((r) => kgLorryExcel(r)).filter(Boolean).join(" + ");
       }
+      function kgExcelVehicleNoList(t) {
+        return kgAssignmentLorries(t)
+          .map((r) => String((r == null ? void 0 : r.registration_no) || "").trim())
+          .filter(Boolean)
+          .join(" + ");
+      }
       const kgCleanExtraLine = (t) => String(t || "").replace(/^[-*•]\s*/, "").trim();
       function kgFirstLorry(t) {
         return kgAssignmentLorries(t)[0] || null;
@@ -36547,7 +36618,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const n = [];
         for (const l of kgSortAssignmentsForExcel(t || [])) {
           var s;
-          const f = kgLorryExcelList(l),
+          const f = kgExcelVehicleNoList(l),
             c = kgExcelDate(l.plan_date),
             m = ar(l).length;
           n.push({
@@ -42684,7 +42755,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "lorries",
           orderBy: "registration_no",
           description:
-            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner and Excel show (M)/(T); WhatsApp keeps names clean and removes location tags and (SL).",
+            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner can show driver/base details; Excel vehicle columns export lorry number only; WhatsApp keeps names clean and removes location tags and (SL).",
           columns: [
             { key: "registration_no", label: "Lorry" },
             { key: "driver_name", label: "Driver short name" },
