@@ -16416,7 +16416,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 children: [
                   "Connected: ",
                   GS || "Not configured",
-                  " · Build V5.8.1 show OFF workers already assigned elsewhere",
+                  " · Build V5.8.8 worker SIC warning bypass",
                 ],
               }),
             ],
@@ -37630,16 +37630,23 @@ Worker : ${c}`;
           kgWorkersAssignedAnySite = new Set(
             s.flatMap((V) => (V.assignment_workers || []).map((xe) => String(xe.worker_id || (xe.worker && xe.worker.id) || ""))).filter(Boolean),
           ),
-          kgPlannerWorkerPool = p.workers.filter((V) => {
-            if (kgSelectedSpecialOffKind) return !0;
-            const xe = kgOffOnDate(V, n),
-              kgAlreadyAtAnotherSite = kgWorkersAssignedAnySite.has(String(V.id)),
-              ke = !kgSelectedSiteSicRestricted || kgSelectedSiteSicApproved.has(String(V.id)) || kgSelectedWorkerIds.has(String(V.id));
-            // OFF workers normally stay out of the picker, but if they are already assigned
-            // somewhere on this Planner date keep them visible so users can see the conflict.
-            const Le = !xe || kgSelectedWorkerIds.has(String(V.id)) || kgAlreadyAtAnotherSite;
-            return ke && Le;
-          }),
+          kgPlannerWorkerPool = p.workers
+            .filter((V) => {
+              if (kgSelectedSpecialOffKind) return !0;
+              const xe = kgOffOnDate(V, n),
+                kgAlreadyAtAnotherSite = kgWorkersAssignedAnySite.has(String(V.id));
+              // Show ALL active workers for the selected site. SIC-approved workers are sorted
+              // first; workers without SIC stay visible in red below and may be chosen after a warning.
+              // OFF workers normally stay out of the picker, but if they are already assigned
+              // somewhere on this Planner date keep them visible so users can see the conflict.
+              return !xe || kgSelectedWorkerIds.has(String(V.id)) || kgAlreadyAtAnotherSite;
+            })
+            .sort((V, xe) => {
+              if (!kgSelectedSiteSicRestricted) return 0;
+              const ke = kgWorkerAllowedForSite(V.id, kgSelectedSite) ? 0 : 1,
+                Le = kgWorkerAllowedForSite(xe.id, kgSelectedSite) ? 0 : 1;
+              return ke - Le;
+            }),
           kgPlannerForemanPool = p.foremen.filter((V) => {
             if (kgSelectedSpecialOffKind) return !0;
             const xe = kgOffOnDate(V, n), ke = !kgSelectedSiteForemanSicRestricted || kgSelectedSiteForemanSicApproved.has(String(V.id)) || kgSelectedForemanIds.has(String(V.id));
@@ -37815,7 +37822,7 @@ Worker : ${c}`;
                     !Ve &&
                       d.jsx("small", {
                         className: "sic-worker-warning-text",
-                        children: "Previously assigned — not currently SIC approved",
+                        children: "NO SIC for this site — you can still select with warning",
                       }),
                     kgOff &&
                       d.jsx("small", {
@@ -37970,7 +37977,7 @@ Worker : ${c}`;
             for (const It of ke) {
               const qt = `${It}|${w.shift || "day"}`;
               if (Ve.has(qt)) { Dt += 1; continue; }
-              const Vt = p.workers.filter((Xt) => (w.worker_ids || []).includes(Number(Xt.id)) && (kgSpecial || (!kgOffOnDate(Xt, It) && kgWorkerAllowedForSite(Xt.id, kgSelectedSite)))).map((Xt) => Number(Xt.id)),
+              const Vt = p.workers.filter((Xt) => (w.worker_ids || []).includes(Number(Xt.id)) && (kgSpecial || !kgOffOnDate(Xt, It))).map((Xt) => Number(Xt.id)),
                 Yt = p.foremen.filter((Xt) => At.includes(Number(Xt.id)) && (kgSpecial || (!kgOffOnDate(Xt, It) && kgForemanAllowedForSite(Xt.id, kgSelectedSite)))).map((Xt) => Number(Xt.id));
               const Xt = { plan_date: It, site_id: Number(w.site_id), lorry_id: Re.length ? Re[0] : null, foreman_id: Yt.length ? Yt[0] : null, shift: w.shift, job_status: w.job_status || "CONTINUE JOB", pic: w.pic || null, is_confirmed: !!w.is_confirmed, remark: It === n ? (w.remark || null) : null, notes: It === n ? (w.notes || null) : null };
               await kgInsertAssignmentCopy(Xt, Re, Yt, Vt, w.worker_ot || {});
@@ -38031,7 +38038,27 @@ Worker : ${c}`;
         }
         async function se(V) {
           (V.preventDefault(), j(""));
+          const kgNoSicWorkers = !kgSelectedSpecialOffKind && kgSelectedSiteSicRestricted
+            ? (w.worker_ids || [])
+                .map((Qe) => p.workers.find((Ve) => Number(Ve.id) === Number(Qe)))
+                .filter((Qe) => Qe && !kgWorkerAllowedForSite(Qe.id, kgSelectedSite))
+            : [];
+          if (kgNoSicWorkers.length) {
+            const kgNoSicNames = kgNoSicWorkers.map((Qe) => kgPlannerWorkerName(Qe) || kgNameNick(Qe) || "Worker");
+            if (!window.confirm(`⚠ SIC WARNING
+
+${kgNoSicNames.join("\n")}
+
+${kgNoSicWorkers.length === 1 ? "This worker doesn't" : "These workers don't"} have SIC for this site:
+${Ca((kgSelectedSite || {}).address, "Selected site")}
+
+Do you still want to SAVE them at this site?`)) return;
+          }
           if (S === "new" && (w.range_start || n) !== (w.range_end || w.range_start || n)) return kgSaveAssignmentRange();
+          const kgRequestedShift = String(w.shift || "day"),
+            kgRequestedShiftLabel = ({ day: "Day", night: "Night", am: "Morning (AM)", pm: "Afternoon (PM)" })[kgRequestedShift] || kgRequestedShift.toUpperCase(),
+            kgSameSiteShift = s.find((Qe) => String(Qe.id) !== String(S || "") && Number(((Qe.site || {}).id) || Qe.site_id) === Number(w.site_id) && String(Qe.shift || "day") === kgRequestedShift);
+          if (kgSameSiteShift) return j(`This site is already added for ${kgRequestedShiftLabel} on ${D0(n)}. Choose a different shift (for example Morning + Night) to add the same address again.`);
           const kgOldAssignment = S !== "new" ? s.find((Qe) => String(Qe.id) === String(S)) || null : null,
             kgOldSpecialKind = kgSpecialOffSiteKind(kgOldAssignment && kgOldAssignment.site),
             kgNewSpecialKind = kgSelectedSpecialOffKind,
@@ -38050,7 +38077,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (S === "new") {
             const kgAvailableWorkerIds = (w.worker_ids || []).filter((Qe) => {
               const Ve = p.workers.find((Re) => Number(Re.id) === Number(Qe));
-              return Ve && (kgNewSpecialKind || (!kgOffOnDate(Ve, n) && kgWorkerAllowedForSite(Ve.id, kgSelectedSite)));
+              // A worker without SIC is allowed when the user explicitly confirmed the red warning.
+              // OFF still blocks a new normal-site assignment.
+              return Ve && (kgNewSpecialKind || !kgOffOnDate(Ve, n));
             }), kgAvailableForemanIds = (w.foreman_ids || []).filter((Qe) => {
               const Ve = p.foremen.find((Re) => Number(Re.id) === Number(Qe));
               return Ve && (kgNewSpecialKind || (!kgOffOnDate(Ve, n) && kgForemanAllowedForSite(Ve.id, kgSelectedSite)));
@@ -38061,7 +38090,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             if (kgAvailableWorkerIds.length !== (w.worker_ids || []).length || kgAvailableForemanIds.length !== (w.foreman_ids || []).length || kgAvailableLorryIds.length !== kgSelectedLorries.length) {
               kgSelectedLorries = kgAvailableLorryIds;
               _((Qe) => ({ ...Qe, worker_ids: kgAvailableWorkerIds, foreman_ids: kgAvailableForemanIds, lorry_ids: kgAvailableLorryIds, lorry_id: kgAvailableLorryIds.length ? String(kgAvailableLorryIds[0]) : "" }));
-              He("SIC/OFF check failed. Lorry AND driver must both match this site. Any non-approved worker, foreman, lorry or driver was removed. Please check and Save again.");
+              He("OFF/SIC check failed. Workers without SIC are allowed only after the red warning; OFF workers, non-approved foremen, lorries or drivers were removed. Please check and Save again.");
               return;
             }
           } else {
@@ -38221,7 +38250,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("p", {
                       children: kgPhoneOnly
                         ? "Phone-friendly whole-day job sheet. Same Lorry / Worker / Foreman / Date / P.I.C. / Address format."
-                        : "Same worker may be used at different sites; the website warns before saving.",
+                        : "Same site can be added again for a different shift (for example Morning + Night). Same worker may be used at different sites; the website warns before saving.",
                     }),
                   ],
                 }),
@@ -39015,14 +39044,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             }),
                             p.sites
                               .filter((V) => kgSiteTypeMatches(V, kgSiteTypeFilter))
-                              .filter((V) => S !== "new" || !Ye.has(Number(V.id)) || Number(w.site_id) === Number(V.id))
-                              .map((V) =>
-                                d.jsx(
+                              .map((V) => {
+                                const kgExistingShifts = [...new Set(s
+                                  .filter((xe) => Number(((xe.site || {}).id) || xe.site_id) === Number(V.id))
+                                  .map((xe) => ({ day: "Day", night: "Night", am: "Morning", pm: "PM" })[String(xe.shift || "day")] || String(xe.shift || "day").toUpperCase()))];
+                                const kgAlreadyText = S === "new" && kgExistingShifts.length ? ` — already ${kgExistingShifts.join(" + ")}` : "";
+                                return d.jsx(
                                   "option",
-                                  { value: V.id, children: kgSiteOptionLabel(V) },
+                                  { value: V.id, children: `${kgSiteOptionLabel(V)}${kgAlreadyText}` },
                                   V.id,
-                                ),
-                              ),
+                                );
+                              }),
                           ],
                         }),
                       ],
@@ -39102,10 +39134,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                               value: "night",
                               children: "Night",
                             }),
-                            d.jsx("option", { value: "am", children: "AM" }),
-                            d.jsx("option", { value: "pm", children: "PM" }),
+                            d.jsx("option", { value: "am", children: "Morning (AM)" }),
+                            d.jsx("option", { value: "pm", children: "Afternoon (PM)" }),
                           ],
                         }),
+                        d.jsx("span", { className: "field-help", children: "Same address can be added more than once on the same date when the shift is different. Example: Morning (AM) + Night." }),
                       ],
                     }),
                     d.jsxs("label", {
@@ -39328,7 +39361,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             d.jsx("span", {
                               className: "field-help",
                               children: kgSelectedSiteSicRestricted
-                                ? "Only SIC-approved skilled workers are selectable. OFF workers already assigned to another site stay visible for checking."
+                                ? "SIC-approved workers are shown first. Workers WITHOUT SIC are red below and can still be selected after a warning. OFF workers already assigned elsewhere stay visible for checking."
                                 : "Tick skilled workers. OFF workers already assigned to another site stay visible for checking.",
                             }),
                             d.jsx("div", {
@@ -39346,7 +39379,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                             d.jsx("span", {
                               className: "field-help",
                               children: kgSelectedSiteSicRestricted
-                                ? "Only SIC-approved general workers are selectable. OFF workers already assigned to another site stay visible for checking."
+                                ? "SIC-approved workers are shown first. Workers WITHOUT SIC are red below and can still be selected after a warning. OFF workers already assigned elsewhere stay visible for checking."
                                 : "Tick general workers. OFF workers already assigned to another site stay visible for checking; a duplicate-site warning still appears before save.",
                             }),
                             d.jsx("div", {
@@ -46171,7 +46204,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         padding: 8px 10px;
         font-weight: 900;
       }
-      .sic-worker-blocked { border-color: #ef4444 !important; background: #fef2f2 !important; }
+      .sic-worker-blocked { border-color: #ef4444 !important; background: #fef2f2 !important; color: #991b1b !important; }
       .sic-worker-warning-text { display: block; color: #b91c1c; font-weight: 900; }
       @media (max-width: 720px) {
         .sic-site-box { padding: 11px; }
