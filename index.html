@@ -34348,22 +34348,29 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           _e = q.useMemo(() => bo(ge), [ge]),
           He = q.useMemo(() => {
             var me, ue;
-            const B = new Map();
+            const B = new Map(),
+              kgEnsureShiftRow = (kgSite, kgShiftGroup) => {
+                const kgSiteId = Number((kgSite == null ? void 0 : kgSite.id));
+                const kgKey = `${kgSiteId}|${kgShiftGroup}`;
+                B.has(kgKey) ||
+                  B.set(kgKey, {
+                    site: kgSite,
+                    shiftGroup: kgShiftGroup,
+                    shiftLabel: kgShiftGroup === "delivery" ? "Delivery only" : kgSummaryShiftLabel(kgShiftGroup),
+                    assignments: [],
+                    workers: new Set(),
+                    foremen: new Set(),
+                    workerShifts: 0,
+                    foremanShifts: 0,
+                    otHours: 0,
+                    order: null,
+                    orders: [],
+                  });
+                return B.get(kgKey);
+              };
             for (const ee of w) {
-              const V = Number((me = ee.site) == null ? void 0 : me.id);
-              B.has(V) ||
-                B.set(V, {
-                  site: ee.site,
-                  assignments: [],
-                  workers: new Set(),
-                  foremen: new Set(),
-                  workerShifts: 0,
-                  foremanShifts: 0,
-                  otHours: 0,
-                  order: null,
-                  orders: [],
-                });
-              const xe = B.get(V);
+              const kgShiftGroup = kgSummaryShiftKey(ee.shift),
+                xe = kgEnsureShiftRow(ee.site, kgShiftGroup);
               xe.assignments.push(ee);
               for (const ke of ar(ee))
                 ((xe.foremanShifts += 1), xe.foremen.add(Number(ke.id)));
@@ -34372,72 +34379,78 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               xe.otHours += kgAssignmentOtHours(ee);
             }
             for (const ee of T) {
-              const V = Number((ue = ee.site) == null ? void 0 : ue.id);
-              (B.has(V) ||
-                B.set(V, {
-                  site: ee.site,
-                  assignments: [],
-                  workers: new Set(),
-                  foremen: new Set(),
-                  workerShifts: 0,
-                  foremanShifts: 0,
-                  otHours: 0,
-                  order: null,
-                }),
-                (B.get(V).order = ee));
+              const V = Number((ue = ee.site) == null ? void 0 : ue.id),
+                kgPrefix = `${V}|`,
+                kgRowsForSite = [...B.entries()].filter(([kgKey]) => kgKey.startsWith(kgPrefix)).map(([, kgRow]) => kgRow);
+              if (kgRowsForSite.length)
+                kgRowsForSite.forEach((kgRow) => {
+                  kgRow.order = kgRow.order || ee;
+                  kgRow.orders.push(ee);
+                });
+              else {
+                const kgRow = kgEnsureShiftRow(ee.site, "delivery");
+                kgRow.order = ee;
+                kgRow.orders.push(ee);
+              }
             }
             return [...B.values()].sort((ee, V) => {
               var xe, ke;
-              return String(
+              const kgAddressCompare = String(
                 (xe = ee.site) == null ? void 0 : xe.address,
               ).localeCompare(
                 String((ke = V.site) == null ? void 0 : ke.address),
               );
+              return kgAddressCompare || kgSummaryShiftRank(ee.shiftGroup) - kgSummaryShiftRank(V.shiftGroup);
             });
           }, [w, T]),
           P = q.useMemo(() => {
             var me, ue;
-            const B = new Map();
+            const B = new Map(),
+              kgNewMonthlySite = (kgSite) => ({
+                site: kgSite,
+                days: new Set(),
+                workers: new Set(),
+                foremen: new Set(),
+                workerShifts: 0,
+                foremanShifts: 0,
+                dayWorkerShifts: 0,
+                nightWorkerShifts: 0,
+                dayForemanShifts: 0,
+                nightForemanShifts: 0,
+                otHours: 0,
+                dayOtHours: 0,
+                nightOtHours: 0,
+                orderCount: 0,
+                sentOrders: 0,
+                cost: 0,
+                orders: [],
+              });
             for (const ee of w) {
               const V = Number((me = ee.site) == null ? void 0 : me.id);
-              B.has(V) ||
-                B.set(V, {
-                  site: ee.site,
-                  days: new Set(),
-                  workers: new Set(),
-                  foremen: new Set(),
-                  workerShifts: 0,
-                  foremanShifts: 0,
-                  otHours: 0,
-                  orderCount: 0,
-                  sentOrders: 0,
-                  cost: 0,
-                  orders: [],
-                });
-              const xe = B.get(V);
+              B.has(V) || B.set(V, kgNewMonthlySite(ee.site));
+              const xe = B.get(V), kgShiftGroup = kgSummaryShiftKey(ee.shift),
+                kgForemanCount = ar(ee).length,
+                kgWorkerCount = (ee.assignment_workers || []).length,
+                kgOt = kgAssignmentOtHours(ee);
               xe.days.add(ee.plan_date);
-              for (const ke of ar(ee))
-                (xe.foremen.add(Number(ke.id)), (xe.foremanShifts += 1));
-              for (const ke of ee.assignment_workers || [])
-                (xe.workers.add(Number(ke.worker_id)), (xe.workerShifts += 1));
-              xe.otHours += kgAssignmentOtHours(ee);
+              for (const ke of ar(ee)) xe.foremen.add(Number(ke.id));
+              for (const ke of ee.assignment_workers || []) xe.workers.add(Number(ke.worker_id));
+              xe.foremanShifts += kgForemanCount;
+              xe.workerShifts += kgWorkerCount;
+              xe.otHours += kgOt;
+              if (kgShiftGroup === "night") {
+                xe.nightForemanShifts += kgForemanCount;
+                xe.nightWorkerShifts += kgWorkerCount;
+                xe.nightOtHours += kgOt;
+              } else {
+                xe.dayForemanShifts += kgForemanCount;
+                xe.dayWorkerShifts += kgWorkerCount;
+                xe.dayOtHours += kgOt;
+              }
             }
             for (const ee of T) {
               const V = Number((ue = ee.site) == null ? void 0 : ue.id);
-              B.has(V) ||
-                B.set(V, {
-                  site: ee.site,
-                  days: new Set(),
-                  workers: new Set(),
-                  foremen: new Set(),
-                  workerShifts: 0,
-                  foremanShifts: 0,
-                  otHours: 0,
-                  orderCount: 0,
-                  sentOrders: 0,
-                  cost: 0,
-                  orders: [],
-                });
+              B.has(V) || B.set(V, kgNewMonthlySite(ee.site));
               const xe = B.get(V);
               (xe.days.add(ee.delivery_date),
                 (xe.orderCount += 1),
@@ -34475,25 +34488,27 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           }, [w, kgCrossAssignments, n]),
           N = q.useMemo(() => {
             var me;
-            const B = new Map();
+            const B = new Map(),
+              kgNewSiteDayShift = (kgDate, kgShiftGroup) => ({
+                date: kgDate,
+                shiftGroup: kgShiftGroup,
+                shiftLabel: kgShiftGroup === "delivery" ? "Delivery only" : kgSummaryShiftLabel(kgShiftGroup),
+                workers: new Set(),
+                foremen: new Set(),
+                workerNames: new Set(),
+                workerExcelNames: new Set(),
+                foremanNames: new Set(),
+                workerShifts: 0,
+                foremanShifts: 0,
+                otHours: 0,
+                shifts: new Set(),
+                order: null,
+                orders: [],
+              });
             for (const ue of oe) {
-              const ee = ue.plan_date;
-              B.has(ee) ||
-                B.set(ee, {
-                  date: ee,
-                  workers: new Set(),
-                  foremen: new Set(),
-                  workerNames: new Set(),
-                  workerExcelNames: new Set(),
-                  foremanNames: new Set(),
-                  workerShifts: 0,
-                  foremanShifts: 0,
-                  otHours: 0,
-                  shifts: new Set(),
-                  order: null,
-                  orders: [],
-                });
-              const V = B.get(ee);
+              const ee = ue.plan_date, kgShiftGroup = kgSummaryShiftKey(ue.shift), kgKey = `${ee}|${kgShiftGroup}`;
+              B.has(kgKey) || B.set(kgKey, kgNewSiteDayShift(ee, kgShiftGroup));
+              const V = B.get(kgKey);
               V.shifts.add(ue.shift);
               for (const xe of ar(ue)) {
                 const ke = kgMultiSiteByDay.foremen.get(`${ee}|${String(xe.id)}`);
@@ -34511,51 +34526,174 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
               V.otHours += kgAssignmentOtHours(ue);
             }
             for (const ue of ge) {
-              const ee = ue.delivery_date;
-              (B.has(ee) ||
-                B.set(ee, {
-                  date: ee,
-                  workers: new Set(),
-                  foremen: new Set(),
-                  workerNames: new Set(),
-                  workerExcelNames: new Set(),
-                  foremanNames: new Set(),
-                  workerShifts: 0,
-                  foremanShifts: 0,
-                  otHours: 0,
-                  shifts: new Set(),
-                  order: null,
-                  orders: [],
-                }),
-                (B.get(ee).order = B.get(ee).order || ue),
-                B.get(ee).orders.push(ue));
+              const ee = ue.delivery_date,
+                kgMatchingRows = [...B.entries()].filter(([kgKey]) => kgKey.startsWith(`${ee}|`)).map(([, kgRow]) => kgRow);
+              if (kgMatchingRows.length)
+                kgMatchingRows.forEach((kgRow) => {
+                  kgRow.order = kgRow.order || ue;
+                  kgRow.orders.push(ue);
+                });
+              else {
+                const kgKey = `${ee}|delivery`;
+                B.has(kgKey) || B.set(kgKey, kgNewSiteDayShift(ee, "delivery"));
+                const kgRow = B.get(kgKey);
+                kgRow.order = kgRow.order || ue;
+                kgRow.orders.push(ue);
+              }
             }
             return [...B.values()].sort((ue, ee) =>
-              ue.date.localeCompare(ee.date),
+              ue.date.localeCompare(ee.date) || kgSummaryShiftRank(ue.shiftGroup) - kgSummaryShiftRank(ee.shiftGroup),
             );
           }, [oe, ge, kgMultiSiteByDay]),
           z = q.useMemo(
-            () => ({
-              sites: new Set(
-                oe
-                  .map((B) => {
-                    var me;
-                    return (me = B.site) == null ? void 0 : me.id;
-                  })
-                  .filter(Boolean),
-              ).size,
-              uniqueWorkers: Go(oe).size,
-              workerShifts: oe.reduce(
-                (B, me) => B + (me.assignment_workers || []).length,
-                0,
-              ),
-              foremanShifts: oe.reduce((B, me) => B + ar(me).length, 0),
-              otHours: oe.reduce((B, me) => B + kgAssignmentOtHours(me), 0),
-              deliveryCost: ge.reduce((B, me) => B + Yr(me), 0),
-              sentOrders: ge.filter((B) => B.sent_on).length,
-            }),
+            () => {
+              const kgDayAssignments = oe.filter((B) => kgSummaryShiftKey(B.shift) === "day"),
+                kgNightAssignments = oe.filter((B) => kgSummaryShiftKey(B.shift) === "night");
+              return {
+                sites: new Set(
+                  oe
+                    .map((B) => {
+                      var me;
+                      return (me = B.site) == null ? void 0 : me.id;
+                    })
+                    .filter(Boolean),
+                ).size,
+                uniqueWorkers: Go(oe).size,
+                workerShifts: oe.reduce(
+                  (B, me) => B + (me.assignment_workers || []).length,
+                  0,
+                ),
+                dayWorkerShifts: kgDayAssignments.reduce((B, me) => B + (me.assignment_workers || []).length, 0),
+                nightWorkerShifts: kgNightAssignments.reduce((B, me) => B + (me.assignment_workers || []).length, 0),
+                foremanShifts: oe.reduce((B, me) => B + ar(me).length, 0),
+                dayForemanShifts: kgDayAssignments.reduce((B, me) => B + ar(me).length, 0),
+                nightForemanShifts: kgNightAssignments.reduce((B, me) => B + ar(me).length, 0),
+                otHours: oe.reduce((B, me) => B + kgAssignmentOtHours(me), 0),
+                deliveryCost: ge.reduce((B, me) => B + Yr(me), 0),
+                sentOrders: ge.filter((B) => B.sent_on).length,
+              };
+            },
             [oe, ge],
           );
+        function kgDetailedSiteShiftRows(B) {
+          return oe
+            .filter((me) => kgSummaryShiftKey(me.shift) === B)
+            .sort((me, ue) =>
+              String(me.plan_date || "").localeCompare(String(ue.plan_date || "")) ||
+              Number(me.sort_order || 0) - Number(ue.sort_order || 0),
+            );
+        }
+        function kgDetailedShiftName(B) {
+          const me = String((B == null ? void 0 : B.shift) || "day").toLowerCase();
+          return ({ am: "Morning (AM)", pm: "Afternoon (PM)", day: "Day", night: "Night" })[me] || me.toUpperCase();
+        }
+        function kgDetailedWorkerNames(B, me = !1) {
+          return (B.assignment_workers || []).map((ue) => {
+            const ee = kgMultiSiteByDay.workers.get(`${B.plan_date}|${String(ue.worker_id)}`),
+              V = me ? kgExcelWorkerName(ue.worker) : kgPlannerWorkerName(ue.worker);
+            return kgSummaryMultiSiteText(V, ee);
+          }).filter(Boolean);
+        }
+        function kgDetailedForemanNames(B) {
+          return ar(B).map((me) => {
+            const ue = kgMultiSiteByDay.foremen.get(`${B.plan_date}|${String(me.id)}`);
+            return kgSummaryMultiSiteText(kgNameNick(me), ue);
+          }).filter(Boolean);
+        }
+        function kgRenderDetailedSiteShift(B, me, ue) {
+          const ee = kgDetailedSiteShiftRows(B),
+            V = new Set(ee.flatMap((xe) => (xe.assignment_workers || []).map((ke) => String(ke.worker_id)))).size,
+            xe = new Set(ee.flatMap((ke) => ar(ke).map((Ee) => String(Ee.id)))).size,
+            ke = ee.reduce((Ee, Be) => Ee + (Be.assignment_workers || []).length, 0),
+            Ee = ee.reduce((Be, ze) => Be + ar(ze).length, 0),
+            Be = ee.reduce((ze, Ce) => ze + kgAssignmentOtHours(Ce), 0);
+          return d.jsxs("div", {
+            style: { marginTop: B === "day" ? "18px" : "28px" },
+            children: [
+              d.jsxs("div", {
+                style: { padding: "14px", background: ue, borderRadius: "12px", border: "1px solid #d7dde5", marginBottom: "12px" },
+                children: [
+                  d.jsxs("div", {
+                    style: { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" },
+                    children: [
+                      d.jsxs("div", { children: [
+                        d.jsxs("h3", { style: { margin: 0 }, children: [me, " (", ee.length, ")"] }),
+                        d.jsx("div", { style: { fontSize: "13px", opacity: 0.8, marginTop: "3px" }, children: "Full manpower and job details for this shift" }),
+                      ] }),
+                      d.jsxs("div", {
+                        style: { display: "flex", gap: "8px", flexWrap: "wrap", fontSize: "13px", fontWeight: 700 },
+                        children: [
+                          d.jsxs("span", { style: { padding: "6px 9px", background: "#fff", borderRadius: "8px" }, children: ["Workers: ", V, " unique / ", ke, " shifts"] }),
+                          d.jsxs("span", { style: { padding: "6px 9px", background: "#fff", borderRadius: "8px" }, children: ["Foremen: ", xe, " unique / ", Ee, " shifts"] }),
+                          d.jsxs("span", { style: { padding: "6px 9px", background: "#fff", borderRadius: "8px" }, children: ["OT: ", kgFormatOtHours(Be) || "0hr OT"] }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              I
+                ? d.jsx("div", { className: "empty-state small", children: `Loading ${me.toLowerCase()}…` })
+                : ee.length === 0
+                  ? d.jsx("div", { className: "empty-state small", children: `No ${me} records for this site in the selected month.` })
+                  : d.jsx("div", {
+                      style: { display: "grid", gap: "12px" },
+                      children: ee.map((ze) => {
+                        const Ce = kgDetailedWorkerNames(ze),
+                          Ge = kgDetailedForemanNames(ze),
+                          kt = String(ze.pic || ((ze.site || {}).pic) || "").trim() || "—",
+                          Qe = String(ze.job_status || "").trim() || "—",
+                          It = kgPlannerLorryList(ze),
+                          Ze = kgAssignmentOtHours(ze),
+                          Xn = String(ze.notes || "").trim(),
+                          Xr = String(ze.remark || "").trim(),
+                          Zt = String(((ze.site || {}).notes) || "").trim(),
+                          Qr = String(((ze.site || {}).remark) || "").trim();
+                        return d.jsxs("div", {
+                          style: { border: "1px solid #dfe4ea", borderRadius: "12px", padding: "14px", background: "#fff" },
+                          children: [
+                            d.jsxs("div", {
+                              style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", flexWrap: "wrap", marginBottom: "12px" },
+                              children: [
+                                d.jsxs("div", { children: [
+                                  d.jsxs("strong", { style: { fontSize: "17px" }, children: [ze.plan_date, " · ", kgDayFull(ze.plan_date)] }),
+                                  d.jsxs("div", { style: { marginTop: "3px", fontSize: "13px", opacity: 0.8 }, children: [me, " · ", kgDetailedShiftName(ze)] }),
+                                ] }),
+                                d.jsx("span", { style: { padding: "5px 9px", borderRadius: "999px", background: ze.is_confirmed ? "#ecfdf3" : "#fff7ed", fontWeight: 700, fontSize: "12px" }, children: ze.is_confirmed ? "Confirmed" : "Unconfirmed" }),
+                              ],
+                            }),
+                            d.jsxs("div", {
+                              style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "8px", marginBottom: "12px" },
+                              children: [
+                                d.jsxs("div", { style: { padding: "9px", background: "#f8fafc", borderRadius: "8px" }, children: [d.jsx("small", { children: "P.I.C." }), d.jsx("div", { style: { fontWeight: 700 }, children: kt })] }),
+                                d.jsxs("div", { style: { padding: "9px", background: "#f8fafc", borderRadius: "8px" }, children: [d.jsx("small", { children: "Job status" }), d.jsx("div", { style: { fontWeight: 700 }, children: Qe })] }),
+                                d.jsxs("div", { style: { padding: "9px", background: "#f8fafc", borderRadius: "8px" }, children: [d.jsx("small", { children: "Lorry / Driver" }), d.jsx("div", { style: { fontWeight: 700 }, children: It })] }),
+                                d.jsxs("div", { style: { padding: "9px", background: "#f8fafc", borderRadius: "8px" }, children: [d.jsx("small", { children: "OT" }), d.jsx("div", { style: { fontWeight: 700 }, children: kgFormatOtHours(Ze) || "—" })] }),
+                              ],
+                            }),
+                            d.jsxs("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: "10px" }, children: [
+                              d.jsxs("div", { style: { padding: "10px", border: "1px solid #e5e7eb", borderRadius: "9px" }, children: [
+                                d.jsxs("strong", { children: ["Workers (", (ze.assignment_workers || []).length, ")"] }),
+                                Ce.length ? d.jsx("div", { style: { marginTop: "6px", display: "grid", gap: "4px" }, children: Ce.map((Lt, Wt) => d.jsx("div", { style: { color: String(Lt).includes("⚠") ? "#b42318" : "inherit", fontWeight: String(Lt).includes("⚠") ? 700 : 500 }, children: Lt }, `${ze.id}-w-${Wt}`)) }) : d.jsx("div", { style: { marginTop: "6px", opacity: 0.65 }, children: "No worker" }),
+                              ] }),
+                              d.jsxs("div", { style: { padding: "10px", border: "1px solid #e5e7eb", borderRadius: "9px" }, children: [
+                                d.jsxs("strong", { children: ["Foremen (", ar(ze).length, ")"] }),
+                                Ge.length ? d.jsx("div", { style: { marginTop: "6px", display: "grid", gap: "4px" }, children: Ge.map((Lt, Wt) => d.jsx("div", { style: { color: String(Lt).includes("⚠") ? "#b42318" : "inherit", fontWeight: String(Lt).includes("⚠") ? 700 : 500 }, children: Lt }, `${ze.id}-f-${Wt}`)) }) : d.jsx("div", { style: { marginTop: "6px", opacity: 0.65 }, children: "No foreman" }),
+                              ] }),
+                            ] }),
+                            (Xn || Xr || Zt || Qr) && d.jsxs("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "8px", marginTop: "10px" }, children: [
+                              Xn && d.jsxs("div", { style: { padding: "9px", background: "#fffbea", borderRadius: "8px" }, children: [d.jsx("strong", { children: "Planner Note" }), d.jsx("div", { children: Xn })] }),
+                              Xr && d.jsxs("div", { style: { padding: "9px", background: "#eff6ff", borderRadius: "8px" }, children: [d.jsx("strong", { children: "Planner Remark" }), d.jsx("div", { children: Xr })] }),
+                              Zt && d.jsxs("div", { style: { padding: "9px", background: "#fff1f2", borderRadius: "8px" }, children: [d.jsx("strong", { children: "Site Note (Permanent)" }), d.jsx("div", { children: Zt })] }),
+                              Qr && d.jsxs("div", { style: { padding: "9px", background: "#eef2ff", borderRadius: "8px" }, children: [d.jsx("strong", { children: "Site Remark (Permanent)" }), d.jsx("div", { children: Qr })] }),
+                            ] }),
+                          ],
+                        }, ze.id || `${ze.plan_date}-${B}`);
+                      }),
+                    }),
+            ],
+          });
+        }
         function F(B) {
           (l(B), j(""));
         }
@@ -34603,10 +34741,16 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                       ((ee = ue.site) == null ? void 0 : ee.address) || "",
                     "Job days": ue.days.size,
                     "Foreman shifts": ue.foremanShifts,
+                    "Day foreman shifts": ue.dayForemanShifts,
+                    "Night foreman shifts": ue.nightForemanShifts,
                     "Unique foremen": ue.foremen.size,
                     "Worker shifts": ue.workerShifts,
+                    "Day worker shifts": ue.dayWorkerShifts,
+                    "Night worker shifts": ue.nightWorkerShifts,
                     "Unique workers": ue.workers.size,
                     "OT shift": kgFormatOtHours(ue.otHours) || "",
+                    "Day OT": kgFormatOtHours(ue.dayOtHours) || "",
+                    "Night OT": kgFormatOtHours(ue.nightOtHours) || "",
                     "DO sent": `${ue.sentOrders}/${ue.orderCount}`,
                     "Delivery cost": ue.cost,
                     "Scaffold and ladder outstanding":
@@ -34691,6 +34835,35 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                 name: "Planner Export",
                 ...kgDailyExcelSheet(oe, []),
               });
+              const kgShiftDetailExcelRows = (kgGroup) =>
+                kgDetailedSiteShiftRows(kgGroup).map((kgAssignment) => ({
+                  Date: kgAssignment.plan_date,
+                  Day: kgDayFull(kgAssignment.plan_date),
+                  Shift: kgDetailedShiftName(kgAssignment),
+                  PIC: kgAssignment.pic || ((kgAssignment.site || {}).pic) || "",
+                  "Job status": kgAssignment.job_status || "",
+                  Confirmed: kgAssignment.is_confirmed ? "Yes" : "No",
+                  LORRY: kgExcelVehicleNoList(kgAssignment),
+                  Foremen: kgDetailedForemanNames(kgAssignment).join(" ; "),
+                  Workers: kgDetailedWorkerNames(kgAssignment, !0).join(" ; "),
+                  "Worker count": (kgAssignment.assignment_workers || []).length,
+                  "Foreman count": ar(kgAssignment).length,
+                  "OT shift": kgFormatOtHours(kgAssignmentOtHours(kgAssignment)) || "",
+                  "Planner note": kgAssignment.notes || "",
+                  "Planner remark": kgAssignment.remark || "",
+                  "Site note": ((kgAssignment.site || {}).notes) || "",
+                  "Site remark": ((kgAssignment.site || {}).remark) || "",
+                }));
+              B.push({
+                name: "Day Shift Detail",
+                rows: kgShiftDetailExcelRows("day"),
+                emptyMessage: "No Day Shift records for this site in the selected month.",
+              });
+              B.push({
+                name: "Night Shift Detail",
+                rows: kgShiftDetailExcelRows("night"),
+                emptyMessage: "No Night Shift records for this site in the selected month.",
+              });
               (B.push({
                 name: "Site Monthly Summary",
                 rows: N.map((ee) => {
@@ -34701,7 +34874,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     Date: ee.date,
                     Day: kgDayFull(ee.date),
                     Address: kgSelectedAddress,
-                    Shifts: [...ee.shifts].join(", "),
+                    Shift: ee.shiftLabel || kgSummaryShiftLabel(ee.shiftGroup),
                     "⚠ Foreman 2+ sites": kgForemanWarnings.join(" ; ") || "—",
                     Foremen: [...ee.foremanNames].filter(Boolean).join(", "),
                     "Foreman shifts": ee.foremanShifts,
@@ -35217,8 +35390,20 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     d.jsx(sp, {}),
                     d.jsxs("div", {
                       children: [
-                        d.jsx("strong", { children: z.workerShifts }),
-                        d.jsx("span", { children: "Worker shifts" }),
+                        d.jsx("strong", { children: z.dayWorkerShifts }),
+                        d.jsx("span", { children: "Day worker shifts" }),
+                      ],
+                    }),
+                  ],
+                }),
+                d.jsxs("div", {
+                  className: "summary-card",
+                  children: [
+                    d.jsx(sp, {}),
+                    d.jsxs("div", {
+                      children: [
+                        d.jsx("strong", { children: z.nightWorkerShifts }),
+                        d.jsx("span", { children: "Night worker shifts" }),
                       ],
                     }),
                   ],
@@ -35241,8 +35426,20 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     d.jsx(ei, {}),
                     d.jsxs("div", {
                       children: [
-                        d.jsx("strong", { children: z.foremanShifts }),
-                        d.jsx("span", { children: "Foreman shifts" }),
+                        d.jsx("strong", { children: z.dayForemanShifts }),
+                        d.jsx("span", { children: "Day foreman shifts" }),
+                      ],
+                    }),
+                  ],
+                }),
+                d.jsxs("div", {
+                  className: "summary-card",
+                  children: [
+                    d.jsx(ei, {}),
+                    d.jsxs("div", {
+                      children: [
+                        d.jsx("strong", { children: z.nightForemanShifts }),
+                        d.jsx("span", { children: "Night foreman shifts" }),
                       ],
                     }),
                   ],
@@ -35293,7 +35490,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                       }),
                       d.jsx("span", {
                         children:
-                          "Automatic manpower, delivery and equipment totals",
+                          "Day Shift and Night Shift manpower are shown separately",
                       }),
                     ],
                   }),
@@ -35308,6 +35505,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                             children: d.jsxs("tr", {
                               children: [
                                 d.jsx("th", { children: "Address / Delivery address" }),
+                                d.jsx("th", { children: "Shift" }),
                                 d.jsx("th", { children: "Worker shifts" }),
                                 d.jsx("th", { children: "OT shift" }),
                               ],
@@ -35317,14 +35515,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                             children: I
                               ? d.jsx("tr", {
                                   children: d.jsx("td", {
-                                    colSpan: "3",
+                                    colSpan: "4",
                                     children: "Loading summary…",
                                   }),
                                 })
                               : He.length === 0
                                 ? d.jsx("tr", {
                                     children: d.jsx("td", {
-                                      colSpan: "3",
+                                      colSpan: "4",
                                       className: "empty-cell",
                                       children:
                                         "No site planning or delivery orders for this date.",
@@ -35346,6 +35544,10 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                             }),
                                           }),
                                           d.jsx("td", {
+                                            "data-label": "Shift",
+                                            children: d.jsx("strong", { children: B.shiftLabel || kgSummaryShiftLabel(B.shiftGroup) }),
+                                          }),
+                                          d.jsx("td", {
                                             "data-label": "Worker shifts",
                                             children: B.workerShifts,
                                           }),
@@ -35355,7 +35557,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                           }),
                                         ],
                                       },
-                                      (V = B.site) == null ? void 0 : V.id,
+                                      `${(V = B.site) == null ? void 0 : V.id}-${B.shiftGroup}`,
                                     );
                                   }),
                           }),
@@ -35369,9 +35571,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                               children: [
                                 d.jsx("th", { children: "Address" }),
                                 d.jsx("th", { children: "Job days" }),
-                                d.jsx("th", { children: "Foreman shifts" }),
+                                d.jsx("th", { children: "Day foreman" }),
+                                d.jsx("th", { children: "Night foreman" }),
                                 d.jsx("th", { children: "Unique foremen" }),
-                                d.jsx("th", { children: "Worker shifts" }),
+                                d.jsx("th", { children: "Day workers" }),
+                                d.jsx("th", { children: "Night workers" }),
                                 d.jsx("th", { children: "Unique workers" }),
                                 d.jsx("th", { children: "OT shift" }),
                                 d.jsx("th", { children: "DO sent" }),
@@ -35386,14 +35590,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                             children: I
                               ? d.jsx("tr", {
                                   children: d.jsx("td", {
-                                    colSpan: "10",
+                                    colSpan: "12",
                                     children: "Loading month…",
                                   }),
                                 })
                               : P.length === 0
                                 ? d.jsx("tr", {
                                     children: d.jsx("td", {
-                                      colSpan: "10",
+                                      colSpan: "12",
                                       className: "empty-cell",
                                       children: "No records for this month.",
                                     }),
@@ -35418,16 +35622,24 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                                             children: B.days.size,
                                           }),
                                           d.jsx("td", {
-                                            "data-label": "Foreman shifts",
-                                            children: B.foremanShifts,
+                                            "data-label": "Day foreman",
+                                            children: B.dayForemanShifts,
+                                          }),
+                                          d.jsx("td", {
+                                            "data-label": "Night foreman",
+                                            children: B.nightForemanShifts,
                                           }),
                                           d.jsx("td", {
                                             "data-label": "Unique foremen",
                                             children: B.foremen.size,
                                           }),
                                           d.jsx("td", {
-                                            "data-label": "Worker shifts",
-                                            children: B.workerShifts,
+                                            "data-label": "Day workers",
+                                            children: B.dayWorkerShifts,
+                                          }),
+                                          d.jsx("td", {
+                                            "data-label": "Night workers",
+                                            children: B.nightWorkerShifts,
                                           }),
                                           d.jsx("td", {
                                             "data-label": "Unique workers",
@@ -35543,82 +35755,11 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                               }),
                             ],
                           }),
-                          d.jsx("h3", { style: { margin: "18px 0 8px" }, children: "Planner detail" }),
-                          d.jsxs("table", {
+                          d.jsxs("div", {
+                            style: { marginTop: "18px" },
                             children: [
-                              d.jsx("thead", {
-                                children: d.jsxs("tr", {
-                                  children: [
-                                    d.jsx("th", { children: "Date" }),
-                                    d.jsx("th", { children: "Day" }),
-                                    d.jsx("th", { children: "Shifts" }),
-                                    d.jsx("th", { children: "Foremen" }),
-                                    d.jsx("th", { children: "Foreman shifts" }),
-                                    d.jsx("th", { children: "Workers" }),
-                                    d.jsx("th", { children: "Worker shifts" }),
-                                    d.jsx("th", { children: "OT shift" }),
-                                  ],
-                                }),
-                              }),
-                              d.jsx("tbody", {
-                                children: I
-                                  ? d.jsx("tr", {
-                                      children: d.jsx("td", {
-                                        colSpan: "8",
-                                        children: "Loading planner…",
-                                      }),
-                                    })
-                                  : N.filter((B) => B.workerShifts || B.foremanShifts || B.shifts.size).length === 0
-                                    ? d.jsx("tr", {
-                                        children: d.jsx("td", {
-                                          colSpan: "8",
-                                          className: "empty-cell",
-                                          children: "No planner records for this site.",
-                                        }),
-                                      })
-                                    : N.filter((B) => B.workerShifts || B.foremanShifts || B.shifts.size).map((B) =>
-                                        d.jsxs(
-                                          "tr",
-                                          {
-                                            children: [
-                                              d.jsx("td", {
-                                                "data-label": "Date",
-                                                children: d.jsx("strong", { children: B.date }),
-                                              }),
-                                              d.jsx("td", {
-                                                "data-label": "Day",
-                                                children: kgDayFull(B.date),
-                                              }),
-                                              d.jsx("td", {
-                                                "data-label": "Shifts",
-                                                children: [...B.shifts].join(", ") || "—",
-                                              }),
-                                              d.jsx("td", {
-                                                "data-label": "Foremen",
-                                                children: [...B.foremanNames].filter(Boolean).join(", ") || "—",
-                                              }),
-                                              d.jsx("td", {
-                                                "data-label": "Foreman shifts",
-                                                children: B.foremanShifts,
-                                              }),
-                                              d.jsx("td", {
-                                                "data-label": "Workers",
-                                                children: [...B.workerNames].filter(Boolean).join(", ") || "—",
-                                              }),
-                                              d.jsx("td", {
-                                                "data-label": "Worker shifts",
-                                                children: B.workerShifts,
-                                              }),
-                                              d.jsx("td", {
-                                                "data-label": "OT shift",
-                                                children: kgFormatOtHours(B.otHours) || "",
-                                              }),
-                                            ],
-                                          },
-                                          B.date,
-                                        ),
-                                      ),
-                              }),
+                              kgRenderDetailedSiteShift("day", "DAY SHIFT", "#eef7ff"),
+                              kgRenderDetailedSiteShift("night", "NIGHT SHIFT", "#f4f1ff"),
                             ],
                           }),
                         ],
@@ -36310,6 +36451,15 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
         const n = r instanceof Map ? [...r.values()].filter(Boolean) : [];
         if (n.length <= 1) return t || "";
         return `${t || ""} ⚠ ${n.length} sites: ${n.join(" | ")}`;
+      }
+      function kgSummaryShiftKey(t) {
+        return String(t || "day").toLowerCase() === "night" ? "night" : "day";
+      }
+      function kgSummaryShiftLabel(t) {
+        return kgSummaryShiftKey(t) === "night" ? "Night Shift" : "Day Shift";
+      }
+      function kgSummaryShiftRank(t) {
+        return t === "day" ? 0 : t === "night" ? 1 : 2;
       }
       function kgCopyDateTitle(t) {
         return `${cp(t)} (${kgDayShort(t)})`;
@@ -39672,15 +39822,147 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           (p(L), v(""));
           if (!L) return s([]);
           (c(!0), s([]));
-          const { data: W, error: he } = await qe
-            .from("site_assignments")
-            .select(_s)
-            .order("plan_date", { ascending: !1 })
-            .order("shift")
-            .limit(5000);
-          if (he) (v(he.message), s([]));
-          else s(E(W || [], L));
-          c(!1);
+          try {
+            // v58.13: By Site shows detailed Day Shift and Night Shift sections with manpower, lorry, PIC, OT and notes.
+            // v58.11: search the small manpower master tables FIRST.
+            // Do not load thousands of full planner assignments before knowing who we need.
+            const [workerMaster, foremanMaster, lorryMaster] = await Promise.all([
+              qe.from("workers").select("id,name,nickname,status,worker_type,base_location").limit(5000),
+              qe.from("foremen").select("id,name,nickname,status,foreman_type").limit(5000),
+              qe.from("lorries").select("id,registration_no,driver_name,driver_full_name,driver_base_location,status").limit(5000),
+            ]);
+            const masterError = [workerMaster, foremanMaster, lorryMaster].find((row) => row.error)?.error;
+            if (masterError) throw new Error(masterError.message || String(masterError));
+
+            const allWorkers = workerMaster.data || [];
+            const allForemen = foremanMaster.data || [];
+            const allLorries = lorryMaster.data || [];
+            const matchedWorkers = allWorkers.filter((row) => S(row, L));
+            const matchedForemen = allForemen.filter((row) => S(row, L));
+            const matchedLorries = allLorries.filter((row) =>
+              S({
+                name: row.driver_full_name || row.driver_name,
+                nickname: row.driver_name,
+                driver_full_name: row.driver_full_name,
+                driver_name: row.driver_name,
+              }, L),
+            );
+
+            if (!matchedWorkers.length && !matchedForemen.length && !matchedLorries.length) {
+              s([]);
+              return;
+            }
+
+            const emptyResult = () => Promise.resolve({ data: [], error: null });
+            const [workerHits, foremanHits, lorryHits] = await Promise.all([
+              matchedWorkers.length
+                ? qe.from("assignment_workers").select("assignment_id,worker_id").in("worker_id", matchedWorkers.map((row) => row.id)).limit(5000)
+                : emptyResult(),
+              matchedForemen.length
+                ? qe.from("assignment_foremen").select("assignment_id,foreman_id").in("foreman_id", matchedForemen.map((row) => row.id)).limit(5000)
+                : emptyResult(),
+              matchedLorries.length
+                ? qe.from("assignment_lorries").select("assignment_id,lorry_id").in("lorry_id", matchedLorries.map((row) => row.id)).limit(5000)
+                : emptyResult(),
+            ]);
+            const hitError = [workerHits, foremanHits, lorryHits].find((row) => row.error)?.error;
+            if (hitError) throw new Error(hitError.message || String(hitError));
+
+            const wantedIds = [...new Set([
+              ...(workerHits.data || []).map((row) => String(row.assignment_id)),
+              ...(foremanHits.data || []).map((row) => String(row.assignment_id)),
+              ...(lorryHits.data || []).map((row) => String(row.assignment_id)),
+            ].filter(Boolean))];
+            if (!wantedIds.length) {
+              s([]);
+              return;
+            }
+
+            const chunks = (values, size = 150) => {
+              const out = [];
+              for (let i = 0; i < values.length; i += size) out.push(values.slice(i, i + size));
+              return out;
+            };
+
+            // Fetch only lightweight assignment rows first so the database never has to build
+            // a huge nested 5,000-row result in one statement.
+            let assignments = [];
+            for (const idChunk of chunks(wantedIds)) {
+              const { data, error } = await qe
+                .from("site_assignments")
+                .select("id,plan_date,site_id")
+                .in("id", idChunk);
+              if (error) throw new Error(error.message || String(error));
+              assignments.push(...(data || []));
+            }
+            assignments.sort((a, b) => String(b.plan_date || "").localeCompare(String(a.plan_date || "")));
+
+            // Keep the same practical history ceiling as before, but apply it AFTER matching the name.
+            assignments = assignments.slice(0, 5000);
+            const assignmentIds = assignments.map((row) => String(row.id));
+            const siteIds = [...new Set(assignments.map((row) => String(row.site_id || "")).filter(Boolean))];
+
+            let sites = [];
+            for (const siteChunk of chunks(siteIds)) {
+              const { data, error } = await qe.from("sites").select("id,address").in("id", siteChunk);
+              if (error) throw new Error(error.message || String(error));
+              sites.push(...(data || []));
+            }
+
+            let allWorkerLinks = [], allForemanLinks = [], allLorryLinks = [];
+            for (const idChunk of chunks(assignmentIds)) {
+              const [wr, fr, lr] = await Promise.all([
+                qe.from("assignment_workers").select("assignment_id,worker_id,sort_order").in("assignment_id", idChunk).order("sort_order"),
+                qe.from("assignment_foremen").select("assignment_id,foreman_id,sort_order").in("assignment_id", idChunk).order("sort_order"),
+                qe.from("assignment_lorries").select("assignment_id,lorry_id,sort_order").in("assignment_id", idChunk).order("sort_order"),
+              ]);
+              const detailError = [wr, fr, lr].find((row) => row.error)?.error;
+              if (detailError) throw new Error(detailError.message || String(detailError));
+              allWorkerLinks.push(...(wr.data || []));
+              allForemanLinks.push(...(fr.data || []));
+              allLorryLinks.push(...(lr.data || []));
+            }
+
+            const workerMap = new Map(allWorkers.map((row) => [String(row.id), row]));
+            const foremanMap = new Map(allForemen.map((row) => [String(row.id), row]));
+            const lorryMap = new Map(allLorries.map((row) => [String(row.id), row]));
+            const siteMap = new Map(sites.map((row) => [String(row.id), row]));
+            const workerLinksByAssignment = new Map();
+            const foremanLinksByAssignment = new Map();
+            const lorryLinksByAssignment = new Map();
+            const addToMap = (map, key, value) => {
+              const k = String(key || "");
+              if (!k) return;
+              if (!map.has(k)) map.set(k, []);
+              map.get(k).push(value);
+            };
+            for (const row of allWorkerLinks) {
+              const worker = workerMap.get(String(row.worker_id));
+              if (worker) addToMap(workerLinksByAssignment, row.assignment_id, { ...row, worker });
+            }
+            for (const row of allForemanLinks) {
+              const foreman = foremanMap.get(String(row.foreman_id));
+              if (foreman) addToMap(foremanLinksByAssignment, row.assignment_id, { ...row, foreman });
+            }
+            for (const row of allLorryLinks) {
+              const lorry = lorryMap.get(String(row.lorry_id));
+              if (lorry) addToMap(lorryLinksByAssignment, row.assignment_id, { ...row, lorry });
+            }
+
+            const hydrated = assignments.map((row) => ({
+              ...row,
+              site: siteMap.get(String(row.site_id)) || { id: row.site_id, address: "No address" },
+              assignment_workers: workerLinksByAssignment.get(String(row.id)) || [],
+              assignment_foremen: foremanLinksByAssignment.get(String(row.id)) || [],
+              assignment_lorries: lorryLinksByAssignment.get(String(row.id)) || [],
+            }));
+            s(E(hydrated, L));
+          } catch (err) {
+            v(err && err.message ? err.message : String(err || "Name Search failed."));
+            s([]);
+          } finally {
+            c(!1);
+          }
         }
         const _ = q.useMemo(() => {
           const I = new Map();
