@@ -35002,7 +35002,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     Name: Pe.name,
                     "Address / Base": Pe.base_location === "mandai" ? "Mandai (M)" : Pe.base_location === "tuas" ? "Tuas (T)" : Pe.base_location === "kranji" ? "Kranji (K)" : "",
                     Phone: Pe.phone || "",
-                    Pass: Pe.pass || "",
+                    Skill: Pe.skill || "",
                     License: Pe.license || "",
                     Status: Pe.status,
                     Created: Pe.created_at,
@@ -39823,6 +39823,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (!L) return s([]);
           (c(!0), s([]));
           try {
+            // v58.14: Worker Skill free text + combined Worker/Foreman SIC by-site overview.
             // v58.13: By Site shows detailed Day Shift and Night Shift sections with manpower, lorry, PIC, OT and notes.
             // v58.11: search the small manpower master tables FIRST.
             // Do not load thousands of full planner assignments before knowing who we need.
@@ -40102,7 +40103,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         const T = q.useMemo(() => new Map((f || []).map((I) => [String(I.id), I])), [f]),
           D = q.useMemo(() => new Map((m || []).map((I) => [String(I.id), I])), [m]),
           workerSicSites = q.useMemo(() => (l || []).filter((I) => ["active", "pause"].includes(String(I.status || "active").toLowerCase()) && kgSiteSicWorkerRestricted(I)), [l]),
-          foremanSicSites = q.useMemo(() => (l || []).filter((I) => ["active", "pause"].includes(String(I.status || "active").toLowerCase()) && kgSiteSicForemanRestricted(I)), [l]);
+          foremanSicSites = q.useMemo(() => (l || []).filter((I) => ["active", "pause"].includes(String(I.status || "active").toLowerCase()) && kgSiteSicForemanRestricted(I)), [l]),
+          combinedSicSites = q.useMemo(() => (l || []).filter((I) => ["active", "pause"].includes(String(I.status || "active").toLowerCase()) && (kgSiteSicWorkerRestricted(I) || kgSiteSicForemanRestricted(I))), [l]);
         function workersForSite(I) {
           return kgSiteSicWorkerIds(I).map((L) => T.get(String(L))).filter((L) => L && String(L.status || "").toLowerCase() === "active");
         }
@@ -40114,17 +40116,17 @@ Press OK to assign them to both sites, or Cancel to go back.`)
         }
         const A = q.useMemo(() => {
           const I = String(E || "").trim().toLowerCase(),
-            base = r === "worker" ? workerSicSites : foremanSicSites;
+            base = r === "worker" ? (viewMode === "site" ? combinedSicSites : workerSicSites) : foremanSicSites;
           return base.filter((L) => {
-            const he = r === "worker" ? workersForSite(L) : foremenForSite(L),
-              filteredPeople = r === "worker" ? he.filter(workerMatchesType) : he;
-            if (r === "worker" && workerTypeFilter !== "all" && filteredPeople.length === 0) return !1;
+            const workerPeople = workersForSite(L),
+              foremanPeople = foremenForSite(L),
+              people = r === "worker" && viewMode === "site" ? [...workerPeople, ...foremanPeople] : (r === "worker" ? workerPeople : foremanPeople);
             if (!I) return !0;
-            const J = [L.address, L.pic, L.status, ...filteredPeople.flatMap((j) => [j.name, j.nickname, kgNameNick(j)])]
+            const J = [L.address, L.pic, L.status, ...people.flatMap((j) => [j.name, j.nickname, kgNameNick(j), j.skill])]
               .map((j) => String(j || "").toLowerCase()).join(" ");
             return J.includes(I);
           }).sort((L, W) => String(L.address || "").localeCompare(String(W.address || ""), void 0, { numeric: !0, sensitivity: "base" }));
-        }, [workerSicSites, foremanSicSites, r, E, T, D, workerTypeFilter]);
+        }, [workerSicSites, foremanSicSites, combinedSicSites, r, viewMode, E, T, D]);
         const workerRows = q.useMemo(() => {
           if (r !== "worker" || viewMode !== "worker") return [];
           const I = String(E || "").trim().toLowerCase(), rows = [];
@@ -40160,24 +40162,22 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                 d.jsx("th", { children: "SIC Site" }),
                 d.jsx("th", { children: "PIC" }),
                 d.jsx("th", { children: "Status" }),
-                d.jsx("th", { children: "Skilled Workers" }),
-                d.jsx("th", { children: "General Workers" }),
-                d.jsx("th", { children: "Total" }),
+                d.jsx("th", { children: "Worker SIC" }),
+                d.jsx("th", { children: "Foreman SIC" }),
+                d.jsx("th", { children: "Count" }),
               ] }) }),
               d.jsx("tbody", { children: A.map((I) => {
                 const L = workersForSite(I),
-                  W = L.filter((he) => kgWorkerType(he) === "skilled"),
-                  he = L.filter((J) => kgWorkerType(J) === "general"),
-                  showSkilled = workerTypeFilter !== "general",
-                  showGeneral = workerTypeFilter !== "skilled",
-                  shownTotal = (showSkilled ? W.length : 0) + (showGeneral ? he.length : 0);
+                  W = foremenForSite(I),
+                  workerRestricted = kgSiteSicWorkerRestricted(I),
+                  foremanRestricted = kgSiteSicForemanRestricted(I);
                 return d.jsxs("tr", { children: [
                   d.jsx("td", { "data-label": "SIC Site", children: d.jsx("strong", { children: I.address || "-" }) }),
                   d.jsx("td", { "data-label": "PIC", children: kgSitePicText(I) }),
                   d.jsx("td", { "data-label": "Status", children: kgSiteIsPause(I) ? "PAUSE" : String(I.status || "active").toUpperCase() }),
-                  d.jsx("td", { "data-label": "Skilled Workers", children: showSkilled ? (W.length ? d.jsx("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" }, children: W.map((J) => personPill(J, `${I.id}-skilled-${J.id}`)) }) : d.jsx("span", { style: { color: "#64748b" }, children: "None" })) : d.jsx("span", { style: { color: "#94a3b8" }, children: "Filtered" }) }),
-                  d.jsx("td", { "data-label": "General Workers", children: showGeneral ? (he.length ? d.jsx("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" }, children: he.map((J) => personPill(J, `${I.id}-general-${J.id}`)) }) : d.jsx("span", { style: { color: "#64748b" }, children: "None" })) : d.jsx("span", { style: { color: "#94a3b8" }, children: "Filtered" }) }),
-                  d.jsx("td", { "data-label": "Total", children: d.jsx("strong", { children: shownTotal }) }),
+                  d.jsx("td", { "data-label": "Worker SIC", children: workerRestricted ? (L.length ? d.jsx("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" }, children: L.map((J) => personPill(J, `${I.id}-worker-${J.id}`)) }) : d.jsx("strong", { style: { color: "#b91c1c" }, children: "No worker selected" })) : d.jsx("span", { style: { color: "#64748b", fontWeight: 700 }, children: "All workers allowed" }) }),
+                  d.jsx("td", { "data-label": "Foreman SIC", children: foremanRestricted ? (W.length ? d.jsx("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" }, children: W.map((J) => personPill(J, `${I.id}-foreman-${J.id}`)) }) : d.jsx("strong", { style: { color: "#b91c1c" }, children: "No foreman selected" })) : d.jsx("span", { style: { color: "#64748b", fontWeight: 700 }, children: "All foremen allowed" }) }),
+                  d.jsx("td", { "data-label": "Count", children: d.jsxs("div", { style: { display: "grid", gap: "4px" }, children: [d.jsxs("strong", { children: ["Worker: ", workerRestricted ? L.length : "All"] }), d.jsxs("strong", { children: ["Foreman: ", foremanRestricted ? W.length : "All"] })] }) }),
                 ] }, `site-worker-${I.id}`);
               }) }),
             ],
@@ -40263,16 +40263,16 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                     d.jsx("button", { type: "button", className: viewMode === "site" ? "primary-button" : "secondary-button", onClick: () => setViewMode("site"), children: "By Site" }),
                     d.jsx("button", { type: "button", className: viewMode === "worker" ? "primary-button" : "secondary-button", onClick: () => setViewMode("worker"), children: "By Worker" }),
                   ] }),
-                  d.jsxs("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }, children: [
+                  viewMode === "worker" && d.jsxs("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }, children: [
                     d.jsx("strong", { style: { marginLeft: "8px", marginRight: "4px" }, children: "Worker type:" }),
                     d.jsx("button", { type: "button", className: workerTypeFilter === "all" ? "primary-button" : "secondary-button", onClick: () => setWorkerTypeFilter("all"), children: "All" }),
                     d.jsx("button", { type: "button", className: workerTypeFilter === "skilled" ? "primary-button" : "secondary-button", onClick: () => setWorkerTypeFilter("skilled"), children: "Skilled Worker" }),
                     d.jsx("button", { type: "button", className: workerTypeFilter === "general" ? "primary-button" : "secondary-button", onClick: () => setWorkerTypeFilter("general"), children: "General Worker" }),
                   ] }),
                 ] }),
-                d.jsx("div", { className: "success-box", style: { margin: "12px 16px" }, children: r === "worker" ? (viewMode === "site" ? "By Site: ACTIVE and PAUSE Worker SIC sites are listed. Only ACTIVE workers are shown, separated into Skilled and General." : "By Worker: every ACTIVE worker is listed. Workers without any SIC access will show No SIC site. PAUSE SIC sites are included.") : "Foreman: only sites with Foreman SIC restriction are shown." }),
+                d.jsx("div", { className: "success-box", style: { margin: "12px 16px" }, children: r === "worker" ? (viewMode === "site" ? "By Site: ACTIVE and PAUSE SIC sites are listed. Skilled and General workers are combined into one Worker SIC column, with Foreman SIC beside it." : "By Worker: every ACTIVE worker is listed. Workers without any SIC access will show No SIC site. PAUSE SIC sites are included.") : "Foreman: only sites with Foreman SIC restriction are shown." }),
                 g && d.jsx("div", { className: "error-box", children: g }),
-                x ? d.jsx("div", { className: "empty-state", children: "Loading SIC sites…" }) : noRows ? d.jsx("div", { className: "empty-state", children: r === "worker" ? (viewMode === "worker" ? "No matching active workers found." : "No matching Worker SIC sites found.") : "No Foreman SIC sites found." }) : (r === "worker" ? (viewMode === "worker" ? workerByWorkerTable : workerSiteTable) : foremanTable),
+                x ? d.jsx("div", { className: "empty-state", children: "Loading SIC sites…" }) : noRows ? d.jsx("div", { className: "empty-state", children: r === "worker" ? (viewMode === "worker" ? "No matching active workers found." : "No matching SIC sites found.") : "No Foreman SIC sites found." }) : (r === "worker" ? (viewMode === "worker" ? workerByWorkerTable : workerSiteTable) : foremanTable),
               ],
             }),
           ],
@@ -41861,8 +41861,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           return s.filter((fe) => {
             if (r.table === "sites" && !kgSiteTypeMatches(fe, kgSiteTypeFilter)) return !1;
             if (!J) return !0;
-            if (j && (J === "pass" || J === "have pass" || J === "with pass"))
+            if (r.table === "foremen" && (J === "pass" || J === "have pass" || J === "with pass"))
               return !!String(fe.pass || "").trim();
+            if (r.table === "workers" && (J === "skill" || J === "have skill" || J === "with skill"))
+              return !!String(fe.skill || "").trim();
             if (
               j &&
               (J === "license" ||
@@ -41952,7 +41954,9 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             return _(
               r.table === "sites" && /sic_restricted|sic_worker_ids|sic_foreman|sic_lorry|sic_driver|schema cache|column/i.test(String(G.message || G.details || ""))
                 ? "SIC database fields are not ready. Run the v54 SAFE SQL in Supabase, then save again."
-                : G.message,
+                : r.table === "workers" && /skill|schema cache|column/i.test(String(G.message || G.details || ""))
+                  ? "Worker Skill field is not ready. Run the v58.14 SAFE SQL in Supabase, then save again."
+                  : G.message,
             );
           (x(null), await T());
         }
@@ -42284,6 +42288,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                                     type: J.type || "text",
                                     step: J.step,
                                     min: J.min,
+                                    placeholder: J.placeholder,
                                     value: p[J.name] ?? "",
                                     onChange: (j) =>
                                       g({ ...p, [J.name]: j.target.value }),
@@ -43109,7 +43114,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           description:
             "Maintain workers available for deployment. Choose worker address/base as Mandai, Tuas or Kranji. Planner and Excel show (M)/(T)/(K) beside nickname; WhatsApp keeps names clean and removes location tags and (SL).",
           searchPlaceholder:
-            "Search name, nickname, phone, pass, license, skilled or general — type pass or license to show only those records…",
+            "Search name, nickname, phone, skill, license, skilled or general — example: putty-man or mono…",
           columns: [
             { key: "sort_order", label: "No." },
             { key: "nickname", label: "Nickname" },
@@ -43117,7 +43122,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { key: "base_location", label: "Address / Base" },
             { key: "worker_type", label: "Worker type" },
             { key: "phone", label: "Phone" },
-            { key: "pass", label: "Pass" },
+            { key: "skill", label: "Skill" },
             { key: "license", label: "License" },
             { key: "off_periods", label: "Off / Leave" },
           ],
@@ -43148,10 +43153,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               ],
             },
             { name: "phone", label: "Phone" },
-            { name: "pass", label: "Pass" },
+            { name: "skill", label: "Skill", wide: !0, placeholder: "Example: Putty-man, Mono, Carpenter" },
             { name: "license", label: "License" },
           ],
-          defaults: { sort_order: 0, worker_type: "general", base_location: "" },
+          defaults: { sort_order: 0, worker_type: "general", base_location: "", skill: "" },
         },
         lorries: {
           title: "Lorries",
