@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0f766e" />
     <meta name="description" content="KG Operations daily deployment planner" />
     <title>KG Operations Planner</title>
-    <!-- v58.15: Worker Inactive/Pause can be changed back to Active -->
+    <!-- v58.16: Fix Pause/Inactive worker reactivation, including legacy workers without base -->
     <script src="./config.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script type="module">
@@ -41902,6 +41902,16 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               ...(r.table === "foremen"
                 ? { foreman_type: J.foreman_type || "project" }
                 : {}),
+              ...(r.table === "workers"
+                ? {
+                    worker_type: J.worker_type || "general",
+                    base_location: J.base_location || "",
+                    skill: J.skill || "",
+                    status: ["active", "pause", "inactive", "closed"].includes(String(J.status || "").toLowerCase())
+                      ? String(J.status).toLowerCase()
+                      : "active",
+                  }
+                : {}),
               ...(r.table === "sites"
                 ? {
                     site_type: kgSiteTypeValue(J),
@@ -42470,7 +42480,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         r.table === "workers" &&
                           d.jsx("span", {
                             className: "field-help",
-                            children: "Inactive or Pause workers can be changed back to Active and saved. Existing Planner, SIC and history records are kept.",
+                            children: "Pause or Inactive workers can be changed back to Active and saved even if an older worker has no base location set. Existing Planner, SIC and history records are kept.",
                           }),
                       ],
                     }),
@@ -43117,7 +43127,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Choose worker address/base as Mandai, Tuas or Kranji. Planner and Excel show (M)/(T)/(K) beside nickname; WhatsApp keeps names clean and removes location tags and (SL).",
+            "Maintain workers available for deployment. Worker address/base can be Mandai, Tuas or Kranji; older workers may leave it blank and still change status. Planner and Excel show (M)/(T)/(K) beside nickname when set; WhatsApp keeps names clean and removes location tags and (SL).",
           searchPlaceholder:
             "Search name, nickname, phone, skill, license, skilled or general — example: putty-man or mono…",
           columns: [
@@ -43139,9 +43149,8 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               name: "base_location",
               label: "Worker address / base",
               type: "select",
-              required: !0,
               options: [
-                ["", "Choose Mandai, Tuas or Kranji"],
+                ["", "Not set / choose later"],
                 ["mandai", "Mandai (M)"],
                 ["tuas", "Tuas (T)"],
                 ["kranji", "Kranji (K)"],
