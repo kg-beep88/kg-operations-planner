@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#0f766e" />
     <meta name="description" content="KG Operations daily deployment planner" />
     <title>KG Operations Planner</title>
+    <!-- v58.15: Worker Inactive/Pause can be changed back to Active -->
     <script src="./config.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script type="module">
@@ -42452,21 +42453,25 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                         d.jsxs("select", {
                           value: p.status || "active",
                           onChange: (J) => g({ ...p, status: J.target.value }),
-                          children: [
-                            d.jsx("option", {
-                              value: "active",
-                              children: "Active",
-                            }),
-                            d.jsx("option", {
-                              value: "pause",
-                              children: "Pause",
-                            }),
-                            d.jsx("option", {
-                              value: "closed",
-                              children: "Closed",
-                            }),
-                          ],
+                          children:
+                            r.table === "workers"
+                              ? [
+                                  d.jsx("option", { value: "active", children: "Active" }),
+                                  d.jsx("option", { value: "pause", children: "Pause" }),
+                                  d.jsx("option", { value: "inactive", children: "Inactive" }),
+                                  d.jsx("option", { value: "closed", children: "Closed" }),
+                                ]
+                              : [
+                                  d.jsx("option", { value: "active", children: "Active" }),
+                                  d.jsx("option", { value: "pause", children: "Pause" }),
+                                  d.jsx("option", { value: "closed", children: "Closed" }),
+                                ],
                         }),
+                        r.table === "workers" &&
+                          d.jsx("span", {
+                            className: "field-help",
+                            children: "Inactive or Pause workers can be changed back to Active and saved. Existing Planner, SIC and history records are kept.",
+                          }),
                       ],
                     }),
                     d.jsxs("div", {
@@ -43156,7 +43161,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             { name: "skill", label: "Skill", wide: !0, placeholder: "Example: Putty-man, Mono, Carpenter" },
             { name: "license", label: "License" },
           ],
-          defaults: { sort_order: 0, worker_type: "general", base_location: "", skill: "" },
+          defaults: { sort_order: 0, worker_type: "general", base_location: "", skill: "", status: "active" },
         },
         lorries: {
           title: "Lorries",
