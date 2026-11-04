@@ -39824,6 +39824,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           if (!L) return s([]);
           (c(!0), s([]));
           try {
+            // v58.17: Worker edit save fix: visible modal errors + legacy blank-Skill fallback.
             // v58.14: Worker Skill free text + combined Worker/Foreman SIC by-site overview.
             // v58.13: By Site shows detailed Day Shift and Night Shift sections with manpower, lorry, PIC, OT and notes.
             // v58.11: search the small manpower master tables FIRST.
@@ -41891,10 +41892,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           });
         }, [s, c, r.table, kgSiteTypeFilter]);
         function I() {
-          (kgSetSiteSicSearch(""), kgSetSiteForemanSicSearch(""), kgSetSiteLorrySicSearch(""), kgSetSiteDriverSicSearch(""), x("new"), g({ ...l, sic_restricted: !1, sic_worker_ids: [], sic_foreman_restricted: !1, sic_foreman_ids: [], sic_lorry_restricted: !1, sic_lorry_ids: [], sic_driver_restricted: !1, sic_driver_names: [] }));
+          (_(""), kgSetSiteSicSearch(""), kgSetSiteForemanSicSearch(""), kgSetSiteLorrySicSearch(""), kgSetSiteDriverSicSearch(""), x("new"), g({ ...l, sic_restricted: !1, sic_worker_ids: [], sic_foreman_restricted: !1, sic_foreman_ids: [], sic_lorry_restricted: !1, sic_lorry_ids: [], sic_driver_restricted: !1, sic_driver_names: [] }));
         }
         function L(J) {
-          (kgSetSiteSicSearch(""), kgSetSiteForemanSicSearch(""), kgSetSiteLorrySicSearch(""), kgSetSiteDriverSicSearch(""),
+          (_(""), kgSetSiteSicSearch(""), kgSetSiteForemanSicSearch(""), kgSetSiteLorrySicSearch(""), kgSetSiteDriverSicSearch(""),
             x(J.id),
             g({
               ...l,
@@ -41956,19 +41957,33 @@ Press OK to assign them to both sites, or Cancel to go back.`)
             delete j.site_type;
           }
           j.status = p.status || "active";
-          const fe =
-              v === "new"
-                ? qe.from(r.table).insert(j)
-                : qe.from(r.table).update(j).eq("id", v),
-            { error: G } = await fe;
-          if (G)
-            return _(
+          const kgRunMasterSave = async (payload) =>
+            v === "new"
+              ? await qe.from(r.table).insert(payload)
+              : await qe.from(r.table).update(payload).eq("id", v);
+          let { error: G } = await kgRunMasterSave(j);
+          // v58.17: legacy worker databases may not yet have the optional Skill column.
+          // If Skill is blank, do not let that optional field block a status/name/base update.
+          if (
+            G &&
+            r.table === "workers" &&
+            /skill|schema cache|column/i.test(String(G.message || G.details || "")) &&
+            !String(p.skill || "").trim()
+          ) {
+            const kgLegacyWorkerPayload = { ...j };
+            delete kgLegacyWorkerPayload.skill;
+            ({ error: G } = await kgRunMasterSave(kgLegacyWorkerPayload));
+          }
+          if (G) {
+            const kgSaveMessage =
               r.table === "sites" && /sic_restricted|sic_worker_ids|sic_foreman|sic_lorry|sic_driver|schema cache|column/i.test(String(G.message || G.details || ""))
                 ? "SIC database fields are not ready. Run the v54 SAFE SQL in Supabase, then save again."
                 : r.table === "workers" && /skill|schema cache|column/i.test(String(G.message || G.details || ""))
-                  ? "Worker Skill field is not ready. Run the v58.14 SAFE SQL in Supabase, then save again."
-                  : G.message,
-            );
+                  ? "Worker Skill field is not ready. Run the v58.14 SAFE SQL in Supabase, then save again. If Skill is blank, this version will still save the other worker changes."
+                  : String(G.message || G.details || "Save failed. Please try again.");
+            _(kgSaveMessage);
+            return;
+          }
           (x(null), await T());
         }
         async function kgDeleteMaster(J) {
@@ -42484,6 +42499,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           }),
                       ],
                     }),
+                    w && d.jsx("div", {
+                      className: "error-box wide",
+                      style: { marginTop: "4px" },
+                      children: w,
+                    }),
                     d.jsxs("div", {
                       className: "form-actions wide",
                       children: [
@@ -42494,6 +42514,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
                           children: "Cancel",
                         }),
                         d.jsx("button", {
+                          type: "submit",
                           className: "primary-button",
                           children: "Save",
                         }),
