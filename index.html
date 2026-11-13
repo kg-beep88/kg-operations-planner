@@ -35001,7 +35001,7 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
                     ID: Pe.id,
                     Nickname: kgExcelWorkerName(Pe),
                     Name: Pe.name,
-                    "Address / Base": Pe.base_location === "mandai" ? "Mandai (M)" : Pe.base_location === "tuas" ? "Tuas (T)" : Pe.base_location === "kranji" ? "Kranji (K)" : "",
+                    "Address / Base": Pe.base_location === "kranji" ? "Kranji (K)" : Pe.base_location === "mandai" || Pe.base_location === "mandai_westlite" ? "Mandai - Westlite (MW)" : Pe.base_location === "tuas" || Pe.base_location === "tuas_kg" ? "Tuas - KG (TKG)" : Pe.base_location === "tuas_westlite" ? "Tuas - Westlite (TW)" : "",
                     Phone: Pe.phone || "",
                     Skill: Pe.skill || "",
                     License: Pe.license || "",
@@ -36360,11 +36360,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
       const kgCopyPersonName = (t) => kgRemoveCopySl(kgNameNick(t));
       function kgBaseLocationCode(t) {
         const r = String(t || "").trim().toLowerCase();
-        return r === "mandai" || r === "m" ? "M" : r === "tuas" || r === "t" ? "T" : r === "kranji" || r === "k" ? "K" : "";
+        return r === "kranji" || r === "k" ? "K"
+          : r === "mandai" || r === "mandai_westlite" || r === "mw" ? "MW"
+          : r === "tuas" || r === "tuas_kg" || r === "tkg" ? "TKG"
+          : r === "tuas_westlite" || r === "tw" ? "TW"
+          : "";
       }
       function kgDriverBaseLocationCode(t) {
-        const r = String(t || "").trim().toLowerCase();
-        return r === "mandai" || r === "m" ? "M" : r === "tuas" || r === "t" ? "T" : "";
+        return kgBaseLocationCode(t);
       }
       function kgPlannerWorkerName(t) {
         const r = kgNameNick(t), n = kgBaseLocationCode(t == null ? void 0 : t.base_location);
@@ -43148,7 +43151,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "workers",
           orderBy: "nickname",
           description:
-            "Maintain workers available for deployment. Worker address/base can be Mandai, Tuas or Kranji; older workers may leave it blank and still change status. Planner and Excel show (M)/(T)/(K) beside nickname when set; WhatsApp keeps names clean and removes location tags and (SL).",
+            "Maintain workers available for deployment. Worker address/base can be Kranji, Mandai - Westlite, Tuas - KG or Tuas - Westlite; older workers may leave it blank and still change status. Planner and Excel show (K)/(MW)/(TKG)/(TW) beside nickname when set; WhatsApp keeps names clean and removes location tags and (SL).",
           searchPlaceholder:
             "Search name, nickname, phone, skill, license, skilled or general — example: putty-man or mono…",
           columns: [
@@ -43172,9 +43175,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               type: "select",
               options: [
                 ["", "Not set / choose later"],
-                ["mandai", "Mandai (M)"],
-                ["tuas", "Tuas (T)"],
                 ["kranji", "Kranji (K)"],
+                ["mandai", "Mandai - Westlite (MW)"],
+                ["tuas", "Tuas - KG (TKG)"],
+                ["tuas_westlite", "Tuas - Westlite (TW)"],
               ],
             },
             {
@@ -43199,7 +43203,7 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           table: "lorries",
           orderBy: "registration_no",
           description:
-            "Maintain lorry numbers plus driver short name, full name and driver address/base (Mandai or Tuas). Planner can show driver/base details; Excel vehicle columns export lorry number only; WhatsApp keeps names clean and removes location tags and (SL).",
+            "Maintain lorry numbers plus driver short name, full name and driver address/base (Kranji, Mandai - Westlite, Tuas - KG or Tuas - Westlite). Planner can show driver/base details; Excel vehicle columns export lorry number only; WhatsApp keeps names clean and removes location tags and (SL).",
           columns: [
             { key: "registration_no", label: "Lorry" },
             { key: "driver_name", label: "Driver short name" },
@@ -43216,9 +43220,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               type: "select",
               required: !0,
               options: [
-                ["", "Choose Mandai or Tuas"],
-                ["mandai", "Mandai (M)"],
-                ["tuas", "Tuas (T)"],
+                ["", "Choose location"],
+                ["kranji", "Kranji (K)"],
+                ["mandai", "Mandai - Westlite (MW)"],
+                ["tuas", "Tuas - KG (TKG)"],
+                ["tuas_westlite", "Tuas - Westlite (TW)"],
               ],
             },
           ],
