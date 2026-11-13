@@ -36366,6 +36366,14 @@ Please change the parent <Route path="${D}"> to <Route path="${D === "/" ? "*" :
           : r === "tuas_westlite" || r === "tw" ? "TW"
           : "";
       }
+      function kgBaseLocationFullName(t) {
+        const r = String(t || "").trim().toLowerCase();
+        return r === "kranji" || r === "k" ? "Kranji"
+          : r === "mandai" || r === "mandai_westlite" || r === "mw" ? "Mandai - Westlite"
+          : r === "tuas" || r === "tuas_kg" || r === "tkg" ? "Tuas - KG"
+          : r === "tuas_westlite" || r === "tw" ? "Tuas - Westlite"
+          : "";
+      }
       function kgDriverBaseLocationCode(t) {
         return kgBaseLocationCode(t);
       }
@@ -42041,7 +42049,11 @@ Press OK to assign them to both sites, or Cancel to go back.`)
           await T();
         }
         function he(J, j) {
-          return j.key === "foreman_type"
+          return j.key === "base_location"
+            ? kgBaseLocationFullName(J.base_location) || "—"
+            : j.key === "driver_base_location"
+              ? kgBaseLocationFullName(J.driver_base_location) || "—"
+            : j.key === "foreman_type"
             ? kgForemanType(J) === "boss"
               ? "Boss foreman"
               : "Project foreman"
@@ -43175,10 +43187,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               type: "select",
               options: [
                 ["", "Not set / choose later"],
-                ["kranji", "Kranji (K)"],
-                ["mandai", "Mandai - Westlite (MW)"],
-                ["tuas", "Tuas - KG (TKG)"],
-                ["tuas_westlite", "Tuas - Westlite (TW)"],
+                ["kranji", "Kranji"],
+                ["mandai", "Mandai - Westlite"],
+                ["tuas", "Tuas - KG"],
+                ["tuas_westlite", "Tuas - Westlite"],
               ],
             },
             {
@@ -43221,10 +43233,10 @@ Press OK to assign them to both sites, or Cancel to go back.`)
               required: !0,
               options: [
                 ["", "Choose location"],
-                ["kranji", "Kranji (K)"],
-                ["mandai", "Mandai - Westlite (MW)"],
-                ["tuas", "Tuas - KG (TKG)"],
-                ["tuas_westlite", "Tuas - Westlite (TW)"],
+                ["kranji", "Kranji"],
+                ["mandai", "Mandai - Westlite"],
+                ["tuas", "Tuas - KG"],
+                ["tuas_westlite", "Tuas - Westlite"],
               ],
             },
           ],
